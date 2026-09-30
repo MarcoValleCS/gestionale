@@ -294,6 +294,21 @@ class PagesSmokeTest(FlowTestBase):
 
 
 class PermissionsTest(FlowTestBase):
+    def test_anonimo_rediretto_al_login(self):
+        urls = [
+            reverse("core:home"),
+            reverse("contacts:list"),
+            reverse("catalog:product_list"),
+            reverse("sales:quote_list"),
+            reverse("inventory:stock_list"),
+            reverse("catalog:product_defaults", args=[self.product.pk]),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 302)
+                self.assertIn(reverse("accounts:login"), response.url)
+
     def test_utente_senza_ruolo_non_accede(self):
         from django.contrib.auth.models import Group
 
