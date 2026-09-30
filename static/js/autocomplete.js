@@ -22,7 +22,8 @@
     const input = document.querySelector('[data-target="#' + select.id + '"]');
     if (!input) return;
     const option = select.selectedOptions[0];
-    input.value = option ? option.text : "";
+    /* L'opzione vuota («---------») non è una selezione: il campo resta vuoto */
+    input.value = option && option.value ? option.text : "";
   }
 
   function positionMenu(menu, input) {
@@ -131,6 +132,11 @@
   document.addEventListener("input", function (event) {
     const input = event.target.closest ? event.target.closest("[data-autocomplete]") : null;
     if (!input) return;
+    /* Se si svuota il campo, si azzera anche la selezione nascosta */
+    if (input.value.trim() === "") {
+      const select = selectFor(input);
+      if (select) select.value = "";
+    }
     clearTimeout(input._acTimer);
     input._acTimer = setTimeout(function () { fetchSuggestions(input); }, 180);
   });
