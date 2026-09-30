@@ -11,6 +11,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, RoleRequiredMixin, role_required
 from apps.contacts.models import Contact
 from apps.core.models import Tag
+from apps.core.utils import format_money
 
 from . import importer
 from .forms import CategoryForm, ProductForm, ProductImportForm, ProductQuickForm
@@ -169,6 +170,32 @@ def product_quick_create(request):
 
     errors = {field: [entry["message"] for entry in entries] for field, entries in form.errors.get_json_data().items()}
     return JsonResponse({"errors": errors}, status=400)
+
+
+@role_required(*EDIT_ROLES)
+def product_search(request):
+    """Ricerca articoli per l'autocompletamento nelle righe documento (JSON)."""
+    query = request.GET.get("q", "").strip()
+    context_type = request.GET.get("context", "sale")
+    queryset = Product.objects.filter(active=True).select_related("uom")
+    if query:
+        queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query) | Q(barcode__icontains=query))
+
+    results = []
+    for product in queryset.order_by("name")[:12]:
+        price = product.purchase_price if context_type == "purchase" else product.sale_price
+        extra_parts = [f"{format_money(price)} €"]
+        if product.category_id:
+            extra_parts.append(product.category.name)
+        extra_parts.append(product.uom.code)
+        results.append(
+            {
+                "id": product.pk,
+                "label": f"{product.code} – {product.name}",
+                "extra": " · ".join(extra_parts),
+            }
+        )
+    return JsonResponse({"results": results})
 
 
 @role_required(*EDIT_ROLES)

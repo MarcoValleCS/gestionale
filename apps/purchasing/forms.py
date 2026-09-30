@@ -3,7 +3,7 @@ from django import forms
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
 from apps.core.forms import BaseBootstrapModelForm, BootstrapFormMixin
-from apps.sales.forms import LineFormMixin
+from apps.sales.forms import LineFormMixin, PurchaseSupplierFormMixin
 
 from .models import PriceListItem, PurchaseOrder, PurchaseOrderLine, SupplierPriceList
 
@@ -41,15 +41,14 @@ class PriceListAdjustForm(BootstrapFormMixin, forms.Form):
     )
 
 
-class PurchaseOrderForm(BaseBootstrapModelForm):
+class PurchaseOrderForm(PurchaseSupplierFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = PurchaseOrder
         fields = ["supplier", "date", "expected_date", "payment_term", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier"].queryset = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
-        self.fields["supplier"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
+        self.apply_supplier_queryset()
 
 
 class PurchaseOrderLineForm(LineFormMixin, BaseBootstrapModelForm):

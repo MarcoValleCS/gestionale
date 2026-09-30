@@ -216,3 +216,35 @@ class QuickCreateTest(TestCase):
         self.assertContains(response, "quick-contact-modal")
         self.assertContains(response, "quick-product-modal")
         self.assertContains(response, "data-quick-product")
+        self.assertContains(response, "data-autocomplete=")
+        self.assertContains(response, "autocomplete-wrap")
+        self.assertContains(response, 'name="tax_code"')
+
+    def test_ricerca_articoli(self):
+        product = Product.objects.create(
+            name="Bullone M10 zincato",
+            code="ARTM10",
+            uom=self.uom,
+            sale_price="0.50",
+            sale_vat=self.vat,
+            purchase_price="0.25",
+            purchase_vat=self.vat,
+            barcode="8012345678901",
+        )
+
+        by_name = self.client.get(reverse("catalog:search"), {"q": "bullone"})
+        self.assertEqual(by_name.status_code, 200)
+        results = by_name.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["id"], product.pk)
+        self.assertIn("ARTM10", results[0]["label"])
+        self.assertIn("0,50 €", results[0]["extra"])
+
+        by_barcode = self.client.get(reverse("catalog:search"), {"q": "8012345678901"})
+        self.assertEqual(by_barcode.json()["results"][0]["id"], product.pk)
+
+        purchase_context = self.client.get(reverse("catalog:search"), {"q": "bullone", "context": "purchase"})
+        self.assertIn("0,25 €", purchase_context.json()["results"][0]["extra"])
+
+        no_results = self.client.get(reverse("catalog:search"), {"q": "inesistente"})
+        self.assertEqual(no_results.json()["results"], [])

@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
+from .utils import format_quantity
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField("Creato il", auto_now_add=True)
@@ -49,7 +51,7 @@ class VatRate(models.Model):
 
     def __str__(self):
         if self.rate:
-            return f"{self.rate}% – {self.name}"
+            return f"{format_quantity(self.rate)}% – {self.name}"
         return f"{self.name}"
 
     def clean(self):

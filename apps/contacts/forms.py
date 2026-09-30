@@ -44,9 +44,10 @@ class ContactQuickForm(BaseBootstrapModelForm):
 
     class Meta:
         model = Contact
-        fields = ["name", "vat_number", "email", "phone", "city", "address"]
+        fields = ["name", "tax_code", "vat_number", "email", "phone", "city", "address"]
         labels = {
             "name": "Ragione sociale / Nome",
+            "tax_code": "Codice fiscale",
             "vat_number": "Partita IVA",
             "email": "Email",
             "phone": "Telefono",

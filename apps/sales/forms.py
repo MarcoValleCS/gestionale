@@ -16,6 +16,16 @@ class CustomerChoiceFormMixin:
     def apply_customer_queryset(self):
         self.fields["customer"].queryset = Contact.objects.filter(is_customer=True, active=True).order_by("name")
         self.fields["customer"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
+        self.fields["customer"].widget.attrs["class"] = "d-none"
+        self.fields["customer"].widget.attrs["data-autocomplete-target"] = "1"
+
+
+class PurchaseSupplierFormMixin:
+    def apply_supplier_queryset(self):
+        self.fields["supplier"].queryset = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
+        self.fields["supplier"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
+        self.fields["supplier"].widget.attrs["class"] = "d-none"
+        self.fields["supplier"].widget.attrs["data-autocomplete-target"] = "1"
 
 
 class LineFormMixin:
@@ -27,6 +37,8 @@ class LineFormMixin:
         self.fields["product"].label_from_instance = lambda obj: f"{obj.code} – {obj.name}"
         self.fields["product"].widget.attrs["data-defaults-url"] = reverse("catalog:product_defaults", args=[0])
         self.fields["product"].widget.attrs["data-context"] = self.defaults_context
+        self.fields["product"].widget.attrs["class"] = "d-none"
+        self.fields["product"].widget.attrs["data-autocomplete-target"] = "1"
         self.fields["uom"].queryset = active_units()
         self.fields["vat_rate"].queryset = active_vat_rates()
         self.fields["description"].required = False

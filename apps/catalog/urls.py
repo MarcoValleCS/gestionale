@@ -16,4 +16,5 @@ urlpatterns = [
     path("<int:pk>/modifica/", views.ProductUpdateView.as_view(), name="product_update"),
     path("<int:pk>/default/", views.product_defaults, name="product_defaults"),
     path("crea-rapido/", views.product_quick_create, name="quick_create"),
+    path("cerca/", views.product_search, name="search"),
 ]

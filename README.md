@@ -32,9 +32,12 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   valore del magazzino, articoli sotto scorta e ultimi documenti.
 - **Utenti e ruoli** – Amministratore, Vendite, Acquisti, Magazzino, con pagine e azioni
   filtrate per ruolo. Utenti gestibili dall'interfaccia.
-- **Creazione rapida** – dal preventivo, dall'ordine cliente e dall'ordine fornitore puoi
-  creare con un clic («+» accanto al campo) un cliente, un fornitore o un articolo che
-  non è ancora in anagrafica: viene creato e inserito subito nel documento.
+- **Creazione rapida e ricerca a digitazione** – nei documenti clienti, fornitori e articoli
+  si cercano **scrivendo** (per nome, codice, P.IVA, codice fiscale, città; per gli articoli
+  anche per codice a barre): bastano poche lettere e compare l'elenco dei risultati con i
+  dati principali. Se l'elemento non esiste, dalla stessa tendina scegli **«Crea «...»»**
+  (o il pulsante «+»): viene creato al volo, con anche il **codice fiscale**, e inserito
+  subito nel documento.
 
 Non sono ancora inclusi: fatturazione elettronica (SDI), DDT, fatture di vendita/acquisto.
 Sono i candidati naturali per le prossime fasi.

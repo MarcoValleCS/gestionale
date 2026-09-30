@@ -1,17 +1,24 @@
 <div class="col-md-{{ col|default:6 }}">
   <div class="mb-3">
-    <label class="form-label" for="{{ field.id_for_label }}">
+    <label class="form-label" for="{{ field.id_for_label }}_search">
       {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
     </label>
-    <div class="input-group">
+    <div class="autocomplete-wrap">
+      <div class="input-group">
+        <input type="text" class="form-control autocomplete-input" id="{{ field.id_for_label }}_search"
+               autocomplete="off" placeholder="Digita per cercare…"
+               data-autocomplete="{% url 'contacts:search' %}"
+               data-target="#{{ field.id_for_label }}"
+               data-kind="{{ kind|default:'customer' }}">
+        <button class="btn btn-outline-primary" type="button"
+                data-quick-contact data-kind="{{ kind|default:'customer' }}" data-target="#{{ field.id_for_label }}"
+                title="{{ title|default:'Crea nuovo contatto' }}">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
       {{ field }}
-      <button class="btn btn-outline-primary" type="button"
-              data-quick-contact data-kind="{{ kind|default:'customer' }}" data-target="#{{ field.id_for_label }}"
-              title="{{ title|default:'Crea nuovo contatto' }}">
-        <i class="bi bi-plus-lg"></i>
-      </button>
     </div>
-    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+    <div class="form-text">Scrivi per cercare per nome, codice, P.IVA, codice fiscale o città. Se non esiste, crealo con «+».</div>
     {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
   </div>
 </div>

@@ -1,11 +1,17 @@
 <tr class="line-row">
   <td class="d-none">{{ lineform.id }}</td>
   <td>
-    <div class="input-group input-group-sm flex-nowrap">
+    <div class="autocomplete-wrap">
+      <div class="input-group input-group-sm flex-nowrap">
+        <input type="text" class="form-control autocomplete-input" autocomplete="off" placeholder="Cerca articolo…"
+               data-autocomplete="{% url 'catalog:search' %}"
+               data-target="#{{ lineform.product.id_for_label }}"
+               data-kind="product">
+        <button class="btn btn-outline-primary" type="button" data-quick-product title="Crea nuovo articolo">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
       {{ lineform.product }}
-      <button class="btn btn-outline-primary" type="button" data-quick-product title="Crea nuovo articolo">
-        <i class="bi bi-plus-lg"></i>
-      </button>
     </div>
   </td>
   <td>{{ lineform.description }}</td>

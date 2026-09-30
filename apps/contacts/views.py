@@ -137,3 +137,40 @@ def contact_quick_create(request):
 
     errors = {field: [entry["message"] for entry in entries] for field, entries in form.errors.get_json_data().items()}
     return JsonResponse({"errors": errors}, status=400)
+
+
+def contact_search(request):
+    """Ricerca clienti/fornitori per l'autocompletamento nei documenti (JSON)."""
+    query = request.GET.get("q", "").strip()
+    kind = request.GET.get("kind", "customer")
+    queryset = Contact.objects.filter(active=True)
+    if kind == "supplier":
+        queryset = queryset.filter(is_supplier=True)
+    else:
+        queryset = queryset.filter(is_customer=True)
+    if query:
+        queryset = queryset.filter(
+            Q(name__icontains=query)
+            | Q(code__icontains=query)
+            | Q(vat_number__icontains=query)
+            | Q(tax_code__icontains=query)
+            | Q(city__icontains=query)
+        )
+
+    results = []
+    for contact in queryset.order_by("name")[:10]:
+        extra_parts = []
+        if contact.vat_number:
+            extra_parts.append(f"P.IVA {contact.vat_number}")
+        elif contact.tax_code:
+            extra_parts.append(f"C.F. {contact.tax_code}")
+        if contact.city:
+            extra_parts.append(contact.city)
+        results.append(
+            {
+                "id": contact.pk,
+                "label": f"{contact.name} ({contact.code})",
+                "extra": " · ".join(extra_parts),
+            }
+        )
+    return JsonResponse({"results": results})
