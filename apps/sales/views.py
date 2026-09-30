@@ -25,8 +25,44 @@ ORDER_DELIVER_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
 
 
 # ------------------------------------------------------------------ helper
+def fdate(value):
+    return value.strftime("%d/%m/%Y") if value else ""
+
+
+def build_print_context(
+    document,
+    *,
+    title,
+    counterparty,
+    meta_rows,
+    back_url,
+    counterparty_label="Destinatario",
+    notes="",
+    show_signature=False,
+    signature_label="",
+):
+    """Contesto per il documento stampabile (templates/print/document.html)."""
+    return {
+        "document": document,
+        "document_title": title,
+        "counterparty": counterparty,
+        "counterparty_label": counterparty_label,
+        "meta_rows": meta_rows,
+        "back_url": back_url,
+        "lines": document.lines.select_related("product", "uom", "vat_rate"),
+        "vat_rows": document.vat_breakdown(),
+        "notes": notes,
+        "show_signature": show_signature,
+        "signature_label": signature_label,
+    }
+
+
 def with_vat_rates(context):
+    from apps.core.forms import active_units, active_vat_rates
+
     context["vat_rates_json"] = {str(v.pk): str(v.rate) for v in VatRate.objects.filter(is_active=True)}
+    context["quick_uoms"] = active_units()
+    context["quick_vats"] = active_vat_rates()
     return context
 
 
@@ -160,15 +196,30 @@ class QuoteUpdateView(RoleRequiredMixin, UpdateView):
 class QuotePrintView(RoleRequiredMixin, DetailView):
     allowed_roles = QUOTE_ROLES
     model = Quote
-    template_name = "sales/quote_print.html"
+    template_name = "print/document.html"
     context_object_name = "quote"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["document"] = self.object
-        context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
-        context["vat_rows"] = self.object.vat_breakdown()
-        context["back_url"] = reverse("sales:quote_detail", args=[self.object.pk])
+        doc = self.object
+        context.update(
+            build_print_context(
+                doc,
+                title="Preventivo",
+                counterparty=doc.customer,
+                counterparty_label="Spett.le cliente",
+                meta_rows=[
+                    ("Data", fdate(doc.date)),
+                    ("Valido fino al", fdate(doc.valid_until)),
+                    ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
+                    ("Vostro riferimento", doc.reference),
+                ],
+                back_url=reverse("sales:quote_detail", args=[doc.pk]),
+                notes=doc.terms_text,
+                show_signature=True,
+                signature_label="Per accettazione (data e firma)",
+            )
+        )
         return context
 
 
@@ -365,15 +416,30 @@ class SalesOrderUpdateView(RoleRequiredMixin, UpdateView):
 class SalesOrderPrintView(RoleRequiredMixin, DetailView):
     allowed_roles = ORDER_VIEW_ROLES
     model = SalesOrder
-    template_name = "sales/order_print.html"
+    template_name = "print/document.html"
     context_object_name = "order"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["document"] = self.object
-        context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
-        context["vat_rows"] = self.object.vat_breakdown()
-        context["back_url"] = reverse("sales:order_detail", args=[self.object.pk])
+        doc = self.object
+        context.update(
+            build_print_context(
+                doc,
+                title="Conferma d'ordine",
+                counterparty=doc.customer,
+                counterparty_label="Spett.le cliente",
+                meta_rows=[
+                    ("Data", fdate(doc.date)),
+                    ("Consegna prevista", fdate(doc.expected_date)),
+                    ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
+                    ("Vostro riferimento", doc.reference),
+                ],
+                back_url=reverse("sales:order_detail", args=[doc.pk]),
+                notes=doc.terms_text,
+                show_signature=True,
+                signature_label="Conferma d'ordine (data e firma)",
+            )
+        )
         return context
 
 

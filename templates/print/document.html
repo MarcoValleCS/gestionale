@@ -1,0 +1,273 @@
+{% load core_extras %}<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>{{ document_title }} {{ document.number }} · {{ company.name|default:"Gestionale" }}</title>
+  <style>
+    :root { --doc-color: {{ company.document_color|default:"#1d4ed8" }}; --doc-soft: {{ company.document_color|default:"#1d4ed8" }}1a; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1f2937;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 12px;
+      background: #eef1f5;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      border-bottom: 1px solid #e2e6ee;
+      padding: 10px 18px;
+    }
+    .toolbar a, .toolbar button {
+      font: inherit;
+      text-decoration: none;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid #d3d9e4;
+      background: #fff;
+      color: #1f2937;
+      cursor: pointer;
+    }
+    .toolbar button.primary {
+      background: var(--doc-color);
+      border-color: var(--doc-color);
+      color: #fff;
+      font-weight: 600;
+    }
+    .sheet {
+      position: relative;
+      width: 210mm;
+      min-height: 296mm;
+      margin: 18px auto 40px;
+      background: #fff;
+      padding: 0 14mm 26mm;
+      box-shadow: 0 4px 20px rgba(16, 24, 40, 0.14);
+    }
+    .accent-bar { height: 7px; background: var(--doc-color); margin: 0 -14mm 9mm; }
+    /* ------------------------------------------------------- intestazione */
+    .header { display: flex; justify-content: space-between; gap: 10mm; align-items: flex-start; }
+    .company-logo { max-height: 22mm; max-width: 62mm; object-fit: contain; margin-bottom: 3mm; }
+    .company-name { font-size: 19px; font-weight: 700; color: #111827; margin: 0 0 2mm; }
+    .company-block { font-size: 11px; color: #4b5563; line-height: 1.55; }
+    .doc-badge { text-align: right; min-width: 62mm; }
+    .doc-title {
+      display: inline-block;
+      border: 2px solid var(--doc-color);
+      color: var(--doc-color);
+      border-radius: 10px;
+      padding: 3mm 6mm;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .doc-number { font-size: 15px; font-weight: 700; color: #111827; margin-top: 2.5mm; }
+    .doc-date { color: #6b7280; font-size: 11px; }
+    /* ---------------------------------------------------------- soggetti */
+    .parties { display: flex; justify-content: space-between; gap: 8mm; margin: 8mm 0 6mm; }
+    .party-box {
+      flex: 1;
+      border: 1px solid #e5e7eb;
+      border-left: 3px solid var(--doc-color);
+      border-radius: 6px;
+      background: #fafbfd;
+      padding: 4mm 5mm;
+    }
+    .party-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.09em; color: #6b7280; margin-bottom: 1.5mm; }
+    .party-name { font-size: 13px; font-weight: 700; color: #111827; }
+    .party-block { line-height: 1.55; color: #374151; }
+    .meta-table { border-collapse: collapse; min-width: 62mm; }
+    .meta-table td { padding: 1mm 0 1mm 4mm; vertical-align: top; }
+    .meta-table td.label { color: #6b7280; white-space: nowrap; }
+    .meta-table td.value { text-align: right; font-weight: 600; color: #111827; }
+    /* -------------------------------------------------------------- righe */
+    table.lines { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+    table.lines thead th {
+      background: var(--doc-soft);
+      color: #111827;
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2.6mm 2.2mm;
+      border-bottom: 2px solid var(--doc-color);
+    }
+    table.lines tbody td { padding: 2.4mm 2.2mm; border-bottom: 1px solid #eef1f5; vertical-align: top; }
+    table.lines tbody tr:nth-child(even) td { background: #fafbfd; }
+    .num { text-align: right; white-space: nowrap; }
+    .item-code { color: #6b7280; font-size: 10.5px; }
+    .item-desc { font-weight: 600; color: #111827; }
+    /* ------------------------------------------------------------ totali */
+    .after { display: flex; justify-content: space-between; gap: 10mm; margin-top: 7mm; align-items: flex-start; }
+    .notes-block { flex: 1; font-size: 10.5px; color: #4b5563; line-height: 1.6; white-space: pre-line; }
+    .notes-title { text-transform: uppercase; letter-spacing: 0.08em; font-size: 9.5px; color: #6b7280; margin-bottom: 1.5mm; }
+    .totals { width: 74mm; border-collapse: collapse; }
+    .totals td { padding: 2mm 0; }
+    .totals td.label { color: #6b7280; }
+    .totals td.value { text-align: right; font-weight: 600; white-space: nowrap; }
+    .totals tr.grand td { padding: 3mm 4mm; font-size: 14px; font-weight: 700; }
+    .totals tr.grand td.label { color: #fff; background: var(--doc-color); border-radius: 8px 0 0 8px; }
+    .totals tr.grand td.value { color: #fff; background: var(--doc-color); border-radius: 0 8px 8px 0; }
+    /* ----------------------------------------------------------- firma */
+    .signature { width: 100%; border-collapse: collapse; margin-top: 12mm; }
+    .signature td { width: 50%; padding-top: 16mm; border-top: 0; font-size: 10.5px; color: #4b5563; }
+    .signature .line { border-bottom: 1px solid #9ca3af; height: 12mm; }
+    /* --------------------------------------------------------- footer */
+    .sheet-footer {
+      position: absolute;
+      bottom: 9mm;
+      left: 14mm;
+      right: 14mm;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 2.5mm;
+      font-size: 9.5px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      gap: 6mm;
+    }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none !important; }
+      .sheet { width: auto; min-height: 0; margin: 0; padding: 0 0 24mm; box-shadow: none; }
+      .accent-bar { margin: 0 0 8mm; }
+      .sheet-footer { position: fixed; bottom: 0; left: 0; right: 0; padding-top: 2mm; }
+      @page { size: A4; margin: 12mm 14mm 14mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <a href="{{ back_url }}">&#8592; Torna indietro</a>
+    <button class="primary" onclick="window.print()">Stampa / Salva PDF</button>
+  </div>
+
+  <div class="sheet">
+    <div class="accent-bar"></div>
+
+    <header class="header">
+      <div>
+        {% if company.logo %}
+        <img class="company-logo" src="{{ company.logo.url }}" alt="{{ company.name }}">
+        {% endif %}
+        <div class="company-name">{{ company.name }}</div>
+        <div class="company-block">
+          {% if company.address %}{{ company.address }}<br>{% endif %}
+          {% if company.zip_code or company.city %}{{ company.zip_code }} {{ company.city }}{% if company.province %} ({{ company.province }}){% endif %}<br>{% endif %}
+          {% if company.vat_number %}P.IVA {{ company.vat_number }}{% if company.tax_code %} · C.F. {{ company.tax_code }}{% endif %}<br>{% endif %}
+          {% if company.phone %}Tel. {{ company.phone }}{% if company.email %} · {{ company.email }}{% endif %}{% elif company.email %}{{ company.email }}{% endif %}
+        </div>
+      </div>
+      <div class="doc-badge">
+        <div class="doc-title">{{ document_title }}</div>
+        <div class="doc-number">{{ document.number }}</div>
+        <div class="doc-date">del {{ document.date|date:"d/m/Y" }}</div>
+      </div>
+    </header>
+
+    <section class="parties">
+      <div class="party-box">
+        <div class="party-label">{{ counterparty_label|default:"Destinatario" }}</div>
+        <div class="party-name">{{ counterparty.name }}</div>
+        <div class="party-block">
+          {% if counterparty.address %}{{ counterparty.address }}<br>{% endif %}
+          {% if counterparty.zip_code or counterparty.city %}{{ counterparty.zip_code }} {{ counterparty.city }}{% if counterparty.province %} ({{ counterparty.province }}){% endif %}<br>{% endif %}
+          {% if counterparty.vat_number %}P.IVA {{ counterparty.vat_number }}<br>{% endif %}
+          {% if counterparty.reference_contact %}{{ counterparty.reference_contact }}{% endif %}
+        </div>
+      </div>
+      <table class="meta-table">
+        {% for label, value in meta_rows %}
+        <tr><td class="label">{{ label }}</td><td class="value">{{ value|default:"—" }}</td></tr>
+        {% endfor %}
+      </table>
+    </section>
+
+    <table class="lines">
+      <thead>
+        <tr>
+          <th style="width:9mm">#</th>
+          <th>Articolo / Descrizione</th>
+          <th class="num" style="width:16mm">Q.tà</th>
+          <th style="width:12mm">U.d.M.</th>
+          <th class="num" style="width:20mm">Prezzo</th>
+          <th class="num" style="width:14mm">Sc. %</th>
+          <th class="num" style="width:14mm">IVA</th>
+          <th class="num" style="width:22mm">Importo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>
+            {% if line.product %}<span class="item-code">{{ line.product.code }}</span><br>{% endif %}
+            <span class="item-desc">{{ line.description|default:"—" }}</span>
+          </td>
+          <td class="num">{{ line.qty|qty }}</td>
+          <td>{{ line.uom.code|default:"—" }}</td>
+          <td class="num">{{ line.unit_price|money }} €</td>
+          <td class="num">{{ line.discount_pct|qty }}%</td>
+          <td class="num">{{ line.vat_rate.rate|qty }}%</td>
+          <td class="num">{{ line.line_subtotal|money }} €</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" style="text-align:center; color:#9ca3af; padding:6mm">Nessuna riga</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <section class="after">
+      <div class="notes-block">
+        {% if notes %}
+        <div class="notes-title">Condizioni e note</div>
+        {{ notes }}
+        {% endif %}
+      </div>
+      <table class="totals">
+        <tr><td class="label">Imponibile</td><td class="value">{{ document.subtotal|money }} €</td></tr>
+        {% for row in vat_rows %}
+        <tr>
+          <td class="label">IVA {{ row.rate.rate|qty }}% su {{ row.base|money }} €</td>
+          <td class="value">{{ row.vat|money }} €</td>
+        </tr>
+        {% endfor %}
+        <tr class="grand">
+          <td class="label">Totale</td>
+          <td class="value">{{ document.grand_total|money }} €</td>
+        </tr>
+      </table>
+    </section>
+
+    {% if show_signature %}
+    <table class="signature">
+      <tr>
+        <td style="padding-right: 8mm">
+          <div class="line"></div>
+          Luogo e data
+        </td>
+        <td style="padding-left: 8mm">
+          <div class="line"></div>
+          {{ signature_label|default:"Timbro e firma" }}
+        </td>
+      </tr>
+    </table>
+    {% endif %}
+
+    <footer class="sheet-footer">
+      <div>
+        {{ company.name }}{% if company.vat_number %} · P.IVA {{ company.vat_number }}{% endif %}
+        {% if company.website %} · {{ company.website }}{% endif %}
+      </div>
+      <div>{% if company.iban %}IBAN {{ company.iban }}{% endif %}</div>
+    </footer>
+  </div>
+</body>
+</html>

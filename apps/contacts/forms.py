@@ -37,3 +37,19 @@ class ContactForm(BaseBootstrapModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["tags"].help_text = "Tieni premuto Ctrl per selezionare più etichette."
+
+
+class ContactQuickForm(BaseBootstrapModelForm):
+    """Form ridotto per creare un contatto dal volo mentre si compila un documento."""
+
+    class Meta:
+        model = Contact
+        fields = ["name", "vat_number", "email", "phone", "city", "address"]
+        labels = {
+            "name": "Ragione sociale / Nome",
+            "vat_number": "Partita IVA",
+            "email": "Email",
+            "phone": "Telefono",
+            "city": "Città",
+            "address": "Indirizzo",
+        }

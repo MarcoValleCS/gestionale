@@ -180,6 +180,98 @@ body {
   margin-bottom: 0.5rem;
 }
 
+/* ------------------------------------------------------- rifiniture UI */
+.card {
+  border-radius: 12px;
+}
+
+.card-header {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.btn {
+  border-radius: 8px;
+}
+
+.btn-sm {
+  border-radius: 7px;
+}
+
+.form-control,
+.form-select {
+  border-radius: 8px;
+}
+
+.badge {
+  border-radius: 6px;
+}
+
+.list-group-item {
+  border-color: #eef0f4;
+}
+
+.table thead th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #667085;
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.kpi-card {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 8px 22px rgba(16, 24, 40, 0.09);
+  transform: translateY(-1px);
+}
+
+.kpi-card .fs-3,
+.kpi-card .fs-4 {
+  letter-spacing: -0.01em;
+}
+
+.kpi-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.chart-box {
+  height: 300px;
+  position: relative;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sidebar-bg);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.modal-content {
+  border-radius: 14px;
+}
+
+.dropdown-menu {
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+}
+
 /* ------------------------------------------------------------- Stampa */
 .print-sheet {
   background: #fff;

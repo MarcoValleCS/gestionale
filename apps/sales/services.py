@@ -120,6 +120,12 @@ def confirm_sales_order(order, user=None):
 
     created = []
     with transaction.atomic():
+        # Fissa il costo unitario per il calcolo della marginalità
+        for line in lines:
+            if line.product_id and line.unit_cost is None:
+                line.unit_cost = line.product.purchase_unit_price(line.product.main_supplier)
+                line.save(update_fields=["unit_cost"])
+
         for group in by_supplier.values():
             supplier = group["supplier"]
             po = PurchaseOrder.objects.create(
@@ -173,8 +179,12 @@ def deliver_sales_order(order, user=None, warehouse=None):
             except ValidationError as exc:
                 errors.append(str(exc))
                 continue
+        update_fields = ["qty_delivered"]
+        if line.product_id and line.unit_cost is None:
+            line.unit_cost = line.product.purchase_unit_price(line.product.main_supplier)
+            update_fields.append("unit_cost")
         line.qty_delivered = line.qty
-        line.save(update_fields=["qty_delivered"])
+        line.save(update_fields=update_fields)
 
     if order.all_delivered:
         order.status = SalesOrder.STATUS_DELIVERED

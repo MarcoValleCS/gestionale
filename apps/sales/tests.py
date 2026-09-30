@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.catalog.models import Category, Product
 from apps.contacts.models import Contact
@@ -13,7 +14,7 @@ from apps.inventory.services import register_movement
 from apps.purchasing.models import PurchaseOrder, SupplierPriceList, PriceListItem
 from apps.purchasing.services import apply_pricelist_adjustment
 
-from . import services
+from . import analytics, services
 from .models import Quote, SalesOrder
 
 User = get_user_model()
@@ -168,6 +169,77 @@ class FullFlowTest(FlowTestBase):
         self.assertEqual(new_quote.lines.count(), 1)
 
 
+class AnalyticsTest(FlowTestBase):
+    def _delivered_order(self, qty="10", price="10.00", unit_cost="4.00"):
+        order = SalesOrder.objects.create(
+            customer=self.customer,
+            status=SalesOrder.STATUS_DELIVERED,
+            delivered_at=timezone.now(),
+        )
+        order.lines.create(
+            product=self.product,
+            description=self.product.name,
+            qty=Decimal(qty),
+            uom=self.uom,
+            unit_price=Decimal(price),
+            vat_rate=self.vat22,
+            qty_delivered=Decimal(qty),
+            unit_cost=Decimal(unit_cost) if unit_cost is not None else None,
+        )
+        order.recalculate()
+        return order
+
+    def test_fatturato_e_margine(self):
+        self._delivered_order()
+
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        self.assertEqual(summary["revenue"], Decimal("100.00"))
+        self.assertEqual(summary["cost"], Decimal("40.00"))
+        self.assertEqual(summary["margin"], Decimal("60.00"))
+        self.assertEqual(summary["margin_pct"], Decimal("60.00"))
+        self.assertEqual(summary["orders"], 1)
+
+        by_product = analytics.by_product(analytics.PERIOD_YEAR)
+        self.assertEqual(len(by_product), 1)
+        self.assertEqual(by_product[0]["label"], "Bullone M8")
+        self.assertEqual(by_product[0]["margin"], Decimal("60.00"))
+
+        by_supplier = analytics.by_supplier(analytics.PERIOD_YEAR)
+        self.assertEqual(by_supplier[0]["label"], "Fornitore Test S.p.A.")
+        self.assertEqual(by_supplier[0]["margin"], Decimal("60.00"))
+
+    def test_margine_usa_prezzo_acquisto_se_costo_non_fissato(self):
+        self._delivered_order(unit_cost=None)
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        # prezzo di acquisto dell'articolo = 5.00 → costo 50
+        self.assertEqual(summary["cost"], Decimal("50.00"))
+        self.assertEqual(summary["margin"], Decimal("50.00"))
+
+    def test_serie_mensile(self):
+        self._delivered_order()
+        series = analytics.monthly_series(12)
+        self.assertEqual(len(series["labels"]), 12)
+        self.assertEqual(series["revenue"][-1], 100.0)
+        self.assertEqual(series["margin"][-1], 60.0)
+        self.assertEqual(series["revenue"][0], 0.0)
+
+    def test_ordini_non_consegnati_esclusi(self):
+        order = SalesOrder.objects.create(customer=self.customer, status=SalesOrder.STATUS_CONFIRMED)
+        order.lines.create(product=self.product, description="x", qty=Decimal("5"), uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22)
+        order.recalculate()
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        self.assertEqual(summary["revenue"], Decimal("0"))
+
+    def test_dashboard_con_statistiche(self):
+        self._delivered_order()
+        self.login()
+        for period in ("anno", "mese", "12m"):
+            with self.subTest(period=period):
+                response = self.client.get(reverse("core:home") + f"?periodo={period}")
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Marginalità per articolo")
+
+
 class VatAndTotalsTest(FlowTestBase):
     def test_totali_con_iva_mista_e_sconto(self):
         quote = Quote.objects.create(customer=self.customer)
@@ -246,6 +318,8 @@ class PagesSmokeTest(FlowTestBase):
             reverse("contacts:update", args=[self.customer.pk]),
             reverse("catalog:product_list"),
             reverse("catalog:product_create"),
+            reverse("catalog:product_import"),
+            reverse("catalog:product_import_template"),
             reverse("catalog:product_detail", args=[self.product.pk]),
             reverse("catalog:product_update", args=[self.product.pk]),
             reverse("catalog:category_list"),
@@ -266,6 +340,7 @@ class PagesSmokeTest(FlowTestBase):
             reverse("purchasing:po_create"),
             reverse("purchasing:po_detail", args=[po.pk]),
             reverse("purchasing:po_update", args=[po.pk]),
+            reverse("purchasing:po_print", args=[po.pk]),
             reverse("purchasing:po_receive", args=[po.pk]),
             reverse("purchasing:pricelist_list"),
             reverse("purchasing:pricelist_create"),

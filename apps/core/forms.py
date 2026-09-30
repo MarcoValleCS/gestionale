@@ -87,5 +87,12 @@ class CompanySettingsForm(BaseBootstrapModelForm):
             "phone",
             "website",
             "iban",
+            "logo",
+            "document_color",
             "quote_footer",
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["document_color"].widget.attrs["type"] = "color"
+        self.fields["document_color"].widget.attrs["class"] = "form-control form-control-color"

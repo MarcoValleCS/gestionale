@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
@@ -11,7 +12,7 @@
         <div class="card-header">Dati preventivo</div>
         <div class="card-body">
           <div class="row">
-            {% include "partials/field.html" with field=form.customer col=6 %}
+            {% include "partials/field_quick.html" with field=form.customer col=6 kind="customer" title="Crea nuovo cliente" %}
             {% include "partials/field.html" with field=form.date col=3 %}
             {% include "partials/field.html" with field=form.valid_until col=3 %}
             {% include "partials/field.html" with field=form.payment_term col=4 %}
@@ -89,8 +90,10 @@
   </div>
   <template id="empty-line-template">{% include "sales/_line_row.html" with lineform=line_formset.empty_form %}</template>
 </form>
+{% include "sales/_quick_modals.html" %}
 {% endblock %}
 
 {% block extra_js %}
 {% include "sales/_lines_script.html" %}
+<script src="{% static 'js/quick_create.js' %}"></script>
 {% endblock %}

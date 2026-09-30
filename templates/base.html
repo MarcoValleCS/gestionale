@@ -85,9 +85,9 @@
           </div>
         </div>
         <div class="dropdown">
-          <button class="btn btn-light btn-sm dropdown-toggle" data-bs-toggle="dropdown" type="button">
-            <i class="bi bi-person-circle"></i>
-            {{ user.get_full_name|default:user.username }}
+          <button class="btn btn-light btn-sm dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown" type="button">
+            <span class="user-avatar">{{ user.initials }}</span>
+            <span class="d-none d-md-inline">{{ user.get_full_name|default:user.username }}</span>
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}"><i class="bi bi-key me-2"></i>Cambia password</a></li>

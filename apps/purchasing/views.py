@@ -10,7 +10,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
 from apps.contacts.models import Contact
 from apps.core.models import VatRate
-from apps.sales.views import save_document_lines
+from apps.sales.views import build_print_context, fdate, save_document_lines
 
 from . import services
 from .forms import (
@@ -31,7 +31,11 @@ PO_RECEIVE_ROLES = (ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUSE)
 
 
 def with_vat_rates(context):
+    from apps.core.forms import active_units, active_vat_rates
+
     context["vat_rates_json"] = {str(v.pk): str(v.rate) for v in VatRate.objects.filter(is_active=True)}
+    context["quick_uoms"] = active_units()
+    context["quick_vats"] = active_vat_rates()
     return context
 
 
@@ -322,6 +326,35 @@ class PurchaseOrderUpdateView(RoleRequiredMixin, UpdateView):
             messages.success(request, f"Ordine fornitore «{self.object.number}» aggiornato.")
             return redirect(self.get_success_url())
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
+
+
+class PurchaseOrderPrintView(RoleRequiredMixin, DetailView):
+    allowed_roles = PO_VIEW_ROLES
+    model = PurchaseOrder
+    template_name = "print/document.html"
+    context_object_name = "order"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        doc = self.object
+        context.update(
+            build_print_context(
+                doc,
+                title="Ordine fornitore",
+                counterparty=doc.supplier,
+                counterparty_label="Spett.le fornitore",
+                meta_rows=[
+                    ("Data", fdate(doc.date)),
+                    ("Consegna prevista", fdate(doc.expected_date)),
+                    ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
+                    ("Nostro riferimento", doc.source_sales_order.number if doc.source_sales_order else doc.number),
+                ],
+                back_url=reverse("purchasing:po_detail", args=[doc.pk]),
+                notes=doc.notes,
+                show_signature=False,
+            )
+        )
+        return context
 
 
 @role_required(*PO_EDIT_ROLES)

@@ -19,6 +19,7 @@ urlpatterns = [
     path("ordini/nuovo/", views.PurchaseOrderCreateView.as_view(), name="po_create"),
     path("ordini/<int:pk>/", views.PurchaseOrderDetailView.as_view(), name="po_detail"),
     path("ordini/<int:pk>/modifica/", views.PurchaseOrderUpdateView.as_view(), name="po_update"),
+    path("ordini/<int:pk>/stampa/", views.PurchaseOrderPrintView.as_view(), name="po_print"),
     path("ordini/<int:pk>/invia/", views.po_send, name="po_send"),
     path("ordini/<int:pk>/conferma/", views.po_confirm, name="po_confirm"),
     path("ordini/<int:pk>/ricevi/", views.po_receive, name="po_receive"),

@@ -234,6 +234,14 @@ class SalesOrder(TotalsDocument, TimeStampedModel):
 class SalesOrderLine(DocumentLine):
     order = models.ForeignKey(SalesOrder, on_delete=models.CASCADE, related_name="lines", verbose_name="Ordine")
     qty_delivered = models.DecimalField("Quantità consegnata", max_digits=12, decimal_places=3, default=ZERO)
+    unit_cost = models.DecimalField(
+        "Costo unitario",
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="Costo di acquisto al momento della conferma, usato per la marginalità.",
+    )
 
     @property
     def qty_remaining(self):

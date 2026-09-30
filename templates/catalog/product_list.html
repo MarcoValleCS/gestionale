@@ -51,6 +51,7 @@
         <a class="btn btn-outline-secondary btn-sm" href="{% url 'catalog:category_list' %}"><i class="bi bi-diagram-3"></i> Categorie</a>
         <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
         {% if roles.is_admin or roles.is_sales or roles.is_purchasing %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'catalog:product_import' %}"><i class="bi bi-upload"></i> Importa CSV/Excel</a>
         <a class="btn btn-primary btn-sm" href="{% url 'catalog:product_create' %}"><i class="bi bi-plus-lg"></i> Nuovo articolo</a>
         {% endif %}
       </div>

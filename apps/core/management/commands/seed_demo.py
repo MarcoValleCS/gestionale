@@ -11,8 +11,11 @@ from django.utils import timezone
 from apps.catalog.models import Category, Product
 from apps.contacts.models import Contact
 from apps.core.models import PaymentTerm, Tag, UnitOfMeasure, VatRate
+from apps.inventory.models import StockMovement
+from apps.inventory.services import register_movement
 from apps.purchasing.models import PriceListItem, SupplierPriceList
-from apps.sales.models import Quote, QuoteLine
+from apps.sales import services as sales_services
+from apps.sales.models import Quote, QuoteLine, SalesOrder, SalesOrderLine
 
 
 class Command(BaseCommand):
@@ -132,6 +135,32 @@ class Command(BaseCommand):
             )
             quote.recalculate()
             self.stdout.write(self.style.SUCCESS(f"Creato preventivo di esempio {quote.number}."))
+
+        # Ordine consegnato di esempio: alimenta fatturato e marginalità in dashboard
+        if not SalesOrder.objects.filter(status=SalesOrder.STATUS_DELIVERED).exists():
+            order = SalesOrder.objects.create(
+                customer=customer,
+                payment_term=terms,
+                notes="Ordine di esempio già consegnato.",
+            )
+            SalesOrderLine.objects.create(
+                order=order, position=1, product=bullone, description=bullone.name,
+                qty=Decimal("120"), uom=pz, unit_price=Decimal("0.35"), vat_rate=vat22,
+            )
+            SalesOrderLine.objects.create(
+                order=order, position=2, product=montaggio, description=montaggio.name,
+                qty=Decimal("6"), uom=h, unit_price=Decimal("45.00"), vat_rate=vat22,
+            )
+            order.recalculate()
+            register_movement(
+                product=bullone,
+                delta=Decimal("120"),
+                movement_type=StockMovement.TYPE_LOAD,
+                note="Carico iniziale di esempio",
+            )
+            sales_services.confirm_sales_order(order)
+            sales_services.deliver_sales_order(order)
+            self.stdout.write(self.style.SUCCESS(f"Creato ordine consegnato di esempio {order.number} (visibile in dashboard)."))
 
         self.stdout.write(self.style.SUCCESS("Dati di esempio pronti."))
         self.stdout.write("Suggerimento: apri l'articolo «Bullone M8 zincato» per vedere la scorta minima e poi crea un ordine cliente per provare la generazione automatica dell'ordine fornitore.")

@@ -1,7 +1,7 @@
 """Viste dell'app core: dashboard, impostazioni e tabelle di base."""
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.db.models import DecimalField, F, Sum, Value
+from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Coalesce
 from django.forms import modelformset_factory
 from django.shortcuts import redirect, render
@@ -23,10 +23,16 @@ from .models import CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMea
 
 
 def home(request):
-    """Dashboard con i numeri principali."""
+    """Dashboard: numeri principali, fatturato e marginalità."""
     from apps.catalog.models import Product
     from apps.purchasing.models import PurchaseOrder
+    from apps.sales import analytics
     from apps.sales.models import Quote, SalesOrder
+
+    period = request.GET.get("periodo", analytics.PERIOD_YEAR)
+    valid_periods = {value for value, _label in analytics.PERIOD_CHOICES}
+    if period not in valid_periods:
+        period = analytics.PERIOD_YEAR
 
     stock_sum = Coalesce(
         Sum("stock_levels__quantity"),
@@ -41,6 +47,23 @@ def home(request):
         .order_by("name")
     )
 
+    margin_by_product = analytics.by_product(period)[:10]
+    margin_by_supplier = analytics.by_supplier(period)[:10]
+
+    from apps.inventory.models import StockLevel
+
+    inventory_value = (
+        StockLevel.objects.aggregate(
+            total=Sum(
+                ExpressionWrapper(
+                    F("quantity") * F("product__purchase_price"),
+                    output_field=DecimalField(max_digits=16, decimal_places=4),
+                )
+            )
+        )["total"]
+        or 0
+    )
+
     context = {
         "page_title": "Dashboard",
         "quotes_open": Quote.objects.filter(status__in=["draft", "sent"]).count(),
@@ -51,6 +74,14 @@ def home(request):
         "recent_quotes": Quote.objects.select_related("customer").order_by("-created_at")[:5],
         "recent_orders": SalesOrder.objects.select_related("customer").order_by("-created_at")[:5],
         "recent_pos": PurchaseOrder.objects.select_related("supplier").order_by("-created_at")[:5],
+        # Statistiche
+        "period": period,
+        "period_choices": analytics.PERIOD_CHOICES,
+        "stats": analytics.summary(period),
+        "inventory_value": inventory_value,
+        "margin_by_product": margin_by_product,
+        "margin_by_supplier": margin_by_supplier,
+        "series": analytics.monthly_series(12),
     }
     return render(request, "core/dashboard.html", context)
 

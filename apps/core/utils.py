@@ -16,6 +16,8 @@ def format_quantity(value):
     if value is None:
         return ""
     value = to_decimal(value)
+    if value.as_tuple().exponent < -4:
+        value = value.quantize(Decimal("0.0001"))
     text = f"{value:f}".rstrip("0").rstrip(".")
     if text == "-0":
         text = "0"

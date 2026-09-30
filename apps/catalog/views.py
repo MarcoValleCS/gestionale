@@ -3,16 +3,17 @@ from decimal import Decimal
 from django.contrib import messages
 from django.db.models import DecimalField, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, RoleRequiredMixin
+from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, RoleRequiredMixin, role_required
 from apps.contacts.models import Contact
 from apps.core.models import Tag
 
-from .forms import CategoryForm, ProductForm
+from . import importer
+from .forms import CategoryForm, ProductForm, ProductImportForm, ProductQuickForm
 from .models import Category, Product
 
 STOCK_SUM = Coalesce(
@@ -152,6 +153,70 @@ def product_defaults(request, pk):
             "supplier_id": supplier.pk if supplier else "",
         }
     )
+
+
+@role_required(*EDIT_ROLES)
+def product_quick_create(request):
+    """Creazione rapida di un articolo dai documenti (risposta JSON)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Metodo non consentito."}, status=405)
+
+    context_type = request.POST.get("context", "sale")
+    form = ProductQuickForm(request.POST, context_type=context_type)
+    if form.is_valid():
+        product = form.save()
+        return JsonResponse({"id": product.pk, "label": f"{product.code} – {product.name}", "code": product.code})
+
+    errors = {field: [entry["message"] for entry in entries] for field, entries in form.errors.get_json_data().items()}
+    return JsonResponse({"errors": errors}, status=400)
+
+
+@role_required(*EDIT_ROLES)
+def product_import(request):
+    """Importazione articoli da CSV/Excel."""
+    report = None
+    if request.method == "POST":
+        form = ProductImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                rows = importer.read_table(form.cleaned_data["file"])
+                report = importer.import_products(
+                    rows,
+                    default_supplier=form.cleaned_data.get("supplier"),
+                    update_pricelist=form.cleaned_data.get("update_pricelist"),
+                    user=request.user,
+                )
+                if report.processed:
+                    messages.success(
+                        request,
+                        f"Importazione completata: {report.created} articoli creati, {report.updated} aggiornati.",
+                    )
+                if report.price_items:
+                    messages.info(request, f"Aggiornate {report.price_items} voci di listino fornitore.")
+                if report.errors:
+                    messages.error(request, f"{len(report.errors)} righe non importate: dettaglio qui sotto.")
+            except ValueError as exc:
+                messages.error(request, str(exc))
+    else:
+        form = ProductImportForm()
+
+    return render(
+        request,
+        "catalog/product_import.html",
+        {
+            "form": form,
+            "report": report,
+            "columns": importer.COLUMN_DOCS,
+            "page_title": "Importa articoli da CSV/Excel",
+        },
+    )
+
+
+@role_required(*EDIT_ROLES)
+def product_import_template(request):
+    response = HttpResponse(importer.build_template_csv(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="modello_import_articoli.csv"'
+    return response
 
 
 # --------------------------------------------------------------- Categorie

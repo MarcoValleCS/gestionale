@@ -1,0 +1,17 @@
+<div class="col-md-{{ col|default:6 }}">
+  <div class="mb-3">
+    <label class="form-label" for="{{ field.id_for_label }}">
+      {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
+    </label>
+    <div class="input-group">
+      {{ field }}
+      <button class="btn btn-outline-primary" type="button"
+              data-quick-contact data-kind="{{ kind|default:'customer' }}" data-target="#{{ field.id_for_label }}"
+              title="{{ title|default:'Crea nuovo contatto' }}">
+        <i class="bi bi-plus-lg"></i>
+      </button>
+    </div>
+    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+  </div>
+</div>

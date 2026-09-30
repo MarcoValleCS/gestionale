@@ -1,0 +1,120 @@
+<div class="modal fade" id="quick-contact-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'contacts:quick_create' %}" novalidate>
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title quick-contact-title">Nuovo cliente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Il contatto viene creato subito e selezionato nel documento. Potrai completare i dati in seguito dalla sua scheda.</p>
+          <div class="quick-generic-error alert alert-danger py-2 d-none"></div>
+          <div class="mb-3">
+            <label class="form-label" for="qc-name">Ragione sociale / Nome <span class="text-danger">*</span></label>
+            <input class="form-control" type="text" id="qc-name" name="name" required>
+            <div class="invalid-feedback d-block" data-error-for="name"></div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qc-vat">Partita IVA</label>
+              <input class="form-control" type="text" id="qc-vat" name="vat_number">
+              <div class="invalid-feedback d-block" data-error-for="vat_number"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qc-city">Città</label>
+              <input class="form-control" type="text" id="qc-city" name="city">
+              <div class="invalid-feedback d-block" data-error-for="city"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qc-email">Email</label>
+              <input class="form-control" type="email" id="qc-email" name="email">
+              <div class="invalid-feedback d-block" data-error-for="email"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qc-phone">Telefono</label>
+              <input class="form-control" type="text" id="qc-phone" name="phone">
+              <div class="invalid-feedback d-block" data-error-for="phone"></div>
+            </div>
+            <div class="col-12 mb-3">
+              <label class="form-label" for="qc-address">Indirizzo</label>
+              <input class="form-control" type="text" id="qc-address" name="address">
+              <div class="invalid-feedback d-block" data-error-for="address"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Crea e seleziona</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="quick-product-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'catalog:quick_create' %}" novalidate>
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Nuovo articolo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">L'articolo viene creato subito, inserito nella riga e completato con i prezzi indicati. Potrai rifinirlo in seguito dalla scheda articolo.</p>
+          <div class="quick-generic-error alert alert-danger py-2 d-none"></div>
+          <div class="mb-3">
+            <label class="form-label" for="qp-name">Descrizione <span class="text-danger">*</span></label>
+            <input class="form-control" type="text" id="qp-name" name="name" required>
+            <div class="invalid-feedback d-block" data-error-for="name"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="qp-uom">Unità di misura <span class="text-danger">*</span></label>
+            <select class="form-select" id="qp-uom" name="uom" required>
+              <option value="">—</option>
+              {% for uom in quick_uoms %}
+              <option value="{{ uom.pk }}">{{ uom }}</option>
+              {% endfor %}
+            </select>
+            <div class="invalid-feedback d-block" data-error-for="uom"></div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qp-sale-price">Prezzo vendita</label>
+              <input class="form-control" type="number" step="any" min="0" id="qp-sale-price" name="sale_price" value="0">
+              <div class="invalid-feedback d-block" data-error-for="sale_price"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qp-sale-vat">IVA vendita</label>
+              <select class="form-select" id="qp-sale-vat" name="sale_vat" required>
+                {% for vat in quick_vats %}
+                <option value="{{ vat.pk }}">{{ vat }}</option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback d-block" data-error-for="sale_vat"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qp-purchase-price">Prezzo acquisto</label>
+              <input class="form-control" type="number" step="any" min="0" id="qp-purchase-price" name="purchase_price" value="0">
+              <div class="invalid-feedback d-block" data-error-for="purchase_price"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="qp-purchase-vat">IVA acquisto</label>
+              <select class="form-select" id="qp-purchase-vat" name="purchase_vat" required>
+                {% for vat in quick_vats %}
+                <option value="{{ vat.pk }}">{{ vat }}</option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback d-block" data-error-for="purchase_vat"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Crea e inserisci nella riga</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

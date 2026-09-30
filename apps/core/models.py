@@ -171,6 +171,13 @@ class CompanySettings(models.Model):
     phone = models.CharField("Telefono", max_length=40, blank=True)
     website = models.CharField("Sito web", max_length=200, blank=True)
     iban = models.CharField("IBAN", max_length=40, blank=True)
+    logo = models.ImageField("Logo aziendale", upload_to="company/", null=True, blank=True, help_text="Usato in alto nei documenti stampati (PNG o JPG).")
+    document_color = models.CharField(
+        "Colore documenti",
+        max_length=7,
+        default="#1d4ed8",
+        help_text="Colore principale di grafica e intestazioni nei documenti stampati.",
+    )
     quote_footer = models.TextField(
         "Condizioni generali (in fondo ai documenti)",
         blank=True,

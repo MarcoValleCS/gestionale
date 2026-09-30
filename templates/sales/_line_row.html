@@ -1,6 +1,13 @@
 <tr class="line-row">
   <td class="d-none">{{ lineform.id }}</td>
-  <td>{{ lineform.product }}</td>
+  <td>
+    <div class="input-group input-group-sm flex-nowrap">
+      {{ lineform.product }}
+      <button class="btn btn-outline-primary" type="button" data-quick-product title="Crea nuovo articolo">
+        <i class="bi bi-plus-lg"></i>
+      </button>
+    </div>
+  </td>
   <td>{{ lineform.description }}</td>
   <td>{{ lineform.qty }}</td>
   <td>{{ lineform.uom }}</td>

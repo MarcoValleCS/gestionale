@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
@@ -7,7 +8,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, RoleRequiredMixin, role_required
 from apps.core.models import Tag
 
-from .forms import ContactForm
+from .forms import ContactForm, ContactQuickForm
 from .models import Contact
 
 EDIT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING)
@@ -117,3 +118,22 @@ def contact_toggle_active(request, pk):
     else:
         messages.warning(request, f"«{contact.name}» disattivato.")
     return redirect("contacts:detail", pk=contact.pk)
+
+
+@role_required(*EDIT_ROLES)
+def contact_quick_create(request):
+    """Creazione rapida di un cliente/fornitore dai documenti (risposta JSON)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Metodo non consentito."}, status=405)
+
+    form = ContactQuickForm(request.POST)
+    if form.is_valid():
+        contact = form.save(commit=False)
+        kind = request.POST.get("kind", "customer")
+        contact.is_customer = kind != "supplier"
+        contact.is_supplier = kind == "supplier"
+        contact.save()
+        return JsonResponse({"id": contact.pk, "label": f"{contact.name} ({contact.code})"})
+
+    errors = {field: [entry["message"] for entry in entries] for field, entries in form.errors.get_json_data().items()}
+    return JsonResponse({"errors": errors}, status=400)
