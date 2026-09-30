@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3 justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">{{ page_title }}</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% include "partials/form_fields.html" %}
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+            <a class="btn btn-outline-secondary" href="{% url 'accounts:user_list' %}">Annulla</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Ruoli e permessi</div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <div class="fw-semibold">Amministratore</div>
+          <div class="small text-muted">Accesso completo a tutte le funzioni, impostazioni e utenti.</div>
+        </li>
+        <li class="list-group-item">
+          <div class="fw-semibold">Vendite</div>
+          <div class="small text-muted">Contatti, articoli, preventivi e ordini cliente.</div>
+        </li>
+        <li class="list-group-item">
+          <div class="fw-semibold">Acquisti</div>
+          <div class="small text-muted">Contatti, articoli, ordini fornitore e listini.</div>
+        </li>
+        <li class="list-group-item">
+          <div class="fw-semibold">Magazzino</div>
+          <div class="small text-muted">Giacenze, movimenti, ricezione merci e consegne.</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

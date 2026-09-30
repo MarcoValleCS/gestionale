@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Rettifica giacenza{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Rettifica giacenza</div>
+      <div class="card-body">
+        <div class="alert alert-info py-2" id="current-stock-box">
+          <i class="bi bi-info-circle"></i> <span id="current-stock">Seleziona articolo e magazzino per vedere la giacenza attuale.</span>
+        </div>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% include "partials/form_fields.html" %}
+          <p class="text-muted small">
+            La rettifica registra un movimento di tipo «Rettifica» che porta la giacenza al valore indicato.
+            Usala per inventario o correzioni; per i carichi normali preferisci la ricezione merci dagli ordini fornitore.
+          </p>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Registra rettifica</button>
+            <a class="btn btn-outline-secondary" href="{% url 'inventory:stock_list' %}">Annulla</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const productSelect = document.getElementById("id_product");
+  const warehouseSelect = document.getElementById("id_warehouse");
+  const label = document.getElementById("current-stock");
+  if (!productSelect || !warehouseSelect) return;
+
+  async function updateCurrent() {
+    if (!productSelect.value || !warehouseSelect.value) {
+      label.textContent = "Seleziona articolo e magazzino per vedere la giacenza attuale.";
+      return;
+    }
+    try {
+      const url = "{% url 'inventory:stock_info' 0 %}".replace("/0/", "/" + productSelect.value + "/");
+      const response = await fetch(url + "?magazzino=" + warehouseSelect.value);
+      const data = await response.json();
+      label.textContent = "Giacenza attuale in " + data.warehouse + ": " + data.current + " " + data.uom;
+    } catch (error) {
+      label.textContent = "Impossibile leggere la giacenza.";
+    }
+  }
+
+  productSelect.addEventListener("change", updateCurrent);
+  warehouseSelect.addEventListener("change", updateCurrent);
+  updateCurrent();
+})();
+</script>
+{% endblock %}

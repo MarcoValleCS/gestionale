@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Contatti{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Nome, codice, partita IVA, città…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="tipo">Tipo</label>
+        <select class="form-select form-select-sm" id="tipo" name="tipo">
+          <option value="">Tutti</option>
+          <option value="clienti" {% if kind == "clienti" %}selected{% endif %}>Clienti</option>
+          <option value="fornitori" {% if kind == "fornitori" %}selected{% endif %}>Fornitori</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="tag">Etichetta</label>
+        <select class="form-select form-select-sm" id="tag" name="tag">
+          <option value="">Tutte</option>
+          {% for tag in tags %}
+          <option value="{{ tag.pk }}" {% if selected_tag == tag.pk|stringformat:"s" %}selected{% endif %}>{{ tag.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="inattivi" name="inattivi" value="1" {% if show_inactive %}checked{% endif %}>
+          <label class="form-check-label" for="inattivi">Mostra disattivati</label>
+        </div>
+      </div>
+      <div class="col-md-2 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        <a class="btn btn-primary btn-sm" href="{% url 'contacts:create' %}"><i class="bi bi-plus-lg"></i> Nuovo</a>
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Nome</th>
+          <th>Tipo</th>
+          <th>Città</th>
+          <th>Partita IVA</th>
+          <th>Contatti</th>
+          <th>Etichette</th>
+          <th class="text-center">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for contact in contacts %}
+        <tr>
+          <td class="text-muted number-badge">{{ contact.code }}</td>
+          <td><a class="fw-semibold text-decoration-none" href="{% url 'contacts:detail' contact.pk %}">{{ contact.name }}</a></td>
+          <td>
+            {% if contact.is_customer %}<span class="badge text-bg-primary">Cliente</span>{% endif %}
+            {% if contact.is_supplier %}<span class="badge text-bg-warning">Fornitore</span>{% endif %}
+          </td>
+          <td>{{ contact.city|default:"—" }}</td>
+          <td>{{ contact.vat_number|default:"—" }}</td>
+          <td class="small">
+            {% if contact.email %}<div><i class="bi bi-envelope"></i> {{ contact.email }}</div>{% endif %}
+            {% if contact.phone %}<div><i class="bi bi-telephone"></i> {{ contact.phone }}</div>{% endif %}
+          </td>
+          <td>
+            {% for tag in contact.tags.all %}<span class="tag-chip bg-{{ tag.color }}">{{ tag.name }}</span> {% endfor %}
+          </td>
+          <td class="text-center">
+            {% if contact.active %}Attivo{% else %}<span class="text-muted">Disattivato</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Nessun contatto trovato</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

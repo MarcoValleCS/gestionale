@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ pricelist.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">{{ pricelist.name }}</h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <a class="text-decoration-none" href="{% url 'contacts:detail' pricelist.supplier.pk %}">{{ pricelist.supplier.name }}</a>
+      <span class="badge text-bg-light border">
+        Valido dal {{ pricelist.valid_from|date:"d/m/Y" }}{% if pricelist.valid_to %} al {{ pricelist.valid_to|date:"d/m/Y" }}{% endif %}
+      </span>
+      {% if pricelist.is_current %}<span class="badge text-bg-success">In corso</span>{% else %}<span class="badge text-bg-secondary">Non in corso</span>{% endif %}
+      {% if not pricelist.is_active %}<span class="badge text-bg-dark">Disattivato</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:pricelist_update' pricelist.pk %}"><i class="bi bi-pencil"></i> Modifica listino</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:pricelist_list' %}"><i class="bi bi-arrow-left"></i> Elenco listini</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-list-ul me-1"></i> Articoli del listino ({{ items|length }})</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Codice</th>
+              <th>Articolo</th>
+              <th class="text-end">Prezzo</th>
+              <th class="text-end">Sconto %</th>
+              <th class="text-end">Prezzo netto</th>
+              <th class="text-end">Q.tà min.</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td class="text-muted number-badge">{{ item.product.code }}</td>
+              <td><a class="text-decoration-none" href="{% url 'catalog:product_detail' item.product.pk %}">{{ item.product.name }}</a></td>
+              <td class="text-end">{{ item.price|money }} €</td>
+              <td class="text-end">{{ item.discount_pct|qty }}%</td>
+              <td class="text-end fw-semibold">{{ item.effective_price|money }} €</td>
+              <td class="text-end">{{ item.min_qty|qty }}</td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:pricelist_item_update' item.pk %}"><i class="bi bi-pencil"></i></a>
+                <form class="d-inline" method="post" action="{% url 'purchasing:pricelist_item_delete' item.pk %}" onsubmit="return confirm('Rimuovere «{{ item.product.name }}» dal listino?');">
+                  {% csrf_token %}
+                  <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center text-muted py-4">Nessun articolo nel listino. Aggiungilo dal pannello a destra.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-1"></i> Variazioni applicate</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Data</th><th class="text-end">Variazione</th><th class="text-end">Articoli</th><th>Utente</th></tr></thead>
+          <tbody>
+            {% for adjustment in adjustments %}
+            <tr>
+              <td>{{ adjustment.applied_at|date:"d/m/Y H:i" }}</td>
+              <td class="text-end {% if adjustment.percent > 0 %}text-danger{% else %}text-success{% endif %} fw-semibold">
+                {% if adjustment.percent > 0 %}+{% endif %}{{ adjustment.percent|qty }}%
+              </td>
+              <td class="text-end">{{ adjustment.items_count }}</td>
+              <td>{{ adjustment.applied_by|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-3">Nessuna variazione applicata</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3 border-primary">
+      <div class="card-header bg-primary-subtle text-primary-emphasis">
+        <i class="bi bi-percent me-1"></i> Adeguamento prezzi del listino
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'purchasing:pricelist_adjust' pricelist.pk %}" onsubmit="return confirm('Applicare la variazione a TUTTI i {{ items|length }} articoli del listino?');">
+          {% csrf_token %}
+          {% include "partials/form_fields.html" with form=adjust_form %}
+          <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat"></i> Applica a tutti gli articoli</button>
+        </form>
+        <p class="text-muted small mb-0 mt-2">
+          La variazione modifica il prezzo di listino di ogni articolo. Le variazioni sono registrate nello storico qui accanto.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-lg me-1"></i> Aggiungi articolo</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'purchasing:pricelist_item_create' pricelist.pk %}" novalidate>
+          {% csrf_token %}
+          {% include "partials/form_fields.html" with form=item_form %}
+          <button class="btn btn-outline-primary w-100" type="submit">Aggiungi al listino</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

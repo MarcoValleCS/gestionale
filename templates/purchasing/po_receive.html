@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Ricezione merce {{ order.number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-0">Ricezione merce <span class="number-badge">{{ order.number }}</span></h2>
+    <div class="text-muted">{{ order.supplier.name }}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm no-print" href="{% url 'purchasing:po_detail' order.pk %}"><i class="bi bi-arrow-left"></i> Torna all'ordine</a>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="card">
+    <div class="card-header">Quantità ricevute</div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Articolo / Descrizione</th>
+            <th class="text-end">Ordinata</th>
+            <th class="text-end">Già ricevuta</th>
+            <th class="text-end">Da ricevere</th>
+            <th style="width:130px">Quantità ora</th>
+            <th>U.d.M.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td>
+              {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+              {{ line.description|default:"—" }}
+              {% if line.product and not line.product.is_stock_tracked %}<span class="badge text-bg-light border">non a magazzino</span>{% endif %}
+            </td>
+            <td class="text-end">{{ line.qty|qty }}</td>
+            <td class="text-end">{{ line.qty_received|qty }}</td>
+            <td class="text-end">{{ line.qty_remaining|qty }}</td>
+            <td>
+              <input class="form-control form-control-sm" type="number" step="any" min="0" max="{{ line.qty_remaining }}"
+                     name="qty_{{ line.pk }}" value="{{ line.qty_remaining|qty }}" {% if line.qty_remaining <= 0 %}disabled{% endif %}>
+            </td>
+            <td>{{ line.uom.code|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-body border-top d-flex gap-2 flex-wrap">
+      <button class="btn btn-success" type="submit"><i class="bi bi-check-lg"></i> Registra ricezione e carica magazzino</button>
+      <button class="btn btn-outline-success" type="submit" name="receive_all" value="1"><i class="bi bi-box-arrow-in-down"></i> Ricevi tutto</button>
+      <a class="btn btn-outline-secondary" href="{% url 'purchasing:po_detail' order.pk %}">Annulla</a>
+    </div>
+    <div class="card-body border-top text-muted small">
+      La ricezione carica le quantità nel magazzino e aggiorna lo stato dell'ordine (parzialmente ricevuto / ricevuto).
+    </div>
+  </div>
+</form>
+{% endblock %}

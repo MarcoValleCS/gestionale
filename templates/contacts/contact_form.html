@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">Dati principali</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.name col=12 %}
+            {% include "partials/field.html" with field=form.is_customer col=6 %}
+            {% include "partials/field.html" with field=form.is_supplier col=6 %}
+            {% include "partials/field.html" with field=form.vat_number col=6 %}
+            {% include "partials/field.html" with field=form.tax_code col=6 %}
+            {% include "partials/field.html" with field=form.sdi_code col=6 %}
+            {% include "partials/field.html" with field=form.pec col=6 %}
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header">Recapiti</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.email col=6 %}
+            {% include "partials/field.html" with field=form.phone col=6 %}
+            {% include "partials/field.html" with field=form.mobile col=6 %}
+            {% include "partials/field.html" with field=form.website col=6 %}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Indirizzo</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.address col=8 %}
+            {% include "partials/field.html" with field=form.zip_code col=4 %}
+            {% include "partials/field.html" with field=form.city col=6 %}
+            {% include "partials/field.html" with field=form.province col=3 %}
+            {% include "partials/field.html" with field=form.country col=3 %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">Classificazione</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.payment_term col=12 %}
+            {% include "partials/field.html" with field=form.tags col=12 %}
+            {% include "partials/field.html" with field=form.active col=12 %}
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header">Note</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.notes col=12 %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+        <a class="btn btn-outline-secondary" href="{% if object %}{% url 'contacts:detail' object.pk %}{% else %}{% url 'contacts:list' %}{% endif %}">Annulla</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

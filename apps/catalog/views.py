@@ -1,0 +1,204 @@
+from decimal import Decimal
+
+from django.contrib import messages
+from django.db.models import DecimalField, F, Q, Sum, Value
+from django.db.models.functions import Coalesce
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DetailView, ListView, UpdateView
+
+from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, RoleRequiredMixin
+from apps.contacts.models import Contact
+from apps.core.models import Tag
+
+from .forms import CategoryForm, ProductForm
+from .models import Category, Product
+
+STOCK_SUM = Coalesce(
+    Sum("stock_levels__quantity"),
+    Value(0),
+    output_field=DecimalField(max_digits=14, decimal_places=3),
+)
+
+EDIT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING)
+
+
+class ProductListView(ListView):
+    model = Product
+    template_name = "catalog/product_list.html"
+    context_object_name = "products"
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = (
+            Product.objects.select_related("uom", "category", "main_supplier")
+            .prefetch_related("tags")
+            .annotate(stock_total=STOCK_SUM)
+            .order_by("name")
+        )
+        search = self.request.GET.get("q", "").strip()
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search) | Q(barcode__icontains=search))
+        category_id = self.request.GET.get("categoria", "")
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+        tag_id = self.request.GET.get("tag", "")
+        if tag_id:
+            queryset = queryset.filter(tags__id=tag_id)
+        supplier_id = self.request.GET.get("fornitore", "")
+        if supplier_id:
+            queryset = queryset.filter(main_supplier_id=supplier_id)
+        if self.request.GET.get("sotto_scorta") == "1":
+            queryset = queryset.filter(is_stock_tracked=True, min_stock__gt=0, stock_total__lt=F("min_stock"))
+        if self.request.GET.get("inattivi") != "1":
+            queryset = queryset.filter(active=True)
+        return queryset.distinct()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Articoli"
+        context["categories"] = Category.objects.all()
+        context["tags"] = Tag.objects.all()
+        context["suppliers"] = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
+        context["search"] = self.request.GET.get("q", "")
+        context["category_id"] = self.request.GET.get("categoria", "")
+        context["selected_tag"] = self.request.GET.get("tag", "")
+        context["supplier_id"] = self.request.GET.get("fornitore", "")
+        context["low_stock_only"] = self.request.GET.get("sotto_scorta") == "1"
+        context["show_inactive"] = self.request.GET.get("inattivi") == "1"
+        return context
+
+
+class ProductDetailView(DetailView):
+    model = Product
+    template_name = "catalog/product_detail.html"
+    context_object_name = "product"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        product = self.object
+        context["page_title"] = product.name
+        context["stock_levels"] = product.stock_levels.select_related("warehouse").order_by("warehouse__name")
+        context["movements"] = product.movements.select_related("warehouse", "created_by").order_by("-created_at")[:25]
+        context["price_list_items"] = (
+            product.price_list_items.select_related("pricelist", "pricelist__supplier").order_by("pricelist__supplier__name")
+        )
+        return context
+
+
+class ProductCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = EDIT_ROLES
+    model = Product
+    form_class = ProductForm
+    template_name = "catalog/product_form.html"
+
+    def get_success_url(self):
+        return reverse_lazy("catalog:product_detail", args=[self.object.pk])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Nuovo articolo"
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, f"Articolo «{form.instance.name}» creato.")
+        return super().form_valid(form)
+
+
+class ProductUpdateView(RoleRequiredMixin, UpdateView):
+    allowed_roles = EDIT_ROLES
+    model = Product
+    form_class = ProductForm
+    template_name = "catalog/product_form.html"
+
+    def get_success_url(self):
+        return reverse_lazy("catalog:product_detail", args=[self.object.pk])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = f"Modifica: {self.object.name}"
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, "Articolo aggiornato.")
+        return super().form_valid(form)
+
+
+def product_defaults(request, pk):
+    """Dati per il riempimento automatico delle righe documento (JSON)."""
+    product = get_object_or_404(Product, pk=pk)
+    context_type = request.GET.get("context", "sale")
+    supplier_id = request.GET.get("supplier")
+    supplier = Contact.objects.filter(pk=supplier_id).first() if supplier_id else product.main_supplier
+
+    if context_type == "purchase":
+        vat = product.purchase_vat
+        price = product.purchase_unit_price(supplier)
+    else:
+        vat = product.sale_vat
+        price = product.sale_price
+
+    return JsonResponse(
+        {
+            "code": product.code,
+            "name": product.name,
+            "description": product.description or product.name,
+            "uom_id": product.uom_id,
+            "uom_label": str(product.uom),
+            "vat_id": vat.pk if vat else "",
+            "vat_label": str(vat) if vat else "",
+            "price": str(price or Decimal("0")),
+            "supplier_id": supplier.pk if supplier else "",
+        }
+    )
+
+
+# --------------------------------------------------------------- Categorie
+class CategoryListView(RoleRequiredMixin, ListView):
+    allowed_roles = EDIT_ROLES
+    model = Category
+    template_name = "catalog/category_list.html"
+    context_object_name = "categories"
+
+    def get_queryset(self):
+        return Category.objects.select_related("parent").annotate(product_count=Sum("products")).order_by("name")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Categorie articoli"
+        return context
+
+
+class CategoryCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = EDIT_ROLES
+    model = Category
+    form_class = CategoryForm
+    template_name = "catalog/category_form.html"
+    success_url = reverse_lazy("catalog:category_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Nuova categoria"
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, "Categoria creata.")
+        return super().form_valid(form)
+
+
+class CategoryUpdateView(RoleRequiredMixin, UpdateView):
+    allowed_roles = EDIT_ROLES
+    model = Category
+    form_class = CategoryForm
+    template_name = "catalog/category_form.html"
+    success_url = reverse_lazy("catalog:category_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = f"Modifica categoria: {self.object}"
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, "Categoria aggiornata.")
+        return super().form_valid(form)

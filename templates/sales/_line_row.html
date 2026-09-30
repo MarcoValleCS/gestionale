@@ -1,0 +1,17 @@
+<tr class="line-row">
+  <td class="d-none">{{ lineform.id }}</td>
+  <td>{{ lineform.product }}</td>
+  <td>{{ lineform.description }}</td>
+  <td>{{ lineform.qty }}</td>
+  <td>{{ lineform.uom }}</td>
+  <td>{{ lineform.unit_price }}</td>
+  <td>{{ lineform.discount_pct }}</td>
+  <td>{{ lineform.vat_rate }}</td>
+  <td class="text-end line-total text-nowrap">—</td>
+  <td class="text-center text-nowrap">
+    <button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Rimuovi riga">
+      <i class="bi bi-trash"></i>
+    </button>
+    <span class="d-none">{{ lineform.DELETE }}</span>
+  </td>
+</tr>

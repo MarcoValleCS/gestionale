@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Listini fornitori{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Nome listino o fornitore…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="fornitore">Fornitore</label>
+        <select class="form-select form-select-sm" id="fornitore" name="fornitore">
+          <option value="">Tutti</option>
+          {% for supplier in suppliers %}
+          <option value="{{ supplier.pk }}" {% if supplier_id == supplier.pk|stringformat:"s" %}selected{% endif %}>{{ supplier.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-5 d-flex gap-2 justify-content-end align-items-center">
+        <div class="form-check me-2">
+          <input class="form-check-input" type="checkbox" id="inattivi" name="inattivi" value="1" {% if show_inactive %}checked{% endif %}>
+          <label class="form-check-label" for="inattivi">Mostra non attivi</label>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        <a class="btn btn-primary btn-sm" href="{% url 'purchasing:pricelist_create' %}"><i class="bi bi-plus-lg"></i> Nuovo listino</a>
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Listino</th>
+          <th>Fornitore</th>
+          <th>Validità</th>
+          <th class="text-end">Articoli</th>
+          <th class="text-end">Variazioni</th>
+          <th class="text-center">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pricelist in pricelists %}
+        <tr>
+          <td><a class="fw-semibold text-decoration-none" href="{% url 'purchasing:pricelist_detail' pricelist.pk %}">{{ pricelist.name }}</a></td>
+          <td>{{ pricelist.supplier.name }}</td>
+          <td>
+            dal {{ pricelist.valid_from|date:"d/m/Y" }}
+            {% if pricelist.valid_to %}al {{ pricelist.valid_to|date:"d/m/Y" }}{% endif %}
+          </td>
+          <td class="text-end">{{ pricelist.item_count }}</td>
+          <td class="text-end">{{ pricelist.adjustments.count }}</td>
+          <td class="text-center">
+            {% if pricelist.is_current %}<span class="badge text-bg-success">Attivo</span>
+            {% elif pricelist.is_active %}<span class="badge text-bg-secondary">Non in corso</span>
+            {% else %}<span class="badge text-bg-dark">Disattivato</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Nessun listino trovato</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

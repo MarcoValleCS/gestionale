@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Preventivo {{ quote.number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">Preventivo <span class="number-badge">{{ quote.number }}</span></h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ quote.status|badge_class }}">{{ quote.get_status_display }}</span>
+      {% if quote.is_expired %}<span class="badge text-bg-warning">Scaduto il {{ quote.valid_until|date:"d/m/Y" }}</span>{% endif %}
+      <a class="text-decoration-none" href="{% url 'contacts:detail' quote.customer.pk %}">{{ quote.customer.name }}</a>
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_print' quote.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+    <form method="post" action="{% url 'sales:quote_duplicate' quote.pk %}">{% csrf_token %}
+      <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-copy"></i> Duplica</button>
+    </form>
+    {% if quote.is_editable %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_update' quote.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    {% endif %}
+    {% if quote.status == "draft" %}
+    <form method="post" action="{% url 'sales:quote_send' quote.pk %}">{% csrf_token %}
+      <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-send"></i> Segna come inviato</button>
+    </form>
+    {% endif %}
+    {% if quote.status == "draft" or quote.status == "sent" %}
+    <form method="post" action="{% url 'sales:quote_accept' quote.pk %}">{% csrf_token %}
+      <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-check-lg"></i> Accettato dal cliente</button>
+    </form>
+    <form method="post" action="{% url 'sales:quote_reject' quote.pk %}">{% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-x-lg"></i> Rifiutato</button>
+    </form>
+    {% endif %}
+    {% if quote.status == "accepted" %}
+    <form method="post" action="{% url 'sales:quote_convert' quote.pk %}">{% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-cart-plus"></i> Crea ordine cliente</button>
+    </form>
+    {% endif %}
+    <form method="post" action="{% url 'sales:quote_delete' quote.pk %}" onsubmit="return confirm('Eliminare definitivamente il preventivo {{ quote.number }}?');">{% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+    </form>
+  </div>
+</div>
+
+{% if generated_order %}
+<div class="alert alert-info py-2 no-print">
+  <i class="bi bi-cart-check"></i> Da questo preventivo è stato creato l'ordine cliente
+  <a class="fw-semibold" href="{% url 'sales:order_detail' generated_order.pk %}">{{ generated_order.number }}</a>.
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Righe</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Articolo / Descrizione</th>
+              <th class="text-end">Q.tà</th>
+              <th>U.d.M.</th>
+              <th class="text-end">Prezzo</th>
+              <th class="text-end">Sc. %</th>
+              <th class="text-end">IVA</th>
+              <th class="text-end">Totale</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in lines %}
+            <tr>
+              <td class="text-muted">{{ forloop.counter }}</td>
+              <td>
+                {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+                {{ line.description|default:"—" }}
+              </td>
+              <td class="text-end">{{ line.qty|qty }}</td>
+              <td>{{ line.uom.code|default:"—" }}</td>
+              <td class="text-end">{{ line.unit_price|money }} €</td>
+              <td class="text-end">{{ line.discount_pct|qty }}%</td>
+              <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
+              <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if quote.notes or quote.terms_text %}
+    <div class="card">
+      <div class="card-header">Note e condizioni</div>
+      <div class="card-body">
+        {% if quote.notes %}
+        <div class="mb-3"><div class="text-muted small">Note interne</div><div style="white-space: pre-line">{{ quote.notes }}</div></div>
+        {% endif %}
+        {% if quote.terms_text %}
+        <div><div class="text-muted small">Condizioni</div><div style="white-space: pre-line">{{ quote.terms_text }}</div></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Cliente</div>
+      <div class="card-body">
+        <div class="fw-semibold">{{ quote.customer.name }}</div>
+        {% if quote.customer.address %}<div class="small">{{ quote.customer.address }}</div>{% endif %}
+        {% if quote.customer.zip_code or quote.customer.city %}
+        <div class="small">{{ quote.customer.zip_code }} {{ quote.customer.city }}{% if quote.customer.province %} ({{ quote.customer.province }}){% endif %}</div>
+        {% endif %}
+        {% if quote.customer.vat_number %}<div class="small text-muted">P.IVA {{ quote.customer.vat_number }}</div>{% endif %}
+        <a class="small" href="{% url 'contacts:detail' quote.customer.pk %}">Scheda cliente</a>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">Data</dt><dd class="col-6">{{ quote.date|date:"d/m/Y" }}</dd>
+          <dt class="col-6 text-muted">Valido fino al</dt><dd class="col-6">{{ quote.valid_until|date:"d/m/Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Pagamento</dt><dd class="col-6">{{ quote.payment_term.name|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Riferimento</dt><dd class="col-6">{{ quote.reference|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Creato da</dt><dd class="col-6">{{ quote.created_by|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Totali</div>
+      <div class="card-body">
+        <dl class="doc-totals mb-0">
+          <div class="d-flex justify-content-between"><dt>Imponibile</dt><dd>{{ quote.subtotal|money }} €</dd></div>
+          {% for row in vat_rows %}
+          <div class="d-flex justify-content-between">
+            <dt>IVA {{ row.rate.rate|qty }}%</dt><dd>{{ row.vat|money }} €</dd>
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-between border-top pt-2 mt-1">
+            <dt class="grand-total">Totale</dt>
+            <dd class="grand-total">{{ quote.grand_total|money }} €</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

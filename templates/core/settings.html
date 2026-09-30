@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Impostazioni{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{% url 'core:company_update' %}">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi bi-building me-2"></i>Dati azienda</h2>
+          <p class="text-muted small mb-0">Ragione sociale, partita IVA, indirizzo e condizioni generali stampate sui documenti.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{% url 'core:vat_list' %}">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi bi-percent me-2"></i>Aliquote IVA</h2>
+          <p class="text-muted small mb-0">IVA 22%, 10%, 4%, 5%, esenti e regimi particolari, con natura SDI per il futuro.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{% url 'core:uom_list' %}">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi bi-rulers me-2"></i>Unità di misura</h2>
+          <p class="text-muted small mb-0">Pezzi, kg, metri, litri, ore e tutte le unità usate nei documenti.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{% url 'core:tag_list' %}">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi bi-tags me-2"></i>Etichette</h2>
+          <p class="text-muted small mb-0">Etichette colorate da applicare a clienti, fornitori e articoli per classificarli.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{% url 'core:paymentterm_list' %}">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi bi-credit-card me-2"></i>Condizioni di pagamento</h2>
+          <p class="text-muted small mb-0">Rimessa diretta, bonifico 30/60 giorni e altre condizioni.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{% url 'core:sequence_list' %}">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi bi-123 me-2"></i>Numerazioni</h2>
+          <p class="text-muted small mb-0">Prefissi e numeri di preventivi, ordini cliente e ordini fornitore.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+{% endblock %}

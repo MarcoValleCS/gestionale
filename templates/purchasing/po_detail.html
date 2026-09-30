@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Ordine fornitore {{ order.number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">Ordine fornitore <span class="number-badge">{{ order.number }}</span></h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ order.status|badge_class }}">{{ order.get_status_display }}</span>
+      <a class="text-decoration-none" href="{% url 'contacts:detail' order.supplier.pk %}">{{ order.supplier.name }}</a>
+      {% if order.source_sales_order %}
+      <span class="text-muted small">da ordine cliente <a href="{% url 'sales:order_detail' order.source_sales_order.pk %}">{{ order.source_sales_order.number }}</a></span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    {% if order.is_editable and roles.is_admin or order.is_editable and roles.is_purchasing %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:po_update' order.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    {% endif %}
+    {% if roles.is_admin or roles.is_purchasing %}
+    {% if order.status == "draft" %}
+    <form method="post" action="{% url 'purchasing:po_send' order.pk %}">{% csrf_token %}
+      <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-send"></i> Segna come inviato</button>
+    </form>
+    {% endif %}
+    {% if order.status == "draft" or order.status == "sent" %}
+    <form method="post" action="{% url 'purchasing:po_confirm' order.pk %}">{% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg"></i> Confermato dal fornitore</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if order.can_receive %}
+    <a class="btn btn-success btn-sm" href="{% url 'purchasing:po_receive' order.pk %}"><i class="bi bi-box-arrow-in-down"></i> Ricevi merce</a>
+    {% endif %}
+    {% if roles.is_admin or roles.is_purchasing %}
+    {% if order.status != "received" and order.status != "cancelled" %}
+    <form method="post" action="{% url 'purchasing:po_cancel' order.pk %}" onsubmit="return confirm('Annullare l\'ordine {{ order.number }}?');">{% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-x-circle"></i> Annulla</button>
+    </form>
+    {% endif %}
+    {% if order.status == "draft" %}
+    <form method="post" action="{% url 'purchasing:po_delete' order.pk %}" onsubmit="return confirm('Eliminare definitivamente l\'ordine {{ order.number }}?');">{% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Righe</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Articolo / Descrizione</th>
+              <th class="text-end">Q.tà</th>
+              <th class="text-end">Ricevuta</th>
+              <th>U.d.M.</th>
+              <th class="text-end">Prezzo</th>
+              <th class="text-end">Sc. %</th>
+              <th class="text-end">IVA</th>
+              <th class="text-end">Totale</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in lines %}
+            <tr>
+              <td class="text-muted">{{ forloop.counter }}</td>
+              <td>
+                {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+                {{ line.description|default:"—" }}
+              </td>
+              <td class="text-end">{{ line.qty|qty }}</td>
+              <td class="text-end {% if line.qty_received >= line.qty %}text-success{% elif line.qty_received > 0 %}text-warning{% endif %}">
+                {{ line.qty_received|qty }}
+              </td>
+              <td>{{ line.uom.code|default:"—" }}</td>
+              <td class="text-end">{{ line.unit_price|money }} €</td>
+              <td class="text-end">{{ line.discount_pct|qty }}%</td>
+              <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
+              <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9" class="text-center text-muted py-3">Nessuna riga</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if order.notes %}
+    <div class="card">
+      <div class="card-header">Note</div>
+      <div class="card-body" style="white-space: pre-line">{{ order.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Fornitore</div>
+      <div class="card-body">
+        <div class="fw-semibold">{{ order.supplier.name }}</div>
+        {% if order.supplier.address %}<div class="small">{{ order.supplier.address }}</div>{% endif %}
+        {% if order.supplier.zip_code or order.supplier.city %}
+        <div class="small">{{ order.supplier.zip_code }} {{ order.supplier.city }}{% if order.supplier.province %} ({{ order.supplier.province }}){% endif %}</div>
+        {% endif %}
+        {% if order.supplier.vat_number %}<div class="small text-muted">P.IVA {{ order.supplier.vat_number }}</div>{% endif %}
+        {% if order.supplier.email %}<div class="small">{{ order.supplier.email }}</div>{% endif %}
+        <a class="small" href="{% url 'contacts:detail' order.supplier.pk %}">Scheda fornitore</a>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">Data</dt><dd class="col-6">{{ order.date|date:"d/m/Y" }}</dd>
+          <dt class="col-6 text-muted">Consegna prevista</dt><dd class="col-6">{{ order.expected_date|date:"d/m/Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Pagamento</dt><dd class="col-6">{{ order.payment_term.name|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Creato da</dt><dd class="col-6">{{ order.created_by|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Totali</div>
+      <div class="card-body">
+        <dl class="doc-totals mb-0">
+          <div class="d-flex justify-content-between"><dt>Imponibile</dt><dd>{{ order.subtotal|money }} €</dd></div>
+          {% for row in vat_rows %}
+          <div class="d-flex justify-content-between">
+            <dt>IVA {{ row.rate.rate|qty }}%</dt><dd>{{ row.vat|money }} €</dd>
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-between border-top pt-2 mt-1">
+            <dt class="grand-total">Totale</dt>
+            <dd class="grand-total">{{ order.grand_total|money }} €</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

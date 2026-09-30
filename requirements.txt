@@ -1,0 +1,4 @@
+Django>=6.0,<7
+psycopg[binary]>=3.2
+whitenoise>=6.7
+gunicorn>=23.0; sys_platform != "win32"

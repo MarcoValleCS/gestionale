@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Movimenti di magazzino{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Articolo o riferimento…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="tipo">Tipo</label>
+        <select class="form-select form-select-sm" id="tipo" name="tipo">
+          <option value="">Tutti</option>
+          {% for value, label in types %}
+          <option value="{{ value }}" {% if movement_type == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="magazzino">Magazzino</label>
+        <select class="form-select form-select-sm" id="magazzino" name="magazzino">
+          <option value="">Tutti</option>
+          {% for warehouse in warehouses %}
+          <option value="{{ warehouse.pk }}" {% if warehouse_id == warehouse.pk|stringformat:"s" %}selected{% endif %}>{{ warehouse.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Articolo</th>
+          <th class="text-center">Tipo</th>
+          <th class="text-end">Quantità</th>
+          <th>Magazzino</th>
+          <th>Riferimento</th>
+          <th>Note</th>
+          <th>Utente</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for movement in movements %}
+        <tr>
+          <td class="text-nowrap">{{ movement.created_at|date:"d/m/Y H:i" }}</td>
+          <td>
+            <a class="text-decoration-none" href="{% url 'catalog:product_detail' movement.product.pk %}">{{ movement.product.code }}</a>
+            {{ movement.product.name }}
+          </td>
+          <td class="text-center">
+            {% if movement.movement_type == "load" %}<span class="badge text-bg-success">Carico</span>
+            {% elif movement.movement_type == "unload" %}<span class="badge text-bg-danger">Scarico</span>
+            {% else %}<span class="badge text-bg-warning">Rettifica</span>{% endif %}
+          </td>
+          <td class="text-end {% if movement.quantity < 0 %}text-danger{% else %}text-success{% endif %} fw-semibold">
+            {% if movement.quantity > 0 %}+{% endif %}{{ movement.quantity|qty }}
+          </td>
+          <td>{{ movement.warehouse.name }}</td>
+          <td>{{ movement.reference|default:"—" }}</td>
+          <td class="text-muted">{{ movement.note|default:"—" }}</td>
+          <td>{{ movement.created_by|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Nessun movimento trovato</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ contact.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">
+      {{ contact.name }}
+      <span class="text-muted fs-6 number-badge">{{ contact.code }}</span>
+    </h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      {% if contact.is_customer %}<span class="badge text-bg-primary">Cliente</span>{% endif %}
+      {% if contact.is_supplier %}<span class="badge text-bg-warning">Fornitore</span>{% endif %}
+      {% if not contact.active %}<span class="badge text-bg-secondary">Disattivato</span>{% endif %}
+      {% for tag in contact.tags.all %}<span class="tag-chip bg-{{ tag.color }}">{{ tag.name }}</span>{% endfor %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    {% if roles.is_admin or roles.is_sales or roles.is_purchasing %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'contacts:update' contact.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    <form method="post" action="{% url 'contacts:toggle_active' contact.pk %}">
+      {% csrf_token %}
+      {% if contact.active %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-x-circle"></i> Disattiva</button>
+      {% else %}
+      <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-check-circle"></i> Riattiva</button>
+      {% endif %}
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Dati fiscali</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Partita IVA</dt><dd class="col-7">{{ contact.vat_number|default:"—" }}</dd>
+          <dt class="col-5 text-muted">Codice fiscale</dt><dd class="col-7">{{ contact.tax_code|default:"—" }}</dd>
+          <dt class="col-5 text-muted">SDI / PEC</dt>
+          <dd class="col-7">{{ contact.sdi_code|default:"—" }}{% if contact.pec %}<br>{{ contact.pec }}{% endif %}</dd>
+          <dt class="col-5 text-muted">Cond. pagamento</dt><dd class="col-7">{{ contact.payment_term.name|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">Contatti</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Email</dt>
+          <dd class="col-7">{% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-5 text-muted">Telefono</dt><dd class="col-7">{{ contact.phone|default:"—" }}</dd>
+          <dt class="col-5 text-muted">Cellulare</dt><dd class="col-7">{{ contact.mobile|default:"—" }}</dd>
+          <dt class="col-5 text-muted">Sito web</dt><dd class="col-7">{{ contact.website|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">Indirizzo</div>
+      <div class="card-body small">
+        {{ contact.address|default:"" }}<br>
+        {% if contact.zip_code or contact.city %}{{ contact.zip_code }} {{ contact.city }}{% if contact.province %} ({{ contact.province }}){% endif %}<br>{% endif %}
+        {{ contact.country }}
+      </div>
+    </div>
+    {% if contact.notes %}
+    <div class="card">
+      <div class="card-header">Note</div>
+      <div class="card-body small" style="white-space: pre-line">{{ contact.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header p-0 border-0">
+        <ul class="nav nav-tabs card-header-tabs m-0 px-2 pt-2" role="tablist">
+          {% if contact.is_customer %}
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-quotes" type="button">Preventivi <span class="badge text-bg-light border">{{ quotes|length }}</span></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-orders" type="button">Ordini cliente <span class="badge text-bg-light border">{{ orders|length }}</span></button></li>
+          {% endif %}
+          {% if contact.is_supplier %}
+          <li class="nav-item"><button class="nav-link {% if not contact.is_customer %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-pos" type="button">Ordini fornitore <span class="badge text-bg-light border">{{ purchase_orders|length }}</span></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-pricelists" type="button">Listini <span class="badge text-bg-light border">{{ price_lists|length }}</span></button></li>
+          {% endif %}
+        </ul>
+      </div>
+      <div class="tab-content">
+        {% if contact.is_customer %}
+        <div class="tab-pane fade show active" id="tab-quotes">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Numero</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+              <tbody>
+                {% for quote in quotes %}
+                <tr>
+                  <td><a href="{% url 'sales:quote_detail' quote.pk %}">{{ quote.number }}</a></td>
+                  <td>{{ quote.date|date:"d/m/Y" }}</td>
+                  <td class="text-end">{{ quote.grand_total|money }} €</td>
+                  <td class="text-center"><span class="badge text-bg-{{ quote.status|badge_class }}">{{ quote.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nessun preventivo</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body border-top py-2 text-end">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'sales:quote_list' %}?cliente={{ contact.pk }}">Tutti i preventivi</a>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-orders">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Numero</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+              <tbody>
+                {% for order in orders %}
+                <tr>
+                  <td><a href="{% url 'sales:order_detail' order.pk %}">{{ order.number }}</a></td>
+                  <td>{{ order.date|date:"d/m/Y" }}</td>
+                  <td class="text-end">{{ order.grand_total|money }} €</td>
+                  <td class="text-center"><span class="badge text-bg-{{ order.status|badge_class }}">{{ order.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nessun ordine cliente</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body border-top py-2 text-end">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'sales:order_list' %}?cliente={{ contact.pk }}">Tutti gli ordini</a>
+          </div>
+        </div>
+        {% endif %}
+        {% if contact.is_supplier %}
+        <div class="tab-pane fade {% if not contact.is_customer %}show active{% endif %}" id="tab-pos">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Numero</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+              <tbody>
+                {% for po in purchase_orders %}
+                <tr>
+                  <td><a href="{% url 'purchasing:po_detail' po.pk %}">{{ po.number }}</a></td>
+                  <td>{{ po.date|date:"d/m/Y" }}</td>
+                  <td class="text-end">{{ po.grand_total|money }} €</td>
+                  <td class="text-center"><span class="badge text-bg-{{ po.status|badge_class }}">{{ po.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nessun ordine fornitore</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body border-top py-2 text-end">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'purchasing:po_list' %}?fornitore={{ contact.pk }}">Tutti gli ordini fornitore</a>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-pricelists">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Nome</th><th>Valido dal</th><th class="text-center">Attivo</th></tr></thead>
+              <tbody>
+                {% for pricelist in price_lists %}
+                <tr>
+                  <td><a href="{% url 'purchasing:pricelist_detail' pricelist.pk %}">{{ pricelist.name }}</a></td>
+                  <td>{{ pricelist.valid_from|date:"d/m/Y" }}</td>
+                  <td class="text-center">{% if pricelist.is_active %}<i class="bi bi-check-lg text-success"></i>{% else %}—{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-center text-muted py-3">Nessun listino</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body border-top py-2 text-end">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'purchasing:pricelist_create' %}?fornitore={{ contact.pk }}">Nuovo listino</a>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

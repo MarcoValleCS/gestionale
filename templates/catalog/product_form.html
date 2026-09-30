@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">Dati principali</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.name col=8 %}
+            {% include "partials/field.html" with field=form.code col=4 %}
+            {% include "partials/field.html" with field=form.category col=6 %}
+            {% include "partials/field.html" with field=form.uom col=3 %}
+            {% include "partials/field.html" with field=form.barcode col=3 %}
+            {% include "partials/field.html" with field=form.description col=12 %}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Prezzi e IVA</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.sale_price col=3 %}
+            {% include "partials/field.html" with field=form.sale_vat col=3 %}
+            {% include "partials/field.html" with field=form.purchase_price col=3 %}
+            {% include "partials/field.html" with field=form.purchase_vat col=3 %}
+            {% include "partials/field.html" with field=form.main_supplier col=6 %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">Magazzino</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.is_stock_tracked col=12 %}
+            {% include "partials/field.html" with field=form.min_stock col=12 %}
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header">Classificazione</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.tags col=12 %}
+            {% include "partials/field.html" with field=form.active col=12 %}
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header">Note interne</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.notes col=12 %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+        <a class="btn btn-outline-secondary" href="{% if object %}{% url 'catalog:product_detail' object.pk %}{% else %}{% url 'catalog:product_list' %}{% endif %}">Annulla</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

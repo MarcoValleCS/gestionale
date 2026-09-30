@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Numerazioni{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ formset.management_form }}
+      <div class="card">
+        <div class="card-header">Numerazioni documenti</div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Anno</th>
+                <th>Prefisso</th>
+                <th>Prossimo numero</th>
+                <th>Zeri iniziali</th>
+                <th>Anteprima</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for form in formset %}
+              <tr>
+                <td class="fw-semibold align-middle">{{ form.instance.get_doc_type_display }}</td>
+                <td class="align-middle">{{ form.instance.year|default:"—" }}</td>
+                <td>{{ form.id }}{{ form.prefix }}</td>
+                <td>{{ form.next_number }}</td>
+                <td>{{ form.padding }}</td>
+                <td class="align-middle text-muted number-badge">
+                  {{ form.instance.prefix }}{{ form.instance.year }}-
+                  {% if form.instance.padding == 4 %}0000{% endif %}{{ form.instance.next_number }}
+                </td>
+              </tr>
+              {% for error in form.errors.values %}
+              <tr><td colspan="6" class="text-danger small pb-2">{{ error }}</td></tr>
+              {% endfor %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body border-top">
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva numerazioni</button>
+            <a class="btn btn-outline-secondary" href="{% url 'core:settings' %}">Annulla</a>
+          </div>
+          <p class="text-muted small mb-0 mt-3">
+            I numeri vengono assegnati automaticamente alla creazione dei documenti. Il numero è progressivo per anno.
+          </p>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

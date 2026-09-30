@@ -1,0 +1,141 @@
+{{ vat_rates_json|json_script:"vat-rates-data" }}
+<script>
+(function () {
+  const prefix = "lines";
+  const totalFormsInput = document.getElementById("id_" + prefix + "-TOTAL_FORMS");
+  const tableBody = document.getElementById("lines-body");
+  const templateEl = document.getElementById("empty-line-template");
+  if (!totalFormsInput || !tableBody || !templateEl) return;
+
+  const vatRates = JSON.parse(document.getElementById("vat-rates-data").textContent);
+  const currency = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function parseNumber(value) {
+    if (!value) return 0;
+    return parseFloat(String(value).replace(/\s/g, "").replace(",", ".")) || 0;
+  }
+
+  function isDeleted(row) {
+    const checkbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+    return checkbox && checkbox.checked;
+  }
+
+  function recalc() {
+    let subtotal = 0;
+    const vatMap = {};
+    tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
+      if (isDeleted(row)) return;
+      const qtyField = row.querySelector('[name$="-qty"]');
+      const priceField = row.querySelector('[name$="-unit_price"]');
+      const discountField = row.querySelector('[name$="-discount_pct"]');
+      const vatSelect = row.querySelector('[name$="-vat_rate"]');
+      const qty = parseNumber(qtyField && qtyField.value);
+      const price = parseNumber(priceField && priceField.value);
+      const discount = parseNumber(discountField && discountField.value);
+      const vatPk = vatSelect ? vatSelect.value : "";
+      const rate = vatPk && vatRates[vatPk] ? parseFloat(vatRates[vatPk]) : 0;
+      const lineSubtotal = qty * price * (1 - discount / 100);
+      const lineVat = lineSubtotal * rate / 100;
+      subtotal += lineSubtotal;
+      const cell = row.querySelector(".line-total");
+      if (cell) cell.textContent = currency.format(lineSubtotal + lineVat) + " €";
+      if (vatPk) {
+        vatMap[vatPk] = vatMap[vatPk] || { rate: rate, base: 0, vat: 0 };
+        vatMap[vatPk].base += lineSubtotal;
+        vatMap[vatPk].vat += lineVat;
+      }
+    });
+    let vatTotal = 0;
+    Object.values(vatMap).forEach(function (entry) { vatTotal += entry.vat; });
+
+    const subtotalEl = document.getElementById("totals-subtotal");
+    const vatEl = document.getElementById("totals-vat");
+    const grandEl = document.getElementById("totals-grand");
+    if (subtotalEl) subtotalEl.textContent = currency.format(subtotal) + " €";
+    if (vatEl) vatEl.textContent = currency.format(vatTotal) + " €";
+    if (grandEl) grandEl.textContent = currency.format(subtotal + vatTotal) + " €";
+
+    const breakdown = document.getElementById("vat-breakdown");
+    if (breakdown) {
+      breakdown.innerHTML = "";
+      Object.values(vatMap)
+        .sort(function (a, b) { return b.rate - a.rate; })
+        .forEach(function (entry) {
+          const div = document.createElement("div");
+          div.className = "d-flex justify-content-between small text-muted";
+          div.innerHTML = "<span>IVA " + entry.rate + "%</span><span>" +
+            currency.format(entry.base) + " € + " + currency.format(entry.vat) + " €</span>";
+          breakdown.appendChild(div);
+        });
+    }
+  }
+
+  function fillFromProduct(row) {
+    const productSelect = row.querySelector('[name$="-product"]');
+    if (!productSelect) return;
+    const baseUrl = productSelect.dataset.defaultsUrl;
+    if (!baseUrl || !productSelect.value) return;
+    const url = baseUrl.replace("/0/", "/" + productSelect.value + "/");
+    const params = new URLSearchParams();
+    params.set("context", productSelect.dataset.context || "sale");
+    const supplierField = document.getElementById("id_supplier");
+    if (supplierField && supplierField.value) params.set("supplier", supplierField.value);
+    fetch(url + "?" + params.toString())
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        const desc = row.querySelector('[name$="-description"]');
+        if (desc && !desc.value.trim()) desc.value = data.description;
+        const uom = row.querySelector('[name$="-uom"]');
+        if (uom && data.uom_id) uom.value = data.uom_id;
+        const price = row.querySelector('[name$="-unit_price"]');
+        if (price) price.value = data.price;
+        const vat = row.querySelector('[name$="-vat_rate"]');
+        if (vat && data.vat_id) vat.value = data.vat_id;
+        recalc();
+      })
+      .catch(function () { /* ignora errori di rete */ });
+  }
+
+  function bindRow(row) {
+    const productSelect = row.querySelector('[name$="-product"]');
+    if (productSelect) productSelect.addEventListener("change", function () { fillFromProduct(row); });
+    row.querySelectorAll('input, select').forEach(function (field) {
+      field.addEventListener("input", recalc);
+      field.addEventListener("change", recalc);
+    });
+    const removeButton = row.querySelector(".remove-line");
+    if (removeButton) {
+      removeButton.addEventListener("click", function () {
+        const idField = row.querySelector('input[name$="-id"]');
+        const checkbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+        if (idField && idField.value && checkbox) {
+          checkbox.checked = true;
+          row.classList.add("d-none");
+        } else {
+          row.remove();
+        }
+        recalc();
+      });
+    }
+  }
+
+  const addButton = document.getElementById("add-line");
+  if (addButton) {
+    addButton.addEventListener("click", function () {
+      const index = parseInt(totalFormsInput.value, 10) || 0;
+      const html = templateEl.innerHTML.replace(/__prefix__/g, index);
+      const wrapper = document.createElement("tbody");
+      wrapper.innerHTML = html.trim();
+      const row = wrapper.firstElementChild;
+      if (!row) return;
+      tableBody.appendChild(row);
+      totalFormsInput.value = index + 1;
+      bindRow(row);
+      recalc();
+    });
+  }
+
+  tableBody.querySelectorAll("tr.line-row").forEach(bindRow);
+  recalc();
+})();
+</script>

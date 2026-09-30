@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Aliquote IVA{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Aliquote IVA</span>
+    <a class="btn btn-primary btn-sm" href="{% url 'core:vat_create' %}"><i class="bi bi-plus-lg"></i> Nuova aliquota</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Descrizione</th>
+          <th class="text-end">Aliquota</th>
+          <th>Natura</th>
+          <th class="text-center">Predef. vendite</th>
+          <th class="text-center">Predef. acquisti</th>
+          <th class="text-center">Attiva</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for vat in objects %}
+        <tr>
+          <td class="fw-semibold">{{ vat.code }}</td>
+          <td>{{ vat.name }}</td>
+          <td class="text-end">{{ vat.rate|qty }}%</td>
+          <td>{{ vat.nature|default:"—" }}</td>
+          <td class="text-center">{% if vat.is_default_sales %}<i class="bi bi-check-lg text-success"></i>{% endif %}</td>
+          <td class="text-center">{% if vat.is_default_purchase %}<i class="bi bi-check-lg text-success"></i>{% endif %}</td>
+          <td class="text-center">
+            {% if vat.is_active %}<span class="badge text-bg-success">Attiva</span>{% else %}<span class="badge text-bg-secondary">Disattivata</span>{% endif %}
+          </td>
+          <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="{% url 'core:vat_update' vat.pk %}"><i class="bi bi-pencil"></i></a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Nessuna aliquota configurata</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

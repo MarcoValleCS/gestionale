@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------- gestionale
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+db.sqlite3
+db.sqlite3-journal
+.env
+staticfiles/
+media/
+
+# ------------------------------------------------------------------- editor
+.idea/
+.vscode/
+*.swp
+
+# ------------------------------------------------------------------ sistema
+Thumbs.db
+.DS_Store
