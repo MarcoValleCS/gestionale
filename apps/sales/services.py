@@ -59,6 +59,10 @@ def convert_quote_to_order(quote, user=None):
             notes="",
             terms_text=quote.terms_text,
             created_by=user,
+            # la provvigione concordata sul preventivo segue l'ordine, altrimenti
+            # non eroderebbe il margine nelle statistiche (calcolate sugli ordini)
+            commission_contact=quote.commission_contact,
+            commission_pct=quote.commission_pct,
         )
         for line in quote.lines.all():
             SalesOrderLine.objects.create(

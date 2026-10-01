@@ -5,9 +5,10 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.forms import modelformset_factory
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
@@ -15,7 +16,7 @@ from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
 from apps.core.models import VatRate
 
-from . import services
+from . import analytics, emailing, services
 from .forms import (
     QuoteForm,
     QuoteLineForm,
@@ -118,7 +119,7 @@ class QuoteListView(RoleRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        queryset = Quote.objects.select_related("customer").order_by("-date", "-pk")
+        queryset = Quote.objects.select_related("customer", "created_by").order_by("-date", "-pk")
         status = self.request.GET.get("stato", "")
         if status == "aperti":
             queryset = queryset.filter(status__in=[Quote.STATUS_DRAFT, Quote.STATUS_SENT])
@@ -127,12 +128,20 @@ class QuoteListView(RoleRequiredMixin, ListView):
         customer_id = self.request.GET.get("cliente", "")
         if customer_id:
             queryset = queryset.filter(customer_id=customer_id)
+        # «miei=1» mostra solo i preventivi dell'utente collegato
+        if self.request.GET.get("miei") == "1" and self.request.user.is_authenticated:
+            queryset = queryset.filter(created_by=self.request.user)
+        creator_id = self.request.GET.get("utente", "")
+        if creator_id:
+            queryset = queryset.filter(created_by_id=creator_id)
         search = self.request.GET.get("q", "").strip()
         if search:
             queryset = queryset.filter(Q(number__icontains=search) | Q(customer__name__icontains=search) | Q(reference__icontains=search))
         return queryset
 
     def get_context_data(self, **kwargs):
+        from django.contrib.auth import get_user_model
+
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Preventivi"
         context["statuses"] = Quote.STATUS_CHOICES
@@ -140,6 +149,15 @@ class QuoteListView(RoleRequiredMixin, ListView):
         context["status"] = self.request.GET.get("stato", "")
         context["customer_id"] = self.request.GET.get("cliente", "")
         context["search"] = self.request.GET.get("q", "")
+        context["creator_id"] = self.request.GET.get("utente", "")
+        context["only_mine"] = self.request.GET.get("miei") == "1"
+        # solo chi ha davvero preventivi, per non riempire il menu di voci inutili
+        context["creators"] = (
+            get_user_model()
+            .objects.filter(quotes__isnull=False)
+            .distinct()
+            .order_by("username")
+        )
         return context
 
 
@@ -154,11 +172,15 @@ class QuoteDetailView(RoleRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        from apps.core.pdf import pdf_available
+
         context["page_title"] = f"Preventivo {self.object.number}"
         context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
         context["generated_order"] = self.object.generated_order
+        context["email_configured"] = emailing.email_configured()
+        context["pdf_available"] = pdf_available()
         return context
 
 
@@ -233,26 +255,11 @@ class QuotePrintView(RoleRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        doc = self.object
-        context.update(
-            build_print_context(
-                doc,
-                title="Preventivo",
-                counterparty=doc.customer,
-                counterparty_label="Spett.le cliente",
-                meta_rows=[
-                    ("Data", fdate(doc.date)),
-                    ("Valido fino al", fdate(doc.valid_until)),
-                    ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
-                    ("Vostro riferimento", doc.reference),
-                    ("Cantiere", str(doc.job) if doc.job_id else ""),
-                ],
-                back_url=reverse("sales:quote_detail", args=[doc.pk]),
-                notes=doc.terms_text,
-                show_signature=True,
-                signature_label="Per accettazione (data e firma)",
-            )
-        )
+        # import locale: printing.py usa funzioni di questo modulo, quindi
+        # importarlo in cima creerebbe un ciclo
+        from .printing import quote_print_context
+
+        context.update(quote_print_context(self.object))
         return context
 
 
@@ -265,6 +272,36 @@ def quote_send(request, pk):
         messages.success(request, f"Preventivo {quote.number} segnato come inviato.")
     else:
         messages.warning(request, "Il preventivo non è in bozza: stato non modificato.")
+    return redirect("sales:quote_detail", pk=quote.pk)
+
+
+@role_required(*QUOTE_ROLES)
+def quote_email(request, pk):
+    """Invia il preventivo per email (con PDF in allegato se disponibile)."""
+    quote = get_object_or_404(Quote.objects.select_related("customer"), pk=pk)
+    if request.method == "POST":
+        to_email = (request.POST.get("to") or quote.customer.email or "").strip()
+        subject = (request.POST.get("subject") or f"Preventivo {quote.number}").strip()
+        message_body = (request.POST.get("message") or "").strip()
+
+        if not to_email:
+            messages.error(request, "Indica l'indirizzo email del cliente.")
+        elif not emailing.email_configured():
+            messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        else:
+            try:
+                pdf_attached = emailing.send_quote_email(
+                    quote, to_email=to_email, subject=subject, message=message_body
+                )
+            except Exception as exc:
+                messages.error(request, f"Invio non riuscito: {exc}")
+            else:
+                # inviare il preventivo lo porta da «bozza» a «inviato»
+                if quote.status == Quote.STATUS_DRAFT:
+                    quote.status = Quote.STATUS_SENT
+                    quote.save(update_fields=["status", "updated_at"])
+                extra = "" if pdf_attached else " (senza allegato PDF: non disponibile su questo sistema)"
+                messages.success(request, f"Preventivo {quote.number} inviato a {to_email}{extra}.")
     return redirect("sales:quote_detail", pk=quote.pk)
 
 
@@ -663,3 +700,103 @@ def quote_template_data(request, pk):
             "lines": lines,
         }
     )
+
+
+# ------------------------------------------------------------ esportazione
+EXPORT_COLUMNS = [
+    ("Data", 11),
+    ("Documento", 14),
+    ("Cliente", 30),
+    ("Venditore", 16),
+    ("Codice", 14),
+    ("Articolo / descrizione", 42),
+    ("Q.tà", 10),
+    ("U.d.M.", 8),
+    ("Prezzo unitario", 14),
+    ("Sconto %", 10),
+    ("Imponibile", 13),
+    ("Costo", 13),
+    ("Provvigione", 13),
+    ("Margine", 13),
+    ("Margine %", 11),
+]
+
+
+@role_required(*QUOTE_ROLES)
+def export_sales_excel(request):
+    """Scarica in Excel il dettaglio delle vendite del periodo scelto.
+
+    Una riga per articolo venduto, con costo, provvigione e margine, così il
+    file si può aprire, filtrare e pivotare direttamente.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    period = request.GET.get("periodo", analytics.PERIOD_YEAR)
+    if period not in {value for value, _label in analytics.PERIOD_CHOICES}:
+        period = analytics.PERIOD_YEAR
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Vendite"
+
+    intestazione = Font(bold=True, color="FFFFFF")
+    sfondo = PatternFill("solid", fgColor="2563EB")
+    for indice, (titolo, larghezza) in enumerate(EXPORT_COLUMNS, start=1):
+        cella = sheet.cell(row=1, column=indice, value=titolo)
+        cella.font = intestazione
+        cella.fill = sfondo
+        cella.alignment = Alignment(horizontal="center", vertical="center")
+        sheet.column_dimensions[get_column_letter(indice)].width = larghezza
+    sheet.freeze_panes = "A2"
+
+    totali = {"imponibile": Decimal("0"), "costo": Decimal("0"), "provvigione": Decimal("0"), "margine": Decimal("0")}
+    riga = 2
+    for line, line_revenue, row_cost, share in analytics.lines_with_shares(period):
+        order = line.order
+        margine = line_revenue - row_cost - share
+        valori = [
+            timezone.localtime(order.delivered_at).date() if order.delivered_at else order.date,
+            order.number,
+            order.customer.name,
+            (order.created_by.get_full_name() or order.created_by.username) if order.created_by else "",
+            line.product.code if line.product_id else "",
+            line.description or (line.product.name if line.product_id else ""),
+            float(line.qty or 0),
+            line.uom.code if line.uom_id else "",
+            float(line.unit_price or 0),
+            float(line.discount_pct or 0),
+            float(line_revenue),
+            float(row_cost),
+            float(share),
+            float(margine),
+            float(round(margine / line_revenue * 100, 2)) if line_revenue else 0.0,
+        ]
+        for indice, valore in enumerate(valori, start=1):
+            cella = sheet.cell(row=riga, column=indice, value=valore)
+            if indice == 1:
+                cella.number_format = "DD/MM/YYYY"
+            elif indice in (7, 9, 10, 11, 12, 13, 14, 15):
+                cella.number_format = "#,##0.00"
+        totali["imponibile"] += line_revenue
+        totali["costo"] += row_cost
+        totali["provvigione"] += share
+        totali["margine"] += margine
+        riga += 1
+
+    # riga dei totali, comoda per verificare che i conti tornino
+    if riga > 2:
+        sheet.cell(row=riga, column=6, value="TOTALE").font = Font(bold=True)
+        for colonna, chiave in ((11, "imponibile"), (12, "costo"), (13, "provvigione"), (14, "margine")):
+            cella = sheet.cell(row=riga, column=colonna, value=float(totali[chiave]))
+            cella.font = Font(bold=True)
+            cella.number_format = "#,##0.00"
+
+    nome = f"vendite_{period}_{timezone.localdate():%Y-%m-%d}.xlsx"
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nome}"'
+    workbook.save(response)
+    return response

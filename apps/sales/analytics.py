@@ -44,10 +44,8 @@ def period_bounds(period):
 
 
 def line_cost(line):
-    cost = line.unit_cost
-    if cost is None:
-        cost = line.product.purchase_price if line.product_id else ZERO
-    return Decimal(cost or 0) * Decimal(line.qty or 0)
+    """Costo della riga (delega alla property del modello, unica implementazione)."""
+    return line.line_cost
 
 
 def delivered_lines(period):
@@ -59,56 +57,83 @@ def delivered_lines(period):
     ).select_related("product", "product__main_supplier", "order", "order__customer", "order__job")
 
 
+def lines_with_shares(period):
+    """Righe consegnate con costo e quota di provvigione già calcolati.
+
+    La provvigione è concordata sul documento, non sulla singola riga: ogni
+    riga se ne porta la quota proporzionale al proprio imponibile. Così i
+    raggruppamenti per articolo o fornitore restano coerenti col totale.
+    """
+    commission_by_order = {}
+    for line in delivered_lines(period):
+        order = line.order
+        if order.pk not in commission_by_order:
+            commission_by_order[order.pk] = order.commission_amount
+        order_commission = commission_by_order[order.pk]
+
+        line_revenue = line.line_subtotal
+        if order_commission and order.subtotal:
+            share = round2(order_commission * line_revenue / order.subtotal)
+        else:
+            share = ZERO
+        yield line, line_revenue, round2(line_cost(line)), share
+
+
 def summary(period):
     revenue = ZERO
     cost = ZERO
+    commission = ZERO
     order_ids = set()
-    for line in delivered_lines(period):
-        revenue += line.line_subtotal
-        cost += line_cost(line)
+    for line, line_revenue, row_cost, share in lines_with_shares(period):
+        revenue += line_revenue
+        cost += row_cost
+        commission += share
         order_ids.add(line.order_id)
-    margin = revenue - cost
+    # la provvigione erode il margine, come il costo
+    revenue = round2(revenue)
+    cost = round2(cost)
+    commission = round2(commission)
+    margin = round2(revenue - cost - commission)
     return {
         "period": period,
         "revenue": revenue,
         "cost": cost,
+        "commission": commission,
         "margin": margin,
         "margin_pct": round2(margin / revenue * 100) if revenue else ZERO,
+        "margin_before_commission": round2(revenue - cost),
         "orders": len(order_ids),
     }
 
 
 def _group_lines(period, key_func):
     rows = {}
-    for line in delivered_lines(period):
+    for line, line_revenue, row_cost, share in lines_with_shares(period):
         key, label = key_func(line)
-        entry = rows.setdefault(key, {"label": label, "revenue": ZERO, "cost": ZERO})
-        entry["revenue"] += line.line_subtotal
-        entry["cost"] += line_cost(line)
-    result = []
-    for entry in rows.values():
-        entry["margin"] = entry["revenue"] - entry["cost"]
-        entry["margin_pct"] = round2(entry["margin"] / entry["revenue"] * 100) if entry["revenue"] else ZERO
-        result.append(entry)
-    result.sort(key=lambda row: row["margin"], reverse=True)
-    return result
+        _accumulate(rows, key, label, line_revenue, row_cost, share)
+    return _finalize(rows)
 
 
 def _finalize(rows, limit=None):
     result = list(rows.values())
     for entry in result:
-        entry["margin"] = entry["revenue"] - entry["cost"]
+        # la provvigione erode il margine, come il costo
+        entry["revenue"] = round2(entry["revenue"])
+        entry["cost"] = round2(entry["cost"])
+        entry["commission"] = round2(entry["commission"])
+        entry["margin"] = round2(entry["revenue"] - entry["cost"] - entry["commission"])
         entry["margin_pct"] = round2(entry["margin"] / entry["revenue"] * 100) if entry["revenue"] else ZERO
     result.sort(key=lambda row: row["margin"], reverse=True)
     return result[:limit] if limit else result
 
 
-def _accumulate(rows, key, label, revenue, cost):
+def _accumulate(rows, key, label, revenue, cost, commission=ZERO):
     entry = rows.get(key)
     if entry is None:
-        entry = rows[key] = {"label": label, "revenue": ZERO, "cost": ZERO}
+        entry = rows[key] = {"label": label, "revenue": ZERO, "cost": ZERO, "commission": ZERO}
     entry["revenue"] += revenue
     entry["cost"] += cost
+    entry["commission"] += commission
 
 
 def breakdowns(period, limit=10):
@@ -120,45 +145,63 @@ def breakdowns(period, limit=10):
     """
     revenue = ZERO
     cost = ZERO
+    commission_total = ZERO
     order_ids = set()
     product_rows, supplier_rows, customer_rows, job_rows = {}, {}, {}, {}
+    # provvigione per ordine, per ripartirla sulle righe in proporzione
+    commission_by_order = {}
 
     for line in delivered_lines(period):
+        order = line.order
         line_revenue = line.line_subtotal
         row_cost = line_cost(line)
+
+        if order.pk not in commission_by_order:
+            commission_by_order[order.pk] = order.commission_amount
+        order_commission = commission_by_order[order.pk]
+        # la provvigione è sul documento: ogni riga se ne porta la quota
+        # proporzionale al proprio imponibile
+        if order_commission and order.subtotal:
+            row_commission = round2(order_commission * line_revenue / order.subtotal)
+        else:
+            row_commission = ZERO
+
         revenue += line_revenue
         cost += row_cost
+        commission_total += row_commission
         order_ids.add(line.order_id)
 
         if line.product_id:
-            _accumulate(product_rows, f"p{line.product_id}", line.product.name, line_revenue, row_cost)
+            _accumulate(product_rows, f"p{line.product_id}", line.product.name, line_revenue, row_cost, row_commission)
             supplier = line.product.main_supplier
         else:
-            _accumulate(product_rows, "none", line.description or "Voci libere", line_revenue, row_cost)
+            _accumulate(product_rows, "none", line.description or "Voci libere", line_revenue, row_cost, row_commission)
             supplier = None
 
         if supplier:
-            _accumulate(supplier_rows, f"s{supplier.pk}", supplier.name, line_revenue, row_cost)
+            _accumulate(supplier_rows, f"s{supplier.pk}", supplier.name, line_revenue, row_cost, row_commission)
         else:
-            _accumulate(supplier_rows, "none", "Senza fornitore", line_revenue, row_cost)
+            _accumulate(supplier_rows, "none", "Senza fornitore", line_revenue, row_cost, row_commission)
 
-        customer = line.order.customer
-        _accumulate(customer_rows, f"c{customer.pk}", customer.name, line_revenue, row_cost)
+        customer = order.customer
+        _accumulate(customer_rows, f"c{customer.pk}", customer.name, line_revenue, row_cost, row_commission)
 
-        job = line.order.job if line.order.job_id else None
+        job = order.job if order.job_id else None
         if job:
-            _accumulate(job_rows, f"j{job.pk}", f"{job.code} – {job.name}", line_revenue, row_cost)
+            _accumulate(job_rows, f"j{job.pk}", f"{job.code} – {job.name}", line_revenue, row_cost, row_commission)
         else:
-            _accumulate(job_rows, "none", "Senza cantiere", line_revenue, row_cost)
+            _accumulate(job_rows, "none", "Senza cantiere", line_revenue, row_cost, row_commission)
 
-    margin = revenue - cost
+    margin = revenue - cost - commission_total
     return {
         "summary": {
             "period": period,
             "revenue": revenue,
             "cost": cost,
+            "commission": commission_total,
             "margin": margin,
             "margin_pct": round2(margin / revenue * 100) if revenue else ZERO,
+            "margin_before_commission": revenue - cost,
             "orders": len(order_ids),
         },
         "by_product": _finalize(product_rows, limit),
@@ -226,11 +269,21 @@ def monthly_series(months=12, end_offset=0):
     ).select_related("product", "order")
 
     buckets = {}
+    commission_by_order = {}
     for line in lines:
-        when = timezone.localtime(line.order.delivered_at).date()
+        order = line.order
+        when = timezone.localtime(order.delivered_at).date()
         key = (when.year, when.month)
-        entry = buckets.setdefault(key, {"revenue": ZERO, "cost": ZERO})
-        entry["revenue"] += line.line_subtotal
+        entry = buckets.setdefault(key, {"revenue": ZERO, "cost": ZERO, "commission": ZERO})
+        line_revenue = line.line_subtotal
+
+        if order.pk not in commission_by_order:
+            commission_by_order[order.pk] = order.commission_amount
+        order_commission = commission_by_order[order.pk]
+        if order_commission and order.subtotal:
+            entry["commission"] += round2(order_commission * line_revenue / order.subtotal)
+
+        entry["revenue"] += line_revenue
         entry["cost"] += line_cost(line)
 
     labels, revenue, margin, rows = [], [], [], []
@@ -240,7 +293,7 @@ def monthly_series(months=12, end_offset=0):
         labels.append(label)
         entry = buckets.get((year, month))
         month_revenue = entry["revenue"] if entry else ZERO
-        month_margin = (entry["revenue"] - entry["cost"]) if entry else ZERO
+        month_margin = (entry["revenue"] - entry["cost"] - entry["commission"]) if entry else ZERO
         revenue.append(float(month_revenue))
         margin.append(float(month_margin))
         rows.append(
@@ -248,6 +301,7 @@ def monthly_series(months=12, end_offset=0):
                 "label": label,
                 "revenue": round2(month_revenue),
                 "margin": round2(month_margin),
+                "commission": round2(entry["commission"]) if entry else ZERO,
                 "margin_pct": round2(month_margin / month_revenue * 100) if month_revenue else ZERO,
             }
         )

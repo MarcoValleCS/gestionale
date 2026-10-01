@@ -31,6 +31,15 @@ class CustomerChoiceFormMixin:
         self.fields["job"].required = False
         self.fields["job"].help_text = "Facoltativo: collega il documento al cantiere/commessa."
 
+    def apply_commission_queryset(self):
+        """Chi percepisce la provvigione può essere chiunque: non solo un cliente."""
+        self.fields["commission_contact"].queryset = Contact.objects.filter(active=True).order_by("name")
+        self.fields["commission_contact"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
+        self.fields["commission_contact"].required = False
+        self.fields["commission_contact"].help_text = "Facoltativo: chi ha presentato il cliente."
+        self.fields["commission_pct"].required = False
+        self.fields["commission_pct"].help_text = "Percentuale sull'imponibile. 0 = nessuna provvigione."
+
 
 class PurchaseSupplierFormMixin:
     def apply_supplier_queryset(self):
@@ -75,12 +84,24 @@ class LineFormMixin:
 class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = Quote
-        fields = ["customer", "job", "date", "valid_until", "payment_term", "reference", "terms_text", "notes"]
+        fields = [
+            "customer",
+            "job",
+            "date",
+            "valid_until",
+            "payment_term",
+            "reference",
+            "commission_contact",
+            "commission_pct",
+            "terms_text",
+            "notes",
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_customer_queryset()
         self.apply_job_queryset()
+        self.apply_commission_queryset()
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
             self.fields["valid_until"].initial = timezone.localdate() + timedelta(days=30)
@@ -90,12 +111,24 @@ class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
 class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = SalesOrder
-        fields = ["customer", "job", "date", "expected_date", "payment_term", "reference", "terms_text", "notes"]
+        fields = [
+            "customer",
+            "job",
+            "date",
+            "expected_date",
+            "payment_term",
+            "reference",
+            "commission_contact",
+            "commission_pct",
+            "terms_text",
+            "notes",
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_customer_queryset()
         self.apply_job_queryset()
+        self.apply_commission_queryset()
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
             self.fields["terms_text"].initial = CompanySettings.load().quote_footer

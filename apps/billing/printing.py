@@ -1,25 +1,9 @@
 """Contesti condivisi per stampa, PDF ed email delle fatture."""
-import base64
-import mimetypes
-
 from django.urls import reverse
 
 from apps.core.models import CompanySettings
+from apps.core.pdf import logo_data_uri
 from apps.sales.views import build_print_context, fdate
-
-
-def logo_data_uri():
-    """Il logo aziendale come data-URI (per PDF renderizzati fuori dal browser)."""
-    company = CompanySettings.load()
-    if not company.logo:
-        return ""
-    try:
-        with company.logo.open("rb") as handle:
-            data = handle.read()
-        mime = mimetypes.guess_type(company.logo.name)[0] or "image/png"
-        return f"data:{mime};base64,{base64.b64encode(data).decode()}"
-    except Exception:
-        return ""
 
 
 def sales_invoice_print_context(invoice):

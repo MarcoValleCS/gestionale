@@ -27,6 +27,9 @@
       {% endfor %}
     </select>
     <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i></button>
+    <a class="btn btn-outline-success btn-sm text-nowrap" href="{% url 'sales:export_sales_excel' %}?periodo={{ period }}">
+      <i class="bi bi-file-earmark-excel"></i> Esporta Excel
+    </a>
   </form>
 </div>
 
@@ -205,7 +208,10 @@
       <div class="card-body">
         <div class="text-muted small text-uppercase">Margine</div>
         <div class="fs-3 fw-bold number-badge {% if stats.margin >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stats.margin|money }} €</div>
-        <div class="small text-muted">costo del venduto {{ stats.cost|money }} €</div>
+        <div class="small text-muted">
+          costo del venduto {{ stats.cost|money }} €
+          {% if stats.commission %}&middot; provvigioni {{ stats.commission|money }} €{% endif %}
+        </div>
       </div>
     </div>
   </div>

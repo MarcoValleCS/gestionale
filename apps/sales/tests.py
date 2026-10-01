@@ -1,8 +1,10 @@
 """Test del flusso di vendita completo e delle pagine principali."""
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.contrib.auth.models import Group
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
@@ -533,3 +535,394 @@ class PermissionsTest(FlowTestBase):
         self.assertEqual(self.client.get(reverse("accounts:user_list")).status_code, 403)
         # I listini no
         self.assertEqual(self.client.get(reverse("purchasing:pricelist_list")).status_code, 403)
+
+
+class QuoteEmailTest(FlowTestBase):
+    """Invio del preventivo via email e visibilità di chi l'ha creato."""
+
+    def setUp(self):
+        self.login()
+        self.quote = Quote.objects.create(customer=self.customer, created_by=self.user)
+        self.quote.lines.create(
+            product=self.product, description=self.product.name, qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+        )
+        self.quote.recalculate()
+
+    def test_pagina_mostra_il_modulo_email(self):
+        response = self.client.get(reverse("sales:quote_detail", args=[self.quote.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("sales:quote_email", args=[self.quote.pk]))
+
+    def test_invio_senza_email_configurata_avvisa(self):
+        """Senza EMAIL_HOST l'invio non deve rompersi ma spiegare cosa manca."""
+        response = self.client.post(
+            reverse("sales:quote_email", args=[self.quote.pk]),
+            {"to": "cliente@example.com", "subject": "Preventivo", "message": "Ciao"},
+            follow=True,
+        )
+        self.assertContains(response, "Invio email non configurato")
+        self.quote.refresh_from_db()
+        self.assertEqual(self.quote.status, Quote.STATUS_DRAFT, "lo stato non deve cambiare")
+
+    def test_invio_senza_indirizzo_email(self):
+        self.customer.email = ""
+        self.customer.save(update_fields=["email"])
+        response = self.client.post(
+            reverse("sales:quote_email", args=[self.quote.pk]),
+            {"to": "", "subject": "x", "message": "y"},
+            follow=True,
+        )
+        self.assertContains(response, "indirizzo email del cliente")
+
+    @override_settings(EMAIL_IS_CONFIGURED=True)
+    def test_invio_riuscito_porta_il_preventivo_a_inviato(self):
+        with mock.patch("apps.sales.emailing.send_quote_email", return_value=True) as invio:
+            response = self.client.post(
+                reverse("sales:quote_email", args=[self.quote.pk]),
+                {"to": "cliente@example.com", "subject": "Preventivo X", "message": "Buongiorno"},
+                follow=True,
+            )
+        self.assertEqual(invio.call_count, 1)
+        self.assertContains(response, "inviato a cliente@example.com")
+        self.quote.refresh_from_db()
+        self.assertEqual(self.quote.status, Quote.STATUS_SENT)
+
+    @override_settings(EMAIL_IS_CONFIGURED=True)
+    def test_invio_fallito_avvisa_e_non_cambia_stato(self):
+        with mock.patch("apps.sales.emailing.send_quote_email", side_effect=Exception("SMTP non raggiungibile")):
+            response = self.client.post(
+                reverse("sales:quote_email", args=[self.quote.pk]),
+                {"to": "cliente@example.com", "subject": "x", "message": "y"},
+                follow=True,
+            )
+        self.assertContains(response, "Invio non riuscito")
+        self.quote.refresh_from_db()
+        self.assertEqual(self.quote.status, Quote.STATUS_DRAFT)
+
+    def test_invio_su_preventivo_gia_inviato_non_cambia_stato(self):
+        self.quote.status = Quote.STATUS_ACCEPTED
+        self.quote.save(update_fields=["status"])
+        with mock.patch("apps.sales.emailing.send_quote_email", return_value=True):
+            self.client.post(
+                reverse("sales:quote_email", args=[self.quote.pk]),
+                {"to": "cliente@example.com", "subject": "x", "message": "y"},
+            )
+        self.quote.refresh_from_db()
+        self.assertEqual(self.quote.status, Quote.STATUS_ACCEPTED)
+
+
+class QuoteCreatorTest(FlowTestBase):
+    """L'elenco deve mostrare chi ha creato il preventivo e permettere il filtro."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.altro = User.objects.create_user("lucia", password="password123!", first_name="Lucia", last_name="Bianchi")
+        cls.mio = Quote.objects.create(customer=cls.customer, created_by=cls.user, reference="Mio")
+        cls.suo = Quote.objects.create(customer=cls.customer, created_by=cls.altro, reference="Suo")
+
+    def setUp(self):
+        self.login()
+
+    def test_elenco_mostra_chi_ha_creato(self):
+        response = self.client.get(reverse("sales:quote_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "admin")
+        self.assertContains(response, "Lucia Bianchi")
+
+    def test_filtro_per_utente(self):
+        response = self.client.get(reverse("sales:quote_list"), {"utente": self.altro.pk})
+        quotes = list(response.context["quotes"])
+        self.assertEqual(len(quotes), 1)
+        self.assertEqual(quotes[0].pk, self.suo.pk)
+
+    def test_filtro_solo_i_miei(self):
+        response = self.client.get(reverse("sales:quote_list"), {"miei": "1"})
+        quotes = list(response.context["quotes"])
+        self.assertEqual(len(quotes), 1)
+        self.assertEqual(quotes[0].pk, self.mio.pk)
+
+    def test_elenco_creatori_contiene_solo_chi_ha_preventivi(self):
+        response = self.client.get(reverse("sales:quote_list"))
+        nomi = {u.username for u in response.context["creators"]}
+        self.assertIn("admin", nomi)
+        self.assertIn("lucia", nomi)
+
+
+class QuotePdfTest(FlowTestBase):
+    """Il PDF del preventivo deve essere generato quando WeasyPrint è disponibile."""
+
+    def setUp(self):
+        self.login()
+        self.quote = Quote.objects.create(customer=self.customer)
+        self.quote.lines.create(
+            product=self.product, description=self.product.name, qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+        )
+        self.quote.recalculate()
+
+    def test_pdf_generato_oppure_assente_ma_senza_errori(self):
+        from apps.core.pdf import pdf_available
+        from apps.sales.pdf import render_quote_pdf
+
+        pdf = render_quote_pdf(self.quote)
+        if pdf_available():
+            self.assertIsNotNone(pdf, "con WeasyPrint disponibile il PDF deve essere generato")
+            self.assertTrue(pdf.startswith(b"%PDF-"))
+            self.assertGreater(len(pdf), 1000)
+        else:
+            self.assertIsNone(pdf, "senza WeasyPrint il PDF e' None e il gestionale continua a funzionare")
+
+
+class CommissionTest(FlowTestBase):
+    """La provvigione a chi ha presentato il cliente erode il margine."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.beneficiario = Contact.objects.create(
+            name="Geom. Bianchi", is_customer=False, is_supplier=False, city="Milano"
+        )
+        # secondo articolo, per verificare la ripartizione della provvigione
+        cls.altro_prodotto = Product.objects.create(
+            name="Vaso sospeso",
+            uom=cls.uom,
+            sale_price=Decimal("30.00"),
+            sale_vat=cls.vat22,
+            purchase_price=Decimal("6.00"),
+            purchase_vat=cls.vat22,
+            main_supplier=cls.supplier,
+        )
+
+    def _ordine_consegnato(self, commission_pct="10", commission_contact=None):
+        """Ordine con due righe: 100 di imponibile a costo 40, 300 a costo 60."""
+        order = SalesOrder.objects.create(
+            customer=self.customer,
+            status=SalesOrder.STATUS_DELIVERED,
+            delivered_at=timezone.now(),
+            commission_contact=self.beneficiario if commission_pct else None if commission_contact is None else commission_contact,
+            commission_pct=Decimal(commission_pct or "0"),
+        )
+        order.lines.create(
+            product=self.product, description=self.product.name, qty=Decimal("10"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+            qty_delivered=Decimal("10"), unit_cost=Decimal("4.00"),
+        )
+        order.lines.create(
+            product=self.altro_prodotto, description=self.altro_prodotto.name, qty=Decimal("10"),
+            uom=self.uom, unit_price=Decimal("30.00"), vat_rate=self.vat22,
+            qty_delivered=Decimal("10"), unit_cost=Decimal("6.00"),
+        )
+        order.recalculate()
+        return order
+
+    def test_importo_provvigione(self):
+        order = self._ordine_consegnato(commission_pct="10")
+        self.assertTrue(order.has_commission)
+        # 10% di 400 di imponibile
+        self.assertEqual(order.commission_amount, Decimal("40.00"))
+
+    def test_provvigione_zero_senza_beneficiario(self):
+        order = SalesOrder.objects.create(customer=self.customer, commission_pct=Decimal("10"))
+        self.assertFalse(order.has_commission)
+        self.assertEqual(order.commission_amount, Decimal("0"))
+
+    def test_provvigione_zero_senza_percentuale(self):
+        order = SalesOrder.objects.create(customer=self.customer, commission_contact=self.beneficiario)
+        self.assertFalse(order.has_commission)
+
+    def test_provvigione_erode_il_margine(self):
+        self._ordine_consegnato(commission_pct="10")
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        self.assertEqual(summary["revenue"], Decimal("400.00"))
+        self.assertEqual(summary["cost"], Decimal("100.00"))
+        self.assertEqual(summary["commission"], Decimal("40.00"))
+        # 400 - 100 - 40
+        self.assertEqual(summary["margin"], Decimal("260.00"))
+        self.assertEqual(summary["margin_pct"], Decimal("65.00"))
+
+    def test_senza_provvigione_il_margine_non_cambia(self):
+        self._ordine_consegnato(commission_pct="0")
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        self.assertEqual(summary["commission"], Decimal("0"))
+        self.assertEqual(summary["margin"], Decimal("300.00"))
+
+    def test_margine_prima_della_provvigione_resta_disponibile(self):
+        self._ordine_consegnato(commission_pct="10")
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        self.assertEqual(summary["margin_before_commission"], Decimal("300.00"))
+        self.assertEqual(
+            summary["margin_before_commission"] - summary["commission"], summary["margin"]
+        )
+
+    def test_provvigione_ripartita_sulle_righe_in_proporzione(self):
+        self._ordine_consegnato(commission_pct="10")
+        per_articolo = {row["label"]: row for row in analytics.by_product(analytics.PERIOD_YEAR)}
+        # riga da 100 -> 10 di provvigione, riga da 300 -> 30
+        self.assertEqual(per_articolo["Bullone M8"]["commission"], Decimal("10.00"))
+        self.assertEqual(per_articolo["Vaso sospeso"]["commission"], Decimal("30.00"))
+        self.assertEqual(per_articolo["Bullone M8"]["margin"], Decimal("50.00"))  # 100 - 40 - 10
+        self.assertEqual(per_articolo["Vaso sospeso"]["margin"], Decimal("210.00"))  # 300-60-30
+
+        # e la somma delle quote deve tornare col totale
+        totale = sum(row["commission"] for row in analytics.by_product(analytics.PERIOD_YEAR))
+        self.assertEqual(totale, Decimal("40.00"))
+
+    def test_breakdowns_della_dashboard_include_la_provvigione(self):
+        self._ordine_consegnato(commission_pct="10")
+        stats = analytics.breakdowns(analytics.PERIOD_YEAR, limit=10)
+        self.assertEqual(stats["summary"]["commission"], Decimal("40.00"))
+        self.assertEqual(stats["summary"]["margin"], Decimal("260.00"))
+        somma = sum(row["commission"] for row in stats["by_product"])
+        self.assertEqual(somma, Decimal("40.00"))
+
+    def test_provvigione_erode_anche_il_grafico_mensile(self):
+        self._ordine_consegnato(commission_pct="10")
+        serie = analytics.monthly_series(months=12)
+        self.assertEqual(sum(serie["margin"]), 260.0)
+
+    def test_la_provvigione_segue_il_preventivo_nell_ordine(self):
+        self.login()
+        quote = Quote.objects.create(
+            customer=self.customer,
+            commission_contact=self.beneficiario,
+            commission_pct=Decimal("7.5"),
+        )
+        quote.lines.create(
+            product=self.product, description=self.product.name, qty=Decimal("10"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        quote.status = Quote.STATUS_ACCEPTED
+        quote.save(update_fields=["status"])
+
+        response = self.client.post(reverse("sales:quote_convert", args=[quote.pk]))
+        self.assertEqual(response.status_code, 302)
+        order = SalesOrder.objects.get(source_quote=quote)
+        self.assertEqual(order.commission_contact, self.beneficiario)
+        self.assertEqual(order.commission_pct, Decimal("7.5"))
+        self.assertEqual(order.commission_amount, Decimal("7.50"))  # 7,5% di 100
+
+    def test_il_form_del_preventivo_mostra_i_campi_provvigione(self):
+        self.login()
+        response = self.client.get(reverse("sales:quote_create"))
+        self.assertContains(response, 'name="commission_contact"')
+        self.assertContains(response, 'name="commission_pct"')
+
+    def test_le_fatture_non_hanno_la_provvigione(self):
+        """La provvigione non deve comparire su documenti di acquisto o fatture."""
+        from apps.billing.models import PurchaseInvoice, SalesInvoice
+        from apps.purchasing.models import PurchaseOrder
+
+        for modello in (SalesInvoice, PurchaseInvoice, PurchaseOrder):
+            with self.subTest(modello=modello.__name__):
+                self.assertFalse(hasattr(modello, "commission_pct"))
+
+
+class ExportExcelTest(FlowTestBase):
+    """Esportazione Excel del dettaglio vendite."""
+
+    def setUp(self):
+        self.login()
+
+    def _ordine(self, qty="10", price="10.00", consegnato=True, con_provvigione=False):
+        order = SalesOrder.objects.create(
+            customer=self.customer,
+            status=SalesOrder.STATUS_DELIVERED if consegnato else SalesOrder.STATUS_CONFIRMED,
+            delivered_at=timezone.now() if consegnato else None,
+            created_by=self.user,
+            commission_contact=self.customer if con_provvigione else None,
+            commission_pct=Decimal("10") if con_provvigione else Decimal("0"),
+        )
+        order.lines.create(
+            product=self.product, description=self.product.name, qty=Decimal(qty),
+            uom=self.uom, unit_price=Decimal(price), vat_rate=self.vat22,
+            qty_delivered=Decimal(qty), unit_cost=Decimal("4.00"),
+        )
+        order.recalculate()
+        return order
+
+    def _foglio(self, **parametri):
+        import openpyxl
+        from io import BytesIO
+
+        response = self.client.get(reverse("sales:export_sales_excel"), parametri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertIn(".xlsx", response["Content-Disposition"])
+        return openpyxl.load_workbook(BytesIO(response.content)).active
+
+    def test_file_valido_con_intestazioni_chiare(self):
+        self._ordine()
+        foglio = self._foglio(periodo="anno")
+        intestazioni = [cella.value for cella in foglio[1]]
+        self.assertEqual(intestazioni[0], "Data")
+        self.assertEqual(intestazioni[2], "Cliente")
+        self.assertEqual(intestazioni[3], "Venditore")
+        self.assertIn("Provvigione", intestazioni)
+        self.assertIn("Margine", intestazioni)
+        self.assertEqual(foglio.max_column, 15)
+
+    def test_una_riga_per_articolo_venduto(self):
+        self._ordine()
+        foglio = self._foglio(periodo="anno")
+        # 1 riga di intestazione + 1 riga di dati + 1 riga totali
+        self.assertEqual(foglio.max_row, 3)
+
+    def test_esclude_gli_ordini_non_consegnati(self):
+        self._ordine(consegnato=False)
+        foglio = self._foglio(periodo="anno")
+        self.assertEqual(foglio.max_row, 1, "solo l'intestazione: nessuna vendita consegnata")
+
+    def test_riporta_i_valori_e_i_totali(self):
+        ordine = self._ordine(qty="10", price="10.00")
+        foglio = self._foglio(periodo="anno")
+        riga = [cella.value for cella in foglio[2]]
+        self.assertEqual(riga[1], ordine.number, "deve riportare il numero del documento")
+        self.assertEqual(riga[2], self.customer.name, "deve riportare il cliente")
+        self.assertEqual(riga[5], "Bullone M8")
+        self.assertEqual(riga[6], 10.0)          # quantità
+        self.assertEqual(riga[7], "PZ")          # unità di misura
+        self.assertEqual(riga[8], 10.0)          # prezzo
+        self.assertEqual(riga[10], 100.0)        # imponibile
+        self.assertEqual(riga[11], 40.0)         # costo
+        self.assertEqual(riga[13], 60.0)         # margine
+
+        totali = [cella.value for cella in foglio[foglio.max_row]]
+        self.assertEqual(totali[5], "TOTALE")
+        self.assertEqual(totali[10], 100.0)
+        self.assertEqual(totali[11], 40.0)
+        self.assertEqual(totali[13], 60.0)
+
+    def test_la_provvigione_compare_e_riduce_il_margine(self):
+        self._ordine(con_provvigione=True)
+        foglio = self._foglio(periodo="anno")
+        riga = [cella.value for cella in foglio[2]]
+        self.assertEqual(riga[12], 10.0, "provvigione 10% di 100")
+        self.assertEqual(riga[13], 50.0, "margine 100 - 40 - 10")
+        self.assertEqual(riga[14], 50.0, "margine %")
+
+    def test_il_venditore_e_riportato(self):
+        self._ordine()
+        foglio = self._foglio(periodo="anno")
+        riga = [cella.value for cella in foglio[2]]
+        self.assertEqual(riga[3], "admin")
+
+    def test_la_data_e_un_vero_formato_data(self):
+        import datetime
+
+        self._ordine()
+        foglio = self._foglio(periodo="anno")
+        valore = foglio.cell(row=2, column=1).value
+        self.assertIsInstance(valore, (datetime.date, datetime.datetime))
+        self.assertEqual(foglio.cell(row=2, column=1).number_format, "DD/MM/YYYY")
+
+    def test_periodo_non_valido_ricade_sull_anno(self):
+        self._ordine()
+        foglio = self._foglio(periodo="qualcosa-di-strano")
+        self.assertEqual(foglio.max_row, 3)

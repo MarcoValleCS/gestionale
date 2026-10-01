@@ -145,6 +145,60 @@
         </dl>
       </div>
     </div>
+    {% if quote.has_commission %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-person-badge me-1"></i> Provvigione</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">A</dt>
+          <dd class="col-6"><a href="{% url 'contacts:detail' quote.commission_contact.pk %}">{{ quote.commission_contact.name }}</a></dd>
+          <dt class="col-6 text-muted">Percentuale</dt><dd class="col-6">{{ quote.commission_pct|qty }}%</dd>
+          <dt class="col-6 text-muted">Importo</dt><dd class="col-6 fw-semibold">{{ quote.commission_amount|money }} €</dd>
+        </dl>
+        <p class="text-muted small mb-0 mt-2">Calcolata sull'imponibile ed esclusa dal margine nelle statistiche.</p>
+      </div>
+    </div>
+    {% endif %}
+    <div class="card mb-3 no-print">
+      <div class="card-header"><i class="bi bi-envelope me-1"></i> Invia al cliente</div>
+      <div class="card-body">
+        {% if not email_configured %}
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="bi bi-exclamation-triangle"></i> Invio email non configurato: imposta le variabili <code>EMAIL_*</code> nel file <code>.env</code>.
+        </div>
+        {% endif %}
+        <form method="post" action="{% url 'sales:quote_email' quote.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label" for="email-to">Email del cliente</label>
+            <input class="form-control form-control-sm" type="email" id="email-to" name="to" value="{{ quote.customer.email }}" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="email-subject">Oggetto</label>
+            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="Preventivo {{ quote.number }} – {{ company.name }}">
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="email-message">Messaggio</label>
+            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="6">Buongiorno,
+in allegato il preventivo {{ quote.number }} del {{ quote.date|date:"d/m/Y" }} di {{ quote.grand_total|money }} €.
+{% if quote.valid_until %}Il preventivo è valido fino al {{ quote.valid_until|date:"d/m/Y" }}.
+{% endif %}
+Restiamo a disposizione per qualsiasi chiarimento.
+
+Cordiali saluti
+{{ company.name }}</textarea>
+          </div>
+          <button class="btn btn-outline-primary btn-sm w-100" type="submit">
+            <i class="bi bi-send"></i> Invia il preventivo
+          </button>
+          <p class="text-muted small mt-2 mb-0">
+            {% if pdf_available %}Il preventivo viaggia in allegato PDF.{% else %}PDF non disponibile su questo sistema: l'email partirà senza allegato (puoi salvare il PDF dal browser con «Stampa / PDF»).{% endif %}
+            {% if quote.status == "draft" %}L'invio porta il preventivo da «Bozza» a «Inviato».{% endif %}
+          </p>
+        </form>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header">Totali</div>
       <div class="card-body">

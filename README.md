@@ -71,6 +71,19 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   schermo e pagina offline quando manca la connessione.
 - **Listini fornitori** – prezzo e sconto per articolo, validità temporale e
   **adeguamento percentuale di tutto il listino** (es. +3%) con storico delle variazioni.
+- **Invio preventivi via email** – dalla scheda del preventivo invii al cliente l'email con
+  il **PDF in allegato** (generato dal gestionale) e il messaggio che preferisci; l'invio
+  porta automaticamente il preventivo da «Bozza» a «Inviato».
+- **Chi ha creato il documento** – l'elenco dei preventivi mostra chi l'ha inserito, con un
+  filtro per utente e il pulsante «Solo i miei» per vedere in un clic i propri preventivi.
+- **Provvigione a chi presenta il cliente** – su preventivo e ordine indichi **a chi** va la
+  provvigione (un contatto in anagrafica) e la **percentuale sull'imponibile**. La provvigione
+  **erode il margine** in dashboard e in tutte le statistiche, ripartita sulle righe in
+  proporzione al loro valore; segue automaticamente il preventivo quando lo converti in ordine.
+- **Esportazione Excel** – dalla dashboard scarichi il **dettaglio delle vendite** del periodo
+  scelto, una riga per articolo venduto: data, documento, cliente, venditore, articolo,
+  quantità, prezzo, sconto, imponibile, costo, provvigione, margine e margine %, con riga dei
+  totali. Pronto per filtri e tabelle pivot.
 - **Dashboard** – fatturato, margine e marginalità % del periodo (mese, anno, ultimi 12
   mesi), **grafico navigabile** (1/3/6/12 mesi, torna al periodo precedente) con dettaglio
   mese per mese, **marginalità per articolo, fornitore, cliente e cantiere**, valore del
@@ -438,7 +451,8 @@ consegna), DDT e fatture emesse/ricevute, email e XML FatturaPA (SDI), il calcol
 totali e IVA mista, l'adeguamento dei listini, l'importazione
 CSV/Excel, la creazione rapida, i modelli di preventivo, cantieri, manutenzioni, seriali,
 allegati, varianti, kit, sezioni, statistiche di marginalità, il personale (dipendenti,
-ore, ferie e registro presenze), le PWA (manifest e service
+ore, ferie e registro presenze), l'invio dei preventivi per email, le provvigioni,
+l'esportazione Excel, le PWA (manifest e service
 worker), le protezioni anti-abuso e i permessi dei ruoli.
 
 ## Prossime tappe suggerite

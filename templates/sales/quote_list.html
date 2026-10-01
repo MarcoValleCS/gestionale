@@ -29,11 +29,26 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4 d-flex gap-2 justify-content-end">
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="utente">Creato da</label>
+        <select class="form-select form-select-sm" id="utente" name="utente">
+          <option value="">Tutti</option>
+          {% for creator in creators %}
+          <option value="{{ creator.pk }}" {% if creator_id == creator.pk|stringformat:"s" %}selected{% endif %}>{{ creator.get_full_name|default:creator.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2 justify-content-end">
         <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
-        <a class="btn btn-primary btn-sm" href="{% url 'sales:quote_create' %}"><i class="bi bi-plus-lg"></i> Nuovo preventivo</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'sales:quote_create' %}"><i class="bi bi-plus-lg"></i> Nuovo</a>
       </div>
     </form>
+    <div class="mt-2">
+      <a class="btn btn-sm {% if only_mine %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         href="?{% if only_mine %}{% else %}miei=1{% endif %}">
+        <i class="bi bi-person-check"></i> Solo i miei
+      </a>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-sm table-hover mb-0">
@@ -43,6 +58,7 @@
           <th>Data</th>
           <th>Cliente</th>
           <th>Riferimento</th>
+          <th>Creato da</th>
           <th class="text-end">Imponibile</th>
           <th class="text-end">Totale</th>
           <th class="text-center">Stato</th>
@@ -55,6 +71,9 @@
           <td>{{ quote.date|date:"d/m/Y" }}</td>
           <td>{{ quote.customer.name }}</td>
           <td class="text-muted">{{ quote.reference|default:"—" }}</td>
+          <td class="text-muted small">
+            {% if quote.created_by %}{{ quote.created_by.get_full_name|default:quote.created_by.username }}{% else %}—{% endif %}
+          </td>
           <td class="text-end">{{ quote.subtotal|money }} €</td>
           <td class="text-end fw-semibold">{{ quote.grand_total|money }} €</td>
           <td class="text-center">
@@ -63,7 +82,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted py-4">Nessun preventivo trovato</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Nessun preventivo trovato</td></tr>
         {% endfor %}
       </tbody>
     </table>

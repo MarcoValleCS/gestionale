@@ -67,6 +67,18 @@ class DocumentLine(TimeStampedModel):
         return round2(self.line_subtotal + self.line_vat)
 
     @property
+    def line_cost(self):
+        """Costo della riga: costo fissato alla conferma, altrimenti prezzo di acquisto attuale.
+
+        Lo sconto di riga NON si applica al costo: lo sconto fatto al cliente
+        non riduce quanto si paga il fornitore.
+        """
+        cost = self.unit_cost
+        if cost is None:
+            cost = self.product.purchase_price if self.product_id else ZERO
+        return Decimal(cost or 0) * Decimal(self.qty or 0)
+
+    @property
     def label(self):
         if self.product_id and self.description:
             return f"{self.product.code} – {self.description}" if self.product.code not in self.description else self.description
@@ -127,7 +139,53 @@ class TotalsDocument(models.Model):
         return ordered
 
 
-class Quote(TotalsDocument, TimeStampedModel):
+class CommissionedDocument(models.Model):
+    """Documento di vendita su cui può maturare una provvigione.
+
+    Sta in un mixin separato e NON in ``TotalsDocument``: quello è condiviso
+    anche da fatture e ordini fornitore, dove una provvigione sulle vendite non
+    ha alcun senso.
+    """
+
+    commission_contact = models.ForeignKey(
+        Contact,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="%(class)s_commissions",
+        verbose_name="Provvigione a",
+        help_text="Chi ha presentato il cliente e percepisce la provvigione.",
+    )
+    commission_pct = models.DecimalField(
+        "Provvigione %",
+        max_digits=5,
+        decimal_places=2,
+        default=ZERO,
+        help_text="Percentuale sull'imponibile. Lascia a 0 se non c'è provvigione.",
+    )
+
+    class Meta:
+        abstract = True
+
+    @property
+    def has_commission(self):
+        return bool(self.commission_contact_id and self.commission_pct)
+
+    @property
+    def commission_amount(self):
+        """Valore della provvigione in euro (percentuale sull'imponibile)."""
+        if not self.has_commission:
+            return ZERO
+        return round2(Decimal(self.subtotal or 0) * Decimal(self.commission_pct) / 100)
+
+    @property
+    def margin_after_commission(self):
+        """Imponibile meno il costo delle righe meno la provvigione."""
+        cost = sum((line.line_cost for line in self.lines.all()), ZERO)
+        return round2(Decimal(self.subtotal or 0) - cost - self.commission_amount)
+
+
+class Quote(CommissionedDocument, TotalsDocument, TimeStampedModel):
     STATUS_DRAFT = "draft"
     STATUS_SENT = "sent"
     STATUS_ACCEPTED = "accepted"
@@ -193,7 +251,7 @@ class QuoteLine(DocumentLine):
     quote = models.ForeignKey(Quote, on_delete=models.CASCADE, related_name="lines", verbose_name="Preventivo")
 
 
-class SalesOrder(TotalsDocument, TimeStampedModel):
+class SalesOrder(CommissionedDocument, TotalsDocument, TimeStampedModel):
     STATUS_DRAFT = "draft"
     STATUS_CONFIRMED = "confirmed"
     STATUS_DELIVERED = "delivered"
