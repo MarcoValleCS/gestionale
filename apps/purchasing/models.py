@@ -1,5 +1,5 @@
 """Ordini fornitore e listini."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.db import models
@@ -15,7 +15,8 @@ FOUR_PLACES = Decimal("0.0001")
 
 
 def round4(value):
-    return Decimal(value or 0).quantize(FOUR_PLACES)
+    """Arrotondamento commerciale a quattro decimali (prezzi unitari)."""
+    return Decimal(value or 0).quantize(FOUR_PLACES, rounding=ROUND_HALF_UP)
 
 
 class SupplierPriceList(TimeStampedModel):

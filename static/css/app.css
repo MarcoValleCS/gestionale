@@ -375,6 +375,23 @@ a:hover {
   font-size: 0.875rem;
 }
 
+/* Larghezze minime delle colonne: senza, il browser le comprime e i campi
+   diventano illeggibili. La tabella scorre in orizzontale se non ci stanno. */
+.doc-lines .col-articolo { min-width: 240px; }
+.doc-lines .col-descrizione { min-width: 260px; }
+.doc-lines .col-sezione { min-width: 130px; }
+.doc-lines .col-qta { min-width: 90px; }
+.doc-lines .col-um { min-width: 100px; }
+.doc-lines .col-prezzo { min-width: 120px; }
+.doc-lines .col-sconto { min-width: 90px; }
+.doc-lines .col-iva { min-width: 100px; }
+.doc-lines .col-totale { min-width: 120px; }
+.doc-lines .col-azioni { min-width: 56px; }
+.doc-lines td input,
+.doc-lines td select {
+  min-width: 100%;
+}
+
 .doc-lines .line-total {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;

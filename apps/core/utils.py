@@ -1,5 +1,5 @@
 """Funzioni di utilità condivise."""
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 
 def to_decimal(value, default=Decimal("0")):
@@ -17,7 +17,8 @@ def format_quantity(value):
         return ""
     value = to_decimal(value)
     if value.as_tuple().exponent < -4:
-        value = value.quantize(Decimal("0.0001"))
+        # arrotondamento commerciale, coerente col resto del gestionale
+        value = value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     text = f"{value:f}".rstrip("0").rstrip(".")
     if text == "-0":
         text = "0"
@@ -28,6 +29,6 @@ def format_money(value):
     """Formatta un importo in stile italiano (1234.5 -> 1.234,50)."""
     if value is None:
         return ""
-    value = to_decimal(value).quantize(Decimal("0.01"))
+    value = to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     text = f"{value:,.2f}"
     return text.replace(",", "X").replace(".", ",").replace("X", ".")

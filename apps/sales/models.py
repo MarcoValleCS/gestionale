@@ -1,5 +1,5 @@
 """Preventivi e ordini cliente."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.db import models
@@ -15,11 +15,17 @@ THREE_PLACES = Decimal("0.001")
 
 
 def round2(value):
-    return Decimal(value or 0).quantize(TWO_PLACES)
+    """Arrotondamento commerciale a due decimali (mezzo per eccesso).
+
+    Senza indicare il modo, Python usa l'arrotondamento «bancario»
+    (ROUND_HALF_EVEN): 0,665 diventerebbe 0,66 e 1,005 diventerebbe 1,00.
+    In fatturazione ci si aspetta invece 0,67 e 1,01.
+    """
+    return Decimal(value or 0).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
 
 def round3(value):
-    return Decimal(value or 0).quantize(THREE_PLACES)
+    return Decimal(value or 0).quantize(THREE_PLACES, rounding=ROUND_HALF_UP)
 
 
 class DocumentLine(TimeStampedModel):

@@ -19,7 +19,7 @@ from apps.purchasing.models import PurchaseOrder, SupplierPriceList, PriceListIt
 from apps.purchasing.services import apply_pricelist_adjustment
 
 from . import analytics, services
-from .models import Quote, QuoteTemplate, SalesOrder, group_lines_by_section
+from .models import Quote, QuoteLine, QuoteTemplate, SalesOrder, group_lines_by_section
 
 User = get_user_model()
 
@@ -926,3 +926,115 @@ class ExportExcelTest(FlowTestBase):
         self._ordine()
         foglio = self._foglio(periodo="qualcosa-di-strano")
         self.assertEqual(foglio.max_row, 3)
+
+
+class DiscountAndRoundingTest(FlowTestBase):
+    """Lo sconto di riga e il modo di arrotondare gli importi."""
+
+    def _riga(self, qty, price, discount, vat=None):
+        quote = Quote.objects.create(customer=self.customer)
+        riga = QuoteLine.objects.create(
+            quote=quote, position=1, description="prova", qty=Decimal(qty), uom=self.uom,
+            unit_price=Decimal(price), discount_pct=Decimal(discount), vat_rate=vat or self.vat22,
+        )
+        return quote, riga
+
+    def test_lo_sconto_riduce_l_imponibile_della_riga(self):
+        for qty, price, discount, atteso in [
+            ("10", "100.00", "0", "1000.00"),
+            ("10", "100.00", "10", "900.00"),
+            ("10", "100.00", "50", "500.00"),
+            ("10", "100.00", "100", "0.00"),
+            ("1", "100.00", "33.33", "66.67"),
+            ("3", "33.3333", "10", "90.00"),
+            ("0.5", "1000.00", "15", "425.00"),
+        ]:
+            with self.subTest(qty=qty, sconto=discount):
+                _, riga = self._riga(qty, price, discount)
+                self.assertEqual(riga.line_subtotal, Decimal(atteso))
+
+    def test_lo_sconto_si_riflette_sui_totali_del_documento(self):
+        quote, _ = self._riga("10", "100.00", "20")
+        quote.recalculate()
+        quote.refresh_from_db()
+        self.assertEqual(quote.subtotal, Decimal("800.00"))
+        self.assertEqual(quote.vat_total, Decimal("176.00"))  # 22% di 800
+        self.assertEqual(quote.grand_total, Decimal("976.00"))
+
+    def test_l_iva_si_calcola_sull_imponibile_scontato(self):
+        _, riga = self._riga("10", "100.00", "50")
+        self.assertEqual(riga.line_subtotal, Decimal("500.00"))
+        self.assertEqual(riga.line_vat, Decimal("110.00"))  # 22% di 500, non di 1000
+
+    def test_lo_sconto_arriva_al_fatturato(self):
+        quote, _ = self._riga("10", "100.00", "20")
+        quote.status = Quote.STATUS_ACCEPTED
+        quote.save(update_fields=["status"])
+        order = services.convert_quote_to_order(quote)
+        order.status = SalesOrder.STATUS_DELIVERED
+        order.delivered_at = timezone.now()
+        order.save(update_fields=["status", "delivered_at"])
+
+        summary = analytics.summary(analytics.PERIOD_YEAR)
+        self.assertEqual(summary["revenue"], Decimal("800.00"), "il fatturato deve tenere conto dello sconto")
+
+    def test_i_totali_tornano_con_piu_righe_scontate(self):
+        quote = Quote.objects.create(customer=self.customer)
+        QuoteLine.objects.create(
+            quote=quote, position=1, description="a", qty=Decimal("3"), uom=self.uom,
+            unit_price=Decimal("10.00"), discount_pct=Decimal("10"), vat_rate=self.vat22,
+        )
+        QuoteLine.objects.create(
+            quote=quote, position=2, description="b", qty=Decimal("2"), uom=self.uom,
+            unit_price=Decimal("20.00"), discount_pct=Decimal("5"), vat_rate=self.vat10,
+        )
+        quote.recalculate()
+        quote.refresh_from_db()
+        # 27,00 + 38,00
+        self.assertEqual(quote.subtotal, Decimal("65.00"))
+        # 22% di 27 = 5,94  +  10% di 38 = 3,80
+        self.assertEqual(quote.vat_total, Decimal("9.74"))
+        self.assertEqual(quote.grand_total, Decimal("74.74"))
+
+    def test_arrotondamento_commerciale_non_bancario(self):
+        """Con l'arrotondamento bancario 0,665 diventerebbe 0,66."""
+        from apps.purchasing.models import round4
+        from apps.sales.models import round2, round3
+
+        for valore, atteso in [("0.665", "0.67"), ("1.005", "1.01"), ("0.125", "0.13"), ("2.675", "2.68")]:
+            with self.subTest(valore=valore, funzione="round2"):
+                self.assertEqual(round2(Decimal(valore)), Decimal(atteso))
+        self.assertEqual(round3(Decimal("1.0005")), Decimal("1.001"))
+        self.assertEqual(round4(Decimal("1.00005")), Decimal("1.0001"))
+
+    def test_i_totali_mostrati_in_pagina_tornano_col_calcolo(self):
+        self.login()
+        response = self.client.post(
+            reverse("sales:quote_create"),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "1",
+                "lines-INITIAL_FORMS": "0",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-product": self.product.pk,
+                "lines-0-description": "",
+                "lines-0-qty": "10",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "100.00",
+                "lines-0-discount_pct": "25",
+                "lines-0-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        quote = Quote.objects.latest("pk")
+        self.assertEqual(quote.subtotal, Decimal("750.00"), "lo sconto inserito nel form deve essere salvato")
+        self.assertEqual(quote.lines.get().discount_pct, Decimal("25.00"))
