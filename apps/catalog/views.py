@@ -2,7 +2,7 @@ from decimal import Decimal
 import re
 
 from django.contrib import messages
-from django.db.models import DecimalField, F, Q, Sum, Value
+from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,13 +13,24 @@ from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, R
 from apps.contacts.models import Contact
 from apps.core.models import Tag
 from apps.core.utils import format_money, to_decimal
+from apps.inventory.models import StockLevel
 
 from . import importer
 from .forms import CategoryForm, ProductForm, ProductImportForm, ProductQuickForm
 from .models import Category, KitComponent, Product
 
+# Somma delle giacenze come sottoquery correlata, non come JOIN + GROUP BY:
+# con il raggruppamento il database doveva materializzare tutto il catalogo
+# (due B-tree temporanei) a ogni apertura della lista articoli, e l'indice su
+# (active, name) non poteva più essere usato per l'ordinamento.
 STOCK_SUM = Coalesce(
-    Sum("stock_levels__quantity"),
+    Subquery(
+        StockLevel.objects.filter(product=OuterRef("pk"))
+        .values("product")
+        .annotate(total=Sum("quantity"))
+        .values("total"),
+        output_field=DecimalField(max_digits=14, decimal_places=3),
+    ),
     Value(0),
     output_field=DecimalField(max_digits=14, decimal_places=3),
 )
@@ -46,9 +57,14 @@ class ProductListView(ListView):
         category_id = self.request.GET.get("categoria", "")
         if category_id:
             queryset = queryset.filter(category_id=category_id)
+        # Il filtro per etichetta passa dalla relazione molti-a-molti e può
+        # ripetere la stessa riga: solo in questo caso serve DISTINCT.
+        # Applicarlo sempre costava una deduplicazione su tutto il catalogo.
+        needs_distinct = False
         tag_id = self.request.GET.get("tag", "")
         if tag_id:
             queryset = queryset.filter(tags__id=tag_id)
+            needs_distinct = True
         supplier_id = self.request.GET.get("fornitore", "")
         if supplier_id:
             queryset = queryset.filter(main_supplier_id=supplier_id)
@@ -58,7 +74,7 @@ class ProductListView(ListView):
             queryset = queryset.filter(parent__isnull=True)
         if self.request.GET.get("inattivi") != "1":
             queryset = queryset.filter(active=True)
-        return queryset.distinct()
+        return queryset.distinct() if needs_distinct else queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

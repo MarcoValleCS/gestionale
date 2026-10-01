@@ -1,0 +1,41 @@
+# File che NON devono entrare nell'immagine Docker.
+# Senza questo file il Dockerfile fa «COPY . .» e si porta dentro tutto:
+# ambiente virtuale, database locale, segreti e file generati.
+
+# ------------------------------------------------------------- segreti
+# Il .env contiene la chiave segreta Django e le password: non deve mai
+# finire dentro un'immagine, nemmeno se poi resta sul tuo server.
+.env
+.env.*
+!.env.example
+
+# ------------------------------------------------------- ambiente locale
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# ------------------------------------------------------ database locale
+db.sqlite3
+db.sqlite3-*
+test_db.sqlite3
+test_db.sqlite3-*
+
+# ------------------------------------------------------- file generati
+staticfiles/
+media/
+.cache/
+
+# ------------------------------------------------------------ controllo
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# --------------------------------------------------------- non necessari
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+*.md
