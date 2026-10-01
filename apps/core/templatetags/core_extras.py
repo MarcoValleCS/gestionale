@@ -1,6 +1,8 @@
 """Filtri template personalizzati."""
 from django import template
+from django.utils.safestring import mark_safe
 
+from ..richtext import clean_notes
 from ..utils import format_money, format_quantity
 
 register = template.Library()
@@ -58,6 +60,17 @@ def qty(value):
 @register.filter
 def badge_class(status):
     return BADGE_CLASSES.get(status, "secondary")
+
+
+@register.filter
+def richtext(value):
+    """Rende le note formattate in sicurezza.
+
+    Ripulisce l'HTML con una lista bianca e lo segna come sicuro: il filtro è
+    l'unico punto in cui le note vengono rese come HTML, così ciò che arriva
+    dall'editor, dall'admin o da vecchi dati passa sempre dallo stesso controllo.
+    """
+    return mark_safe(clean_notes(value))
 
 
 @register.filter

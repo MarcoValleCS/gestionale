@@ -83,7 +83,9 @@
      8/12 i campi risultavano schiacciati e illeggibili. #}
   <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <span>Righe del preventivo</span>
+      <span>Righe del preventivo
+        <small class="text-muted fw-normal d-none d-lg-inline ms-2">Usa «Sezione» per raggruppare le righe per ambiente (es. Bagno 1): il subtotale esce in scheda e in stampa.</small>
+      </span>
       <button type="button" class="btn btn-outline-primary btn-sm" id="add-line"><i class="bi bi-plus-lg"></i> Aggiungi riga</button>
     </div>
     <div class="table-responsive">
@@ -118,8 +120,8 @@
     <div class="card-header">Note e condizioni</div>
     <div class="card-body">
       <div class="row">
-        {% include "partials/field.html" with field=form.notes col=6 %}
-        {% include "partials/field.html" with field=form.terms_text col=6 %}
+        <div class="col-lg-5">{% include "partials/field.html" with field=form.notes %}</div>
+        <div class="col-lg-7">{% include "partials/rich_notes.html" with field=form.terms_text %}</div>
       </div>
     </div>
   </div>
@@ -130,6 +132,7 @@
 
 {% block extra_js %}
 {% include "sales/_lines_script.html" %}
+<script src="{% static 'js/rich_notes.js' %}"></script>
 <script src="{% static 'js/quick_create.js' %}"></script>
 <script src="{% static 'js/autocomplete.js' %}"></script>
 <script src="{% static 'js/quote_template.js' %}"></script>

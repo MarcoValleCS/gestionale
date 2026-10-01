@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Collaboratori{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Nome, ditta o specializzazione…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="stato">Stato</label>
+        <select class="form-select form-select-sm" id="stato" name="stato">
+          <option value="attivi" {% if status == "attivi" %}selected{% endif %}>Attivi</option>
+          <option value="cessati" {% if status == "cessati" %}selected{% endif %}>Non attivi</option>
+          <option value="" {% if status == "" %}selected{% endif %}>Tutti</option>
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:collaborator_time_list' %}"><i class="bi bi-clock-history"></i> Ore registrate</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'hr:collaborator_create' %}"><i class="bi bi-person-plus"></i> Nuovo</a>
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Collaboratore</th>
+          <th>Specializzazione</th>
+          <th>Utente</th>
+          <th class="text-end">Compenso/h</th>
+          <th class="text-center">Ore mese</th>
+          <th class="text-center">Ore totali</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="text-muted number-badge">{{ row.collaborator.code }}</td>
+          <td>
+            <span class="fw-semibold">{{ row.collaborator.name }}</span>
+            {% if row.collaborator.company %}<div class="text-muted small">{{ row.collaborator.company }}</div>{% endif %}
+          </td>
+          <td>{{ row.collaborator.specialization|default:"—" }}</td>
+          <td>
+            {% if row.collaborator.user %}
+            <span class="badge text-bg-success" title="Può registrare le ore da solo">{{ row.collaborator.user.username }}</span>
+            {% else %}
+            <span class="badge text-bg-secondary">nessuno</span>
+            {% endif %}
+          </td>
+          <td class="text-end">{% if row.collaborator.hourly_rate %}{{ row.collaborator.hourly_rate|money }} €{% else %}—{% endif %}</td>
+          <td class="text-center">{{ row.hours_month|floatformat:"-2" }}</td>
+          <td class="text-center fw-semibold">{{ row.hours_total|floatformat:"-2" }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:collaborator_update' row.collaborator.pk %}" title="Modifica">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:collaborator_time_list' %}?collaboratore={{ row.collaborator.pk }}" title="Le sue ore">
+              <i class="bi bi-clock-history"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          Nessun collaboratore. Aggiungine uno per fargli rendicontare le ore sui cantieri.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

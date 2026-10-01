@@ -1,0 +1,46 @@
+{% load core_extras %}
+{# Editor delle note stampabili: toolbar semplice + area modificabile.
+   Il valore viaggia in una textarea nascosta, sincronizzata all'invio.
+   Il contenuto iniziale passa dal filtro «richtext», che lo ripulisce. #}
+<div class="mb-3 rich-editor">
+  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+  <div class="rich-toolbar" role="toolbar" aria-label="Formattazione del testo">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="bold" title="Grassetto (Ctrl+B)">
+      <i class="bi bi-type-bold"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="italic" title="Corsivo (Ctrl+I)">
+      <i class="bi bi-type-italic"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="underline" title="Sottolineato (Ctrl+U)">
+      <i class="bi bi-type-underline"></i>
+    </button>
+    <span class="rich-sep"></span>
+    <select class="form-select form-select-sm rich-size" title="Dimensione del carattere" aria-label="Dimensione del carattere">
+      <option value="">Dimensione…</option>
+      <option value="2">Piccolo</option>
+      <option value="3">Normale</option>
+      <option value="4">Grande</option>
+      <option value="5">Più grande</option>
+      <option value="6">Molto grande</option>
+    </select>
+    <span class="rich-sep"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="insertUnorderedList" title="Elenco puntato">
+      <i class="bi bi-list-ul"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="justifyLeft" title="Allinea a sinistra">
+      <i class="bi bi-text-left"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="justifyCenter" title="Centra">
+      <i class="bi bi-text-center"></i>
+    </button>
+    <span class="rich-sep"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="removeFormat" title="Togli la formattazione">
+      <i class="bi bi-eraser"></i>
+    </button>
+  </div>
+  <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true"
+       data-placeholder="Condizioni di vendita, tempi di consegna, note da stampare…">{{ field.value|richtext }}</div>
+  <div class="rich-hidden">{{ field }}</div>
+  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+</div>

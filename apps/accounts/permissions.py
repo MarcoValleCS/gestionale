@@ -9,8 +9,16 @@ ROLE_SALES = "Vendite"
 ROLE_PURCHASING = "Acquisti"
 ROLE_WAREHOUSE = "Magazzino"
 ROLE_HR = "Personale"
+ROLE_COLLABORATOR = "Collaboratore"
 
-ALL_ROLES = [ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_WAREHOUSE, ROLE_HR]
+ALL_ROLES = [ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_WAREHOUSE, ROLE_HR, ROLE_COLLABORATOR]
+
+# Ruolo particolare: chi ce l'ha da solo può accedere unicamente alla propria
+# area di rendicontazione delle ore (vedi apps.accounts.middleware).
+RESTRICTED_ROLES = [ROLE_COLLABORATOR]
+
+# Prefisso delle pagine riservate ai collaboratori (apps.hr è incluso sotto /personale/)
+COLLABORATOR_AREA_PREFIX = "/personale/mio-lavoro/"
 
 ROLE_DESCRIPTIONS = {
     ROLE_ADMIN: "Accesso completo a tutte le funzioni, impostazioni e utenti.",
@@ -18,6 +26,7 @@ ROLE_DESCRIPTIONS = {
     ROLE_PURCHASING: "Contatti, articoli, ordini fornitore e listini.",
     ROLE_WAREHOUSE: "Giacenze, movimenti di magazzino, ricezione merci e consegne.",
     ROLE_HR: "Dipendenti, registrazione ore, ferie e permessi.",
+    ROLE_COLLABORATOR: "Solo la propria area: registra le ore lavorate sui cantieri.",
 }
 
 

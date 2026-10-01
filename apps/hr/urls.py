@@ -24,6 +24,17 @@ urlpatterns = [
     path("assenze/<int:pk>/approva/", views.leave_approve, name="leave_approve"),
     path("assenze/<int:pk>/rifiuta/", views.leave_reject, name="leave_reject"),
     path("assenze/<int:pk>/elimina/", views.leave_delete, name="leave_delete"),
-    # Registro presenze
+    # Collaboratori (gestione dall'ufficio)
+    path("collaboratori/", views.CollaboratorListView.as_view(), name="collaborator_list"),
+    path("collaboratori/nuovo/", views.CollaboratorCreateView.as_view(), name="collaborator_create"),
+    path("collaboratori/<int:pk>/modifica/", views.CollaboratorUpdateView.as_view(), name="collaborator_update"),
+    path("collaboratori/<int:pk>/elimina/", views.collaborator_delete, name="collaborator_delete"),
+    path("collaboratori/ore/", views.CollaboratorTimeListView.as_view(), name="collaborator_time_list"),
+    path("collaboratori/ore/<int:pk>/elimina/", views.collaborator_time_delete, name="collaborator_time_delete"),
     path("presenze/", views.timesheet, name="timesheet"),
+    # Collaboratori esterni: area riservata a chi rendiconta le ore
+    path("mio-lavoro/", views.collaborator_area, name="collaborator_area"),
+    path("mio-lavoro/nuova/", views.collaborator_entry_create, name="collaborator_entry_create"),
+    path("mio-lavoro/<int:pk>/modifica/", views.collaborator_entry_update, name="collaborator_entry_update"),
+    path("mio-lavoro/<int:pk>/elimina/", views.collaborator_entry_delete, name="collaborator_entry_delete"),
 ]

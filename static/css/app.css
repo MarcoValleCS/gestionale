@@ -392,6 +392,59 @@ a:hover {
   min-width: 100%;
 }
 
+/* -------------------------------------------------- note formattabili */
+.rich-editor .rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: #f8f9fa;
+}
+
+.rich-editor .rich-sep {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: #dee2e6;
+}
+
+.rich-editor .rich-size {
+  width: auto;
+  min-width: 120px;
+}
+
+.rich-editor .rich-content {
+  min-height: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0 0 6px 6px;
+  background: #fff;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-y: auto;
+}
+
+.rich-editor .rich-content:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.rich-editor .rich-content:empty::before {
+  content: attr(data-placeholder);
+  color: #adb5bd;
+}
+
+.rich-editor .rich-content ul {
+  margin-bottom: 0;
+  padding-left: 1.4rem;
+}
+
 .doc-lines .line-total {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;

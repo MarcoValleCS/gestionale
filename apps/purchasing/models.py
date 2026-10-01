@@ -11,12 +11,9 @@ from apps.core.models import NumberSequence, PaymentTerm, TimeStampedModel
 from apps.sales.models import DocumentLine, SalesOrder, TotalsDocument, round3
 
 ZERO = Decimal("0")
-FOUR_PLACES = Decimal("0.0001")
 
-
-def round4(value):
-    """Arrotondamento commerciale a quattro decimali (prezzi unitari)."""
-    return Decimal(value or 0).quantize(FOUR_PLACES, rounding=ROUND_HALF_UP)
+# anche round4 vive in apps/core/rounding.py, qui resta importabile come prima
+from apps.core.rounding import round4  # noqa: E402
 
 
 class SupplierPriceList(TimeStampedModel):

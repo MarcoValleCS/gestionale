@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Employee, LeaveRequest, TimeEntry
+from .models import Collaborator, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
 
 
 class TimeEntryInline(admin.TabularInline):
@@ -32,3 +32,26 @@ class LeaveRequestAdmin(admin.ModelAdmin):
     list_filter = ("kind", "status")
     search_fields = ("employee__first_name", "employee__last_name", "reason")
     date_hierarchy = "start_date"
+
+
+class CollaboratorTimeEntryInline(admin.TabularInline):
+    model = CollaboratorTimeEntry
+    extra = 0
+    fields = ("date", "hours", "job", "description")
+
+
+@admin.register(Collaborator)
+class CollaboratorAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "company", "specialization", "hourly_rate", "user", "active")
+    list_filter = ("active", "specialization")
+    search_fields = ("code", "name", "company", "fiscal_code")
+    readonly_fields = ("code",)
+    inlines = [CollaboratorTimeEntryInline]
+
+
+@admin.register(CollaboratorTimeEntry)
+class CollaboratorTimeEntryAdmin(admin.ModelAdmin):
+    list_display = ("date", "collaborator", "hours", "job", "description")
+    list_filter = ("date",)
+    search_fields = ("collaborator__name", "collaborator__company", "description")
+    date_hierarchy = "date"

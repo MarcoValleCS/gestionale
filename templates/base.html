@@ -24,6 +24,15 @@
       <span class="text-truncate">{{ company.name|default:"Gestionale" }}</span>
     </div>
     <nav class="sidebar-nav">
+      {% if roles.is_collaborator_only %}
+      {# Il collaboratore esterno vede solo la sua area: le altre voci lo rimbalzerebbero qui #}
+      <a class="nav-link {% if request.resolver_match.url_name == 'collaborator_area' %}active{% endif %}" href="{% url 'hr:collaborator_area' %}">
+        <i class="bi bi-clock-history"></i> Le mie ore
+      </a>
+      <a class="nav-link" href="{% url 'hr:collaborator_entry_create' %}">
+        <i class="bi bi-plus-lg"></i> Registra le ore
+      </a>
+      {% else %}
       <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'core:home' %}">
         <i class="bi bi-speedometer2"></i> Dashboard
       </a>
@@ -105,6 +114,9 @@
       <a class="nav-link {% if 'timeentry' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:timeentry_list' %}">
         <i class="bi bi-clock-history"></i> Registrazione ore
       </a>
+      <a class="nav-link {% if 'collaborator' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:collaborator_list' %}">
+        <i class="bi bi-person-workspace"></i> Collaboratori
+      </a>
       {% endif %}
       <a class="nav-link {% if 'leave' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:leave_list' %}">
         <i class="bi bi-calendar-x"></i> Ferie e permessi
@@ -122,6 +134,7 @@
         <i class="bi bi-person-gear"></i> Utenti
       </a>
       {% endif %}
+      {% endif %}{# fine del menu completo: i collaboratori vedono solo le loro voci #}
     </nav>
   </aside>
 

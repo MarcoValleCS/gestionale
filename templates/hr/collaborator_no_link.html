@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}La mia area{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Account non collegato</div>
+      <div class="card-body">
+        <p class="mb-2">
+          Il tuo utente non è ancora collegato a un collaboratore, quindi non puoi registrare le ore.
+        </p>
+        <p class="text-muted small mb-0">
+          Comunica all'ufficio il tuo nome utente (<strong>{{ request.user.username }}</strong>):
+          deve collegarlo alla tua scheda collaboratore dalle impostazioni del gestionale.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

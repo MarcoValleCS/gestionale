@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Ore dei collaboratori{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="collaboratore">Collaboratore</label>
+        <select class="form-select form-select-sm" id="collaboratore" name="collaboratore">
+          <option value="">Tutti</option>
+          {% for c in collaborators %}
+          <option value="{{ c.pk }}" {% if collaborator_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="cantiere">Cantiere</label>
+        <select class="form-select form-select-sm" id="cantiere" name="cantiere">
+          <option value="">Tutti</option>
+          {% for job in jobs %}
+          <option value="{{ job.pk }}" {% if job_id == job.pk|stringformat:"s" %}selected{% endif %}>{{ job.code }} – {{ job.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="mese">Mese</label>
+        <select class="form-select form-select-sm" id="mese" name="mese">
+          <option value="">Tutti</option>
+          {% for value, label in months %}
+          <option value="{{ value }}" {% if month == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="anno">Anno</label>
+        <select class="form-select form-select-sm" id="anno" name="anno">
+          {% for value in years %}
+          <option value="{{ value }}" {% if year == value|add:"0" %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+      </div>
+    </form>
+  </div>
+  <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="text-muted small">Totale ore filtrate: <strong>{{ filtered_total|floatformat:"-2" }} h</strong></span>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:collaborator_list' %}"><i class="bi bi-people"></i> Collaboratori</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th class="text-center">Data</th>
+          <th>Collaboratore</th>
+          <th class="text-center">Ore</th>
+          <th>Cantiere / lavoro</th>
+          <th>Lavoro svolto</th>
+          <th class="text-center">Registrato da</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="text-center">{{ entry.date|date:"d/m/Y" }}</td>
+          <td>
+            <span class="fw-semibold">{{ entry.collaborator.name }}</span>
+            {% if entry.collaborator.company %}<div class="text-muted small">{{ entry.collaborator.company }}</div>{% endif %}
+          </td>
+          <td class="text-center fw-semibold">{{ entry.hours|floatformat:"-2" }}</td>
+          <td>{{ entry.job.name|default:"—" }}</td>
+          <td class="text-muted small">{{ entry.description|default:"—" }}</td>
+          <td class="text-center small text-muted">{{ entry.created_by.username|default:"—" }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'hr:collaborator_time_delete' entry.pk %}"
+                  onsubmit="return confirm('Eliminare questa registrazione?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger btn-sm" type="submit" title="Elimina"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">Nessuna ora registrata dai collaboratori.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

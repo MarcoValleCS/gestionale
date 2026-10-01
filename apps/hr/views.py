@@ -14,8 +14,16 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_HR, RoleRequiredMixin, role_required
 from apps.core.concurrency import ConflictAwareUpdateView
 
-from .forms import BulkTimeEntryForm, EmployeeForm, LeaveRequestForm, TimeEntryForm, active_employees
-from .models import Employee, LeaveRequest, TimeEntry
+from .forms import (
+    BulkTimeEntryForm,
+    CollaboratorForm,
+    CollaboratorTimeEntryForm,
+    EmployeeForm,
+    LeaveRequestForm,
+    TimeEntryForm,
+    active_employees,
+)
+from .models import Collaborator, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
 
 ZERO = Decimal("0")
 HR_EDIT_ROLES = (ROLE_ADMIN, ROLE_HR)
@@ -49,7 +57,8 @@ def _parse_int(value, default, minimum=None, maximum=None):
 
 
 # --------------------------------------------------------------- dipendenti
-class EmployeeListView(ListView):
+class EmployeeListView(RoleRequiredMixin, ListView):
+    allowed_roles = HR_EDIT_ROLES
     model = Employee
     template_name = "hr/employee_list.html"
     context_object_name = "employees"
@@ -81,7 +90,8 @@ class EmployeeListView(ListView):
         return context
 
 
-class EmployeeDetailView(DetailView):
+class EmployeeDetailView(RoleRequiredMixin, DetailView):
+    allowed_roles = HR_EDIT_ROLES
     model = Employee
     template_name = "hr/employee_detail.html"
     context_object_name = "employee"
@@ -172,7 +182,8 @@ def employee_delete(request, pk):
 
 
 # ---------------------------------------------------------------- ore
-class TimeEntryListView(ListView):
+class TimeEntryListView(RoleRequiredMixin, ListView):
+    allowed_roles = HR_EDIT_ROLES
     model = TimeEntry
     template_name = "hr/timeentry_list.html"
     context_object_name = "entries"
@@ -522,3 +533,245 @@ def timesheet(request):
             "pending_count": LeaveRequest.objects.filter(status=LeaveRequest.STATUS_REQUESTED).count(),
         },
     )
+
+
+# ---------------------------------------------------------- collaboratori
+COLLAB_EDIT_ROLES = (ROLE_ADMIN, ROLE_HR)
+
+
+def collaborator_for(user):
+    """Il collaboratore collegato all'utente, se esiste."""
+    return Collaborator.objects.filter(user=user).first()
+
+
+# ---- area riservata al collaboratore: vede e tocca solo le proprie ore ----
+def collaborator_area(request):
+    """Pagina iniziale del collaboratore: le sue ore e il modulo per aggiungerne."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return render(request, "hr/collaborator_no_link.html", {"page_title": "La mia area"})
+
+    oggi = timezone.localdate()
+    entries = collaboratore.time_entries.select_related("job").order_by("-date", "-pk")[:60]
+    return render(
+        request,
+        "hr/collaborator_area.html",
+        {
+            "page_title": "Le mie ore",
+            "collaborator": collaboratore,
+            "entries": entries,
+            "hours_month": collaboratore.hours_in_month(oggi.year, oggi.month),
+            "hours_total": collaboratore.hours_total(),
+            "hours_year": collaboratore.time_entries.filter(date__year=oggi.year).aggregate(
+                total=Sum("hours")
+            )["total"] or ZERO,
+        },
+    )
+
+
+def collaborator_entry_create(request):
+    """Il collaboratore registra le ore di una giornata."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return redirect("hr:collaborator_area")
+
+    if request.method == "POST":
+        form = CollaboratorTimeEntryForm(request.POST, collaborator=collaboratore)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.created_by = request.user
+            entry.save()
+            messages.success(request, f"Registrate {entry.hours} ore del {entry.date:%d/%m/%Y}.")
+            return redirect("hr:collaborator_area")
+    else:
+        form = CollaboratorTimeEntryForm(collaborator=collaboratore, initial={"date": timezone.localdate()})
+
+    return render(
+        request,
+        "hr/collaborator_entry_form.html",
+        {"form": form, "collaborator": collaboratore, "page_title": "Registra le ore"},
+    )
+
+
+def collaborator_entry_update(request, pk):
+    """Il collaboratore corregge una propria registrazione (solo le proprie)."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return redirect("hr:collaborator_area")
+    entry = get_object_or_404(CollaboratorTimeEntry, pk=pk, collaborator=collaboratore)
+
+    if request.method == "POST":
+        form = CollaboratorTimeEntryForm(request.POST, instance=entry, collaborator=collaboratore)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Registrazione aggiornata.")
+            return redirect("hr:collaborator_area")
+    else:
+        form = CollaboratorTimeEntryForm(instance=entry, collaborator=collaboratore)
+
+    return render(
+        request,
+        "hr/collaborator_entry_form.html",
+        {"form": form, "collaborator": collaboratore, "entry": entry, "page_title": "Modifica le ore"},
+    )
+
+
+def collaborator_entry_delete(request, pk):
+    """Il collaboratore cancella una propria registrazione."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return redirect("hr:collaborator_area")
+    entry = get_object_or_404(CollaboratorTimeEntry, pk=pk, collaborator=collaboratore)
+    if request.method == "POST":
+        entry.delete()
+        messages.success(request, "Registrazione eliminata.")
+    return redirect("hr:collaborator_area")
+
+
+# ---- gestione dall'ufficio ----
+class CollaboratorListView(RoleRequiredMixin, ListView):
+    allowed_roles = COLLAB_EDIT_ROLES
+    model = Collaborator
+    template_name = "hr/collaborator_list.html"
+    context_object_name = "collaborators"
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = Collaborator.objects.select_related("user", "contact").order_by("name")
+        stato = self.request.GET.get("stato", "attivi")
+        if stato == "attivi":
+            queryset = queryset.filter(active=True)
+        elif stato == "cessati":
+            queryset = queryset.filter(active=False)
+        cerca = self.request.GET.get("q", "").strip()
+        if cerca:
+            queryset = queryset.filter(
+                Q(name__icontains=cerca)
+                | Q(company__icontains=cerca)
+                | Q(specialization__icontains=cerca)
+                | Q(code__icontains=cerca)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        oggi = timezone.localdate()
+        righe = []
+        for collaboratore in context["collaborators"]:
+            righe.append(
+                {
+                    "collaborator": collaboratore,
+                    "hours_month": collaboratore.hours_in_month(oggi.year, oggi.month),
+                    "hours_total": collaboratore.hours_total(),
+                }
+            )
+        context["rows"] = righe
+        context["page_title"] = "Collaboratori"
+        context["status"] = self.request.GET.get("stato", "attivi")
+        context["search"] = self.request.GET.get("q", "")
+        context["active_count"] = Collaborator.objects.filter(active=True).count()
+        return context
+
+
+class CollaboratorCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = COLLAB_EDIT_ROLES
+    model = Collaborator
+    form_class = CollaboratorForm
+    template_name = "hr/collaborator_form.html"
+
+    def get_success_url(self):
+        return reverse_lazy("hr:collaborator_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Nuovo collaboratore"
+        context["cancel_url"] = reverse("hr:collaborator_list")
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, f"Collaboratore «{form.instance.name}» creato.")
+        return super().form_valid(form)
+
+
+class CollaboratorUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
+    allowed_roles = COLLAB_EDIT_ROLES
+    model = Collaborator
+    form_class = CollaboratorForm
+    template_name = "hr/collaborator_form.html"
+
+    def get_success_url(self):
+        return reverse_lazy("hr:collaborator_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = f"Modifica collaboratore: {self.object.name}"
+        context["cancel_url"] = reverse("hr:collaborator_list")
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, "Collaboratore aggiornato.")
+        return super().form_valid(form)
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def collaborator_delete(request, pk):
+    collaboratore = get_object_or_404(Collaborator, pk=pk)
+    if request.method == "POST":
+        nome = collaboratore.name
+        collaboratore.delete()
+        messages.success(request, f"Collaboratore «{nome}» eliminato con le sue registrazioni.")
+        return redirect("hr:collaborator_list")
+    return redirect("hr:collaborator_list")
+
+
+class CollaboratorTimeListView(RoleRequiredMixin, ListView):
+    """Tutte le ore dei collaboratori, per l'ufficio."""
+
+    allowed_roles = COLLAB_EDIT_ROLES
+    model = CollaboratorTimeEntry
+    template_name = "hr/collaborator_time_list.html"
+    context_object_name = "entries"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = CollaboratorTimeEntry.objects.select_related("collaborator", "job", "job__customer")
+        collaborator_id = self.request.GET.get("collaboratore", "")
+        if collaborator_id:
+            queryset = queryset.filter(collaborator_id=collaborator_id)
+        job_id = self.request.GET.get("cantiere", "")
+        if job_id:
+            queryset = queryset.filter(job_id=job_id)
+        oggi = timezone.localdate()
+        anno = _parse_int(self.request.GET.get("anno"), oggi.year, 2000, 2100)
+        mese = self.request.GET.get("mese", "")
+        if mese:
+            numero = _parse_int(mese, 0, 1, 12)
+            if numero:
+                queryset = queryset.filter(date__year=anno, date__month=numero)
+        return queryset.order_by("-date", "-pk")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from apps.jobs.models import Job
+
+        oggi = timezone.localdate()
+        context["page_title"] = "Ore dei collaboratori"
+        context["collaborators"] = Collaborator.objects.order_by("name")
+        context["jobs"] = Job.objects.select_related("customer").order_by("name")
+        context["collaborator_id"] = self.request.GET.get("collaboratore", "")
+        context["job_id"] = self.request.GET.get("cantiere", "")
+        context["year"] = _parse_int(self.request.GET.get("anno"), oggi.year, 2000, 2100)
+        context["month"] = self.request.GET.get("mese", "")
+        context["months"] = [(str(n), calendar.month_name[n]) for n in range(1, 13)]
+        context["years"] = [str(n) for n in range(oggi.year - 3, oggi.year + 2)]
+        context["filtered_total"] = self.get_queryset().aggregate(total=Sum("hours"))["total"] or ZERO
+        return context
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def collaborator_time_delete(request, pk):
+    entry = get_object_or_404(CollaboratorTimeEntry, pk=pk)
+    if request.method == "POST":
+        entry.delete()
+        messages.success(request, "Registrazione eliminata.")
+    return redirect("hr:collaborator_time_list")

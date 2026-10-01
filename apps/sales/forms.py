@@ -40,6 +40,16 @@ class CustomerChoiceFormMixin:
         self.fields["commission_pct"].required = False
         self.fields["commission_pct"].help_text = "Percentuale sull'imponibile. 0 = nessuna provvigione."
 
+    def clean_terms_text(self):
+        """Ripulisce le note formattate prima di salvarle.
+
+        Il campo esiste solo sui documenti di vendita: Django chiama questo
+        metodo solo se il form ha davvero il campo «terms_text».
+        """
+        from apps.core.richtext import clean_notes
+
+        return clean_notes(self.cleaned_data.get("terms_text"))
+
 
 class PurchaseSupplierFormMixin:
     def apply_supplier_queryset(self):
@@ -64,6 +74,11 @@ class LineFormMixin:
         self.fields["vat_rate"].queryset = active_vat_rates()
         self.fields["description"].required = False
         self.fields["description"].label = "Descrizione"
+        # Le sezioni raggruppano le righe per ambiente (es. «Bagno 1») e fanno
+        # uscire il subtotale in scheda e in stampa: il segnaposto serve a far
+        # capire a cosa serve la colonna.
+        self.fields["section"].required = False
+        self.fields["section"].widget.attrs["placeholder"] = "es. Bagno 1"
 
     def clean(self):
         data = super().clean()

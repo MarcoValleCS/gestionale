@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Le mie ore{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h2 class="h4 mb-1">{{ collaborator.name }}</h2>
+    <div class="text-muted small">
+      {% if collaborator.company %}{{ collaborator.company }} · {% endif %}{{ collaborator.code }}
+      {% if collaborator.specialization %} · {{ collaborator.specialization }}{% endif %}
+    </div>
+  </div>
+  <a class="btn btn-primary" href="{% url 'hr:collaborator_entry_create' %}">
+    <i class="bi bi-plus-lg"></i> Registra le ore
+  </a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-sm-4">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Ore questo mese</div>
+        <div class="fs-4 fw-bold number-badge">{{ hours_month|floatformat:"-2" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Ore quest'anno</div>
+        <div class="fs-4 fw-bold number-badge">{{ hours_year|floatformat:"-2" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Ore in totale</div>
+        <div class="fs-4 fw-bold number-badge">{{ hours_total|floatformat:"-2" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Le ore che hai registrato</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th class="text-center">Data</th>
+          <th class="text-center">Ore</th>
+          <th>Cantiere / lavoro</th>
+          <th>Lavoro svolto</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="text-center">{{ entry.date|date:"d/m/Y" }}</td>
+          <td class="text-center fw-semibold">{{ entry.hours|floatformat:"-2" }}</td>
+          <td>{{ entry.job.name|default:"—" }}</td>
+          <td class="text-muted small">{{ entry.description|default:"—" }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:collaborator_entry_update' entry.pk %}" title="Modifica">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{% url 'hr:collaborator_entry_delete' entry.pk %}" class="d-inline"
+                  onsubmit="return confirm('Eliminare le {{ entry.hours }} ore del {{ entry.date|date:"d/m/Y" }}?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger btn-sm" type="submit" title="Elimina"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-4">
+          Non hai ancora registrato ore. Usa «Registra le ore» per indicare quante ore hai fatto e su quale cantiere.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p class="text-muted small mt-3">
+  Puoi modificare o cancellare solo le tue registrazioni. Se una giornata è sbagliata, correggila qui.
+</p>
+{% endblock %}

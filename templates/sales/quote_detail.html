@@ -113,7 +113,7 @@
         <div class="mb-3"><div class="text-muted small">Note interne</div><div style="white-space: pre-line">{{ quote.notes }}</div></div>
         {% endif %}
         {% if quote.terms_text %}
-        <div><div class="text-muted small">Condizioni</div><div style="white-space: pre-line">{{ quote.terms_text }}</div></div>
+        <div><div class="text-muted small">Condizioni</div><div>{{ quote.terms_text|richtext }}</div></div>
         {% endif %}
       </div>
     </div>

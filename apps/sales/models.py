@@ -10,22 +10,10 @@ from apps.contacts.models import Contact
 from apps.core.models import NumberSequence, PaymentTerm, TimeStampedModel, UnitOfMeasure, VatRate
 
 ZERO = Decimal("0")
-TWO_PLACES = Decimal("0.01")
-THREE_PLACES = Decimal("0.001")
 
-
-def round2(value):
-    """Arrotondamento commerciale a due decimali (mezzo per eccesso).
-
-    Senza indicare il modo, Python usa l'arrotondamento «bancario»
-    (ROUND_HALF_EVEN): 0,665 diventerebbe 0,66 e 1,005 diventerebbe 1,00.
-    In fatturazione ci si aspetta invece 0,67 e 1,01.
-    """
-    return Decimal(value or 0).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
-
-
-def round3(value):
-    return Decimal(value or 0).quantize(THREE_PLACES, rounding=ROUND_HALF_UP)
+# Gli arrotondamenti stanno in apps/core/rounding.py: qui restano importabili
+# come prima (apps.sales.models.round2 / round3) per non rompere i chiamanti.
+from apps.core.rounding import round2, round3  # noqa: E402  (dopo ZERO per chiarezza)
 
 
 class DocumentLine(TimeStampedModel):

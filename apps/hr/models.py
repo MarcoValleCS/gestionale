@@ -8,6 +8,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.models import TimeStampedModel
+from apps.core.rounding import round2
 
 ZERO = Decimal("0")
 
@@ -285,3 +286,122 @@ class LeaveRequest(TimeStampedModel):
         self.approved_at = timezone.now()
         self.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
         return self
+
+
+class Collaborator(TimeStampedModel):
+    """Collaboratore esterno: non è un dipendente (scavo, reinterro, elettricista…).
+
+    Lavora a giornate su uno o più cantieri e rendiconta le ore. Può avere un
+    utente per entrare nel gestionale e registrare da solo le sue ore: quel tipo
+    di utente vede soltanto la propria area.
+    """
+
+    code = models.CharField("Codice", max_length=20, unique=True, blank=True)
+    name = models.CharField("Nome", max_length=120)
+    company = models.CharField("Ditta / attività", max_length=120, blank=True)
+    contact = models.ForeignKey(
+        "contacts.Contact",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="collaborators",
+        verbose_name="Contatto in anagrafica",
+        help_text="Facoltativo: serve se il collaboratore emette fattura.",
+    )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="collaborator",
+        verbose_name="Utente collegato",
+        help_text="Utente con cui il collaboratore entra e registra le ore.",
+    )
+    fiscal_code = models.CharField("Codice fiscale / P.IVA", max_length=20, blank=True)
+    phone = models.CharField("Telefono", max_length=40, blank=True)
+    email = models.EmailField("Email", blank=True)
+    hourly_rate = models.DecimalField(
+        "Compenso orario (€)", max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    specialization = models.CharField(
+        "Specializzazione", max_length=120, blank=True, help_text="Es. scavo, elettricista, piastrellista."
+    )
+    active = models.BooleanField("Attivo", default=True)
+    notes = models.TextField("Note", blank=True)
+
+    class Meta:
+        verbose_name = "Collaboratore"
+        verbose_name_plural = "Collaboratori"
+        ordering = ["name"]
+        indexes = [models.Index(fields=["active", "name"], name="collab_active_name_idx")]
+
+    def __str__(self):
+        return f"{self.name} ({self.company})" if self.company else self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            super().save(*args, **kwargs)
+            self.code = f"COL{self.pk:05d}"
+            return super().save(update_fields=["code"])
+        return super().save(*args, **kwargs)
+
+    def hours_in_month(self, year, month):
+        return self.time_entries.filter(date__year=year, date__month=month).aggregate(
+            total=models.Sum("hours")
+        )["total"] or ZERO
+
+    def hours_total(self):
+        return self.time_entries.aggregate(total=models.Sum("hours"))["total"] or ZERO
+
+    @property
+    def cost(self):
+        if self.hourly_rate is None:
+            return None
+        return round2(self.hourly_rate * self.hours_total())
+
+
+class CollaboratorTimeEntry(TimeStampedModel):
+    """Ore rendicontate da un collaboratore esterno su un cantiere."""
+
+    collaborator = models.ForeignKey(
+        Collaborator, on_delete=models.CASCADE, related_name="time_entries", verbose_name="Collaboratore"
+    )
+    date = models.DateField("Data", default=timezone.localdate)
+    hours = models.DecimalField(
+        "Ore", max_digits=5, decimal_places=2, validators=[MinValueValidator(Decimal("0.25"))]
+    )
+    job = models.ForeignKey(
+        "jobs.Job",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="collaborator_time_entries",
+        verbose_name="Cantiere / lavoro",
+    )
+    description = models.CharField("Lavoro svolto", max_length=200, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_collaborator_entries",
+        verbose_name="Registrato da",
+    )
+
+    class Meta:
+        verbose_name = "Ore collaboratore"
+        verbose_name_plural = "Ore collaboratori"
+        ordering = ["-date", "-pk"]
+        indexes = [
+            models.Index(fields=["date", "collaborator"], name="collabentry_date_idx"),
+            models.Index(fields=["collaborator", "-date"], name="collabentry_collab_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.collaborator} · {self.date:%d/%m/%Y} · {self.hours}h"
+
+    @property
+    def amount(self):
+        if self.collaborator.hourly_rate is None:
+            return None
+        return round2(self.collaborator.hourly_rate * self.hours)

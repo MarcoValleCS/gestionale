@@ -49,8 +49,19 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
 - **Kit/composizioni** – articoli che raggruppano componenti (es. mobile + lavabo + specchio):
   nel preventivo si espandono da soli con i componenti a prezzo zero, così magazzino e ordini
   fornitore lavorano sui componenti reali.
-- **Sezioni nei documenti** – righe raggruppabili per ambiente o fase («Bagno 1», «Scavo»,
-  «Finiture») con subtotale per sezione in schermo e in stampa.
+- **Sezioni nei documenti** – righe raggruppabili per ambiente o fase («Bagno 1», «Bagno
+  padronale», «Scavo») con subtotale per sezione in schermo e in stampa.
+- **Condizioni formattabili** – le note che finiscono in stampa si scrivono con un
+  editor semplice: grassetto, corsivo, sottolineato, dimensione del carattere, elenchi e
+  allineamento. Il contenuto viene ripulito da una lista bianca prima di essere salvato e
+  reso, quindi non può veicolare script o immagini.
+- **Collaboratori esterni** – per il lavoro che si dà a terzi (scavo, reinterro,
+  elettricista): anagrafica con ditta, specializzazione e compenso orario; le ore si
+  registrano per giornata indicando **quante ore, quale giorno e su quale cantiere**.
+  Creando per loro un utente con il solo ruolo «Collaboratore», entrano e rendicontano
+  da soli: quell'utente vede **unicamente la propria area** e non può accedere a
+  prezzi, clienti, documenti o statistiche. In più l'ufficio vede tutte le ore
+  raccolte, filtrabili per collaboratore, cantiere e periodo.
 - **Sconto abituale cliente** – percentuale proposta automaticamente nelle righe di
   preventivi e ordini.
 - **DDT** – documenti di trasporto creati dagli ordini cliente (o manuali), con causale,
@@ -257,6 +268,7 @@ Apri <http://127.0.0.1:8000> e accedi con l'utente creato.
 | Acquisti       | Contatti, articoli, ordini fornitore, listini fornitori                   |
 | Magazzino      | Giacenze, movimenti, rettifiche, ricezione merci, consegna ordini cliente |
 | Personale      | Dipendenti, registrazione ore, ferie e permessi                           |
+| Collaboratore  | **Solo** la propria area: registra le ore lavorate sui cantieri            |
 
 ## Più utenti in contemporanea
 
@@ -452,7 +464,7 @@ totali e IVA mista, l'adeguamento dei listini, l'importazione
 CSV/Excel, la creazione rapida, i modelli di preventivo, cantieri, manutenzioni, seriali,
 allegati, varianti, kit, sezioni, statistiche di marginalità, il personale (dipendenti,
 ore, ferie e registro presenze), l'invio dei preventivi per email, le provvigioni,
-l'esportazione Excel, le PWA (manifest e service
+l'esportazione Excel, i collaboratori esterni con la loro area riservata, le PWA (manifest e service
 worker), le protezioni anti-abuso e i permessi dei ruoli.
 
 ## Prossime tappe suggerite

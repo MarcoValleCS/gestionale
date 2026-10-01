@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.core.forms import BaseBootstrapModelForm
 from apps.jobs.models import Job
 
-from .models import Employee, LeaveRequest, TimeEntry
+from .models import Collaborator, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
 
 MIN_HOURS = Decimal("0.25")
 
@@ -168,3 +168,93 @@ class TimesheetFilterForm(forms.Form):
         self.fields["month"].choices = month_choices or []
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-select form-select-sm"
+
+
+# ------------------------------------------------------------ collaboratori
+class CollaboratorForm(BaseBootstrapModelForm):
+    """Anagrafica di un collaboratore esterno."""
+
+    class Meta:
+        model = Collaborator
+        fields = [
+            "name",
+            "company",
+            "specialization",
+            "contact",
+            "user",
+            "fiscal_code",
+            "phone",
+            "email",
+            "hourly_rate",
+            "active",
+            "notes",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+
+        from apps.contacts.models import Contact
+
+        self.fields["contact"].queryset = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
+        self.fields["contact"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
+        self.fields["contact"].required = False
+        self.fields["user"].queryset = get_user_model().objects.filter(is_active=True).order_by("username")
+        self.fields["user"].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+        self.fields["user"].required = False
+        self.fields["user"].help_text = (
+            "Facoltativo: crea un utente con il solo ruolo «Collaboratore» e collegalo qui, "
+            "così può registrare le ore da solo."
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        utente = cleaned.get("user")
+        if utente and self.instance.pk:
+            altro = Collaborator.objects.filter(user=utente).exclude(pk=self.instance.pk).exists()
+            if altro:
+                self.add_error("user", "Questo utente è già collegato a un altro collaboratore.")
+        return cleaned
+
+
+class CollaboratorTimeEntryForm(BaseBootstrapModelForm):
+    """Ore rendicontate da un collaboratore.
+
+    Se ``collaborator`` è passato al form (area del collaboratore), il campo
+    sparisce e le ore finiscono sempre su quello: un collaboratore non può
+    registrare ore a nome di un altro.
+    """
+
+    class Meta:
+        model = CollaboratorTimeEntry
+        fields = ["collaborator", "date", "hours", "job", "description"]
+
+    def __init__(self, *args, collaborator=None, **kwargs):
+        self.fixed_collaborator = collaborator
+        super().__init__(*args, **kwargs)
+        if collaborator is not None:
+            self.fields.pop("collaborator", None)
+        else:
+            self.fields["collaborator"].queryset = Collaborator.objects.filter(active=True).order_by("name")
+            self.fields["collaborator"].label_from_instance = lambda obj: str(obj)
+        self.fields["job"].queryset = open_jobs()
+        self.fields["job"].label_from_instance = lambda obj: f"{obj.code} – {obj.name} ({obj.customer.name})"
+        self.fields["job"].required = False
+        self.fields["job"].help_text = "Su quale cantiere o lavoro sono state fatte queste ore."
+        self.fields["hours"].widget.attrs["step"] = "0.25"
+        self.fields["hours"].widget.attrs["min"] = "0.25"
+        self.fields["hours"].help_text = "In ore e quarti d'ora (es. 4.5 = 4 ore e 30 minuti)."
+
+    def clean_hours(self):
+        ore = self.cleaned_data.get("hours")
+        if ore is not None and ore > 24:
+            raise forms.ValidationError("Non puoi registrare più di 24 ore in un giorno.")
+        return ore
+
+    def save(self, commit=True):
+        istanza = super().save(commit=False)
+        if self.fixed_collaborator is not None:
+            istanza.collaborator = self.fixed_collaborator
+        if commit:
+            istanza.save()
+        return istanza

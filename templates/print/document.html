@@ -265,7 +265,7 @@
       <div class="notes-block">
         {% if notes %}
         <div class="notes-title">Condizioni e note</div>
-        {{ notes }}
+        {{ notes|richtext }}
         {% endif %}
       </div>
       {% if show_prices %}
