@@ -134,6 +134,10 @@ class PurchaseOrder(TotalsDocument, TimeStampedModel):
         verbose_name = "Ordine fornitore"
         verbose_name_plural = "Ordini fornitore"
         ordering = ["-date", "-pk"]
+        indexes = [
+            models.Index(fields=["status", "-date"], name="po_status_date_idx"),
+            models.Index(fields=["supplier", "-date"], name="po_supplier_date_idx"),
+        ]
 
     def __str__(self):
         return self.number or f"Ordine fornitore {self.pk}"

@@ -79,6 +79,10 @@ class Product(TimeStampedModel):
         verbose_name = "Articolo"
         verbose_name_plural = "Articoli"
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["active", "name"], name="product_active_name_idx"),
+            models.Index(fields=["barcode"], name="product_barcode_idx"),
+        ]
 
     def __str__(self):
         return f"{self.code} – {self.name}" if self.code else self.name

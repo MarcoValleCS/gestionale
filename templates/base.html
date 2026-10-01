@@ -33,6 +33,9 @@
       <a class="nav-link {% if request.resolver_match.url_name == 'quote_list' %}active{% endif %}" href="{% url 'sales:quote_list' %}">
         <i class="bi bi-file-earmark-text"></i> Preventivi
       </a>
+      <a class="nav-link {% if 'quote_template' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'sales:quote_template_list' %}">
+        <i class="bi bi-stars"></i> Modelli preventivo
+      </a>
       {% endif %}
       {% if roles.is_admin or roles.is_sales or roles.is_warehouse or roles.is_purchasing %}
       <a class="nav-link {% if request.resolver_match.url_name == 'order_list' %}active{% endif %}" href="{% url 'sales:order_list' %}">

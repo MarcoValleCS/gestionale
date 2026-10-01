@@ -17,6 +17,12 @@ urlpatterns = [
     path("preventivi/<int:pk>/converti/", views.quote_convert, name="quote_convert"),
     path("preventivi/<int:pk>/duplica/", views.quote_duplicate, name="quote_duplicate"),
     path("preventivi/<int:pk>/elimina/", views.quote_delete, name="quote_delete"),
+    # Modelli di preventivo
+    path("modelli/", views.QuoteTemplateListView.as_view(), name="quote_template_list"),
+    path("modelli/nuovo/", views.QuoteTemplateCreateView.as_view(), name="quote_template_create"),
+    path("modelli/<int:pk>/", views.QuoteTemplateUpdateView.as_view(), name="quote_template_update"),
+    path("modelli/<int:pk>/dati/", views.quote_template_data, name="quote_template_data"),
+    path("modelli/<int:pk>/elimina/", views.quote_template_delete, name="quote_template_delete"),
     # Ordini cliente
     path("ordini/", views.SalesOrderListView.as_view(), name="order_list"),
     path("ordini/nuovo/", views.SalesOrderCreateView.as_view(), name="order_create"),

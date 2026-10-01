@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16-alpine
@@ -6,6 +12,24 @@ services:
       POSTGRES_DB: ${DB_NAME:-gestionale}
       POSTGRES_USER: ${DB_USER:-gestionale}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Impostare DB_PASSWORD nel file .env}
+    # Configurazione tarata su un VPS piccolo (1 vCPU / 1 GB RAM)
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "effective_cache_size=384MB"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "max_connections=25"
+      - "-c"
+      - "wal_compression=on"
+      - "-c"
+      - "max_wal_size=512MB"
+    shm_size: "256mb"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -13,6 +37,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    logging: *default-logging
 
   web:
     build: .
@@ -29,6 +54,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    logging: *default-logging
 
   caddy:
     image: caddy:2-alpine
@@ -45,6 +71,7 @@ services:
       - caddy_config:/config
     depends_on:
       - web
+    logging: *default-logging
 
 volumes:
   pgdata:

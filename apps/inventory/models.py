@@ -69,6 +69,10 @@ class StockMovement(models.Model):
         verbose_name = "Movimento di magazzino"
         verbose_name_plural = "Movimenti di magazzino"
         ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(fields=["-created_at"], name="movement_created_idx"),
+            models.Index(fields=["product", "-created_at"], name="movement_product_idx"),
+        ]
 
     def __str__(self):
         return f"{self.product} {self.quantity:+} ({self.get_movement_type_display()})"

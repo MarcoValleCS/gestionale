@@ -16,6 +16,9 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   IVA a scelta per ogni riga, totali e riepilogo IVA, **stampa/PDF grafica** con logo e
   colore aziendale, stati (bozza → inviato → accettato/rifiutato → convertito in ordine),
   duplicazione.
+- **Modelli di preventivo** – modelli riutilizzabili con righe e condizioni preimpostate
+  (es. «Bagno completo», «Piscina – manutenzione stagionale»): nel preventivo si scelgono
+  e si caricano con un clic, senza riscrivere ogni volta le stesse righe.
 - **Ordini cliente** – creati direttamente o dal preventivo accettato, con consegna
   prevista e stato consegne. Alla **conferma** il sistema confronta la giacenza con le
   righe e **genera automaticamente gli ordini fornitore** per le carenze, raggruppati
@@ -197,6 +200,72 @@ cat backup-2026-01-01.sql | docker compose exec -T db psql -U gestionale gestion
 git pull && docker compose up -d --build
 ```
 
+## Sicurezza, backup e prestazioni
+
+### Protezioni già attive
+
+- **Accesso obbligatorio** a tutte le pagine (anche agli endpoint di ricerca), sessioni di 12 ore.
+- **Anti-abuso** (`apps/core/middleware.py`): massimo 8 tentativi di accesso ogni 5 minuti per
+  IP e 120 ricerche al minuto; oltre la soglia risponde 429. I contatori sono condivisi tra i
+  processi grazie alla cache su file.
+- **Header di sicurezza** (Django + Caddy): `X-Frame-Options: DENY`, `X-Content-Type-Options`,
+  `Referrer-Policy`, `Permissions-Policy`, HSTS quando HTTPS è attivo, header `Server` rimosso.
+- **HTTPS automatico** con Caddy (certificato Let's Encrypt) quando c'è un dominio.
+- **Limiti di caricamento**: 25 MB per richiesta in Caddy, 10 MB in Django (import Excel).
+- **Cookie** di sessione e CSRF `Secure` con HTTPS, `SameSite=Lax`, `HttpOnly`.
+
+### Protezioni consigliate sul VPS (una volta sola)
+
+```bash
+sudo apt update && sudo apt install -y ufw fail2ban unattended-upgrades
+
+# Firewall: solo SSH, HTTP e HTTPS
+sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw --force enable
+sudo systemctl enable --now fail2ban
+
+# Aggiornamenti di sicurezza automatici
+sudo dpkg-reconfigure -plow unattended-upgrades
+
+# Swap: indispensabile con 1 GB di RAM (evita il blocco su picchi di lavoro)
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+```
+
+**DDoS**: con 1 vCPU la difesa migliore è non esporre l'IP. Metti il dominio dietro
+**Cloudflare (piano gratuito)**: assorbe gli attacchi volumetrici, nasconde l'IP del VPS e
+aggiunge WAF di base. Opzionale: `sudo apt install crowdsec` per bloccare scanner e bot a
+livello di sistema. Docker è già configurato con rotazione dei log (10 MB × 3 file per
+servizio), così il disco da 10 GB non si riempie.
+
+### Backup
+
+Due script pronti in `scripts/`:
+
+```bash
+# Backup database + file caricati (mantiene 14 giorni)
+./scripts/backup.sh                    # oppure ./scripts/backup.sh /percorso/backup
+
+# Backup automatico ogni notte alle 3:00
+crontab -e
+0 3 * * * cd /opt/gestionale && ./scripts/backup.sh >> /var/log/gestionale-backup.log 2>&1
+
+# Ripristino (chiede conferma prima di sovrascrivere)
+./scripts/restore.sh /opt/backups/gestionale/db_2026-10-01_0300.sql.gz
+```
+
+Copia periodicamente i backup anche fuori dal VPS (rsync verso un altro server, cloud):
+il backup sullo stesso disco non protegge da guasti.
+
+### Prestazioni
+
+- **PostgreSQL tarato** per 1 GB di RAM: `shared_buffers=128MB`,
+  `effective_cache_size=384MB`, `work_mem=4MB`, `max_connections=25`.
+- **Indici** sulle query più usate: stato+data su preventivi e ordini, nome+attivo su contatti
+  e articoli, codice a barre, data sui movimenti di magazzino, P.IVA sui contatti.
+- **Gunicorn**: 2 worker con thread, riciclo periodico dei worker, timeout 60s — tarato per 1 vCPU.
+- **Cache su file** condivisa e **Whitenoise** per i file statici (nessun nginx separato).
+
 ## Struttura del progetto
 
 ```
@@ -211,7 +280,11 @@ apps/
   purchasing/           ordini fornitore e listini
 templates/              interfaccia (Bootstrap 5, in italiano) e documenti stampabili
 static/js/quick_create.js   creazione al volo di contatti e articoli
+static/js/autocomplete.js   ricerca a digitazione
+static/js/quote_template.js caricamento dei modelli di preventivo
+scripts/                backup e ripristino per il VPS
 docker/                 entrypoint e configurazione Caddy
+CONSIGLI-ARREDO-BAGNO-PISCINE.md   idee e roadmap per il tuo settore
 ```
 
 ## Test
@@ -222,7 +295,8 @@ python manage.py test apps
 
 Coprono il flusso completo (preventivo → ordine → ordine fornitore → ricezione →
 consegna), il calcolo di totali e IVA mista, l'adeguamento dei listini, l'importazione
-CSV/Excel, la creazione rapida, le statistiche di marginalità e i permessi dei ruoli.
+CSV/Excel, la creazione rapida, i modelli di preventivo, le statistiche di marginalità,
+le protezioni anti-abuso e i permessi dei ruoli.
 
 ## Prossime tappe suggerite
 

@@ -43,6 +43,10 @@ class Contact(TimeStampedModel):
         verbose_name = "Contatto"
         verbose_name_plural = "Contatti"
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["active", "name"], name="contact_active_name_idx"),
+            models.Index(fields=["vat_number"], name="contact_vat_idx"),
+        ]
 
     def __str__(self):
         return self.name

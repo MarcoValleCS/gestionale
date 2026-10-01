@@ -139,6 +139,10 @@ class Quote(TotalsDocument, TimeStampedModel):
         verbose_name = "Preventivo"
         verbose_name_plural = "Preventivi"
         ordering = ["-date", "-pk"]
+        indexes = [
+            models.Index(fields=["status", "-date"], name="quote_status_date_idx"),
+            models.Index(fields=["customer", "-date"], name="quote_customer_date_idx"),
+        ]
 
     def __str__(self):
         return self.number or f"Preventivo {self.pk}"
@@ -201,6 +205,10 @@ class SalesOrder(TotalsDocument, TimeStampedModel):
         verbose_name = "Ordine cliente"
         verbose_name_plural = "Ordini cliente"
         ordering = ["-date", "-pk"]
+        indexes = [
+            models.Index(fields=["status", "-date"], name="order_status_date_idx"),
+            models.Index(fields=["customer", "-date"], name="order_customer_date_idx"),
+        ]
 
     def __str__(self):
         return self.number or f"Ordine {self.pk}"
@@ -246,3 +254,44 @@ class SalesOrderLine(DocumentLine):
     @property
     def qty_remaining(self):
         return round3(Decimal(self.qty or 0) - Decimal(self.qty_delivered or 0))
+
+
+class QuoteTemplate(TimeStampedModel):
+    """Modello di preventivo riutilizzabile (righe e condizioni preimpostate)."""
+
+    name = models.CharField("Nome modello", max_length=120, unique=True)
+    description = models.CharField("Descrizione", max_length=200, blank=True)
+    payment_term = models.ForeignKey(
+        PaymentTerm, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Condizione di pagamento"
+    )
+    terms_text = models.TextField("Condizioni (stampate)", blank=True)
+    notes = models.TextField("Note interne", blank=True)
+    is_active = models.BooleanField("Attivo", default=True)
+    sort_order = models.PositiveSmallIntegerField("Ordine di visualizzazione", default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quote_templates",
+        verbose_name="Creato da",
+    )
+
+    class Meta:
+        verbose_name = "Modello di preventivo"
+        verbose_name_plural = "Modelli di preventivo"
+        ordering = ["sort_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def lines_count(self):
+        return self.lines.count()
+
+    def value(self):
+        return round2(sum((line.line_subtotal for line in self.lines.all()), ZERO))
+
+
+class QuoteTemplateLine(DocumentLine):
+    template = models.ForeignKey(QuoteTemplate, on_delete=models.CASCADE, related_name="lines", verbose_name="Modello")

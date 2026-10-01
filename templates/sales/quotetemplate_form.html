@@ -9,49 +9,20 @@
   <div class="row g-3">
     <div class="col-lg-8">
       <div class="card mb-3">
-        <div class="card-header">Dati preventivo</div>
+        <div class="card-header">Dati del modello</div>
         <div class="card-body">
           <div class="row">
-            {% include "partials/field_quick.html" with field=form.customer col=6 kind="customer" title="Crea nuovo cliente" %}
-            {% include "partials/field.html" with field=form.date col=3 %}
-            {% include "partials/field.html" with field=form.valid_until col=3 %}
-            {% include "partials/field.html" with field=form.payment_term col=4 %}
-            {% include "partials/field.html" with field=form.reference col=8 %}
+            {% include "partials/field.html" with field=form.name col=8 %}
+            {% include "partials/field.html" with field=form.sort_order col=2 %}
+            {% include "partials/field.html" with field=form.is_active col=2 %}
+            {% include "partials/field.html" with field=form.description col=12 %}
           </div>
         </div>
       </div>
-
-      {% if quote_templates %}
-      <div class="card mb-3">
-        <div class="card-body py-3">
-          <div class="row g-2 align-items-end">
-            <div class="col-md-8">
-              <label class="form-label mb-1" for="quote-template-select"><i class="bi bi-stars me-1"></i> Modello di preventivo</label>
-              <select class="form-select form-select-sm" id="quote-template-select">
-                <option value="">— scegli un modello per riempire le righe —</option>
-                {% for template in quote_templates %}
-                <option value="{{ template.pk }}">{{ template.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-4 d-flex gap-2">
-              <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1" id="load-template"
-                      data-url="{% url 'sales:quote_template_data' 0 %}">
-                <i class="bi bi-download"></i> Carica modello
-              </button>
-              <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_template_list' %}" title="Gestisci i modelli">
-                <i class="bi bi-gear"></i>
-              </a>
-            </div>
-          </div>
-          <div id="template-feedback" class="d-none"></div>
-        </div>
-      </div>
-      {% endif %}
 
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Righe del preventivo</span>
+          <span>Righe del modello</span>
           <button type="button" class="btn btn-outline-primary btn-sm" id="add-line"><i class="bi bi-plus-lg"></i> Aggiungi riga</button>
         </div>
         <div class="table-responsive">
@@ -82,7 +53,7 @@
       </div>
 
       <div class="card">
-        <div class="card-header">Note e condizioni</div>
+        <div class="card-header">Condizioni e note</div>
         <div class="card-body">
           <div class="row">
             {% include "partials/field.html" with field=form.notes col=6 %}
@@ -94,7 +65,7 @@
 
     <div class="col-lg-4">
       <div class="card mb-3 position-sticky" style="top: 80px">
-        <div class="card-header">Totali</div>
+        <div class="card-header">Valore indicativo</div>
         <div class="card-body">
           <dl class="doc-totals mb-0">
             <div class="d-flex justify-content-between"><dt>Imponibile</dt><dd id="totals-subtotal">0,00 €</dd></div>
@@ -106,12 +77,13 @@
           </dl>
           <div id="vat-breakdown" class="mt-2"></div>
           <p class="text-muted small mt-3 mb-0">
-            I totali definitivi vengono ricalcolati dal server al salvataggio.
+            Il valore è indicativo (i prezzi possono essere aggiornati nel singolo preventivo).
+            Pagamento e condizioni del modello vengono riportati nel preventivo solo se i campi sono vuoti.
           </p>
         </div>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva preventivo</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva modello</button>
         <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
       </div>
     </div>
@@ -125,5 +97,4 @@
 {% include "sales/_lines_script.html" %}
 <script src="{% static 'js/quick_create.js' %}"></script>
 <script src="{% static 'js/autocomplete.js' %}"></script>
-<script src="{% static 'js/quote_template.js' %}"></script>
 {% endblock %}

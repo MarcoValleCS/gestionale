@@ -119,21 +119,61 @@
     }
   }
 
+  function setSelectValue(select, value, label) {
+    if (!select || value === null || value === undefined || value === "") return;
+    let option = Array.prototype.find.call(select.options, function (o) { return o.value === String(value); });
+    if (!option && label) {
+      option = new Option(label, value, true, true);
+      select.add(option);
+    }
+    if (option) select.value = option.value;
+  }
+
+  function setFieldValue(row, selector, value) {
+    const field = row.querySelector(selector);
+    if (field && value !== undefined && value !== null) field.value = value;
+  }
+
+  /* Riempie una riga con valori dati senza innescare l'autocompletamento
+     (usato dal caricamento dei modelli di preventivo). */
+  function fillRow(row, values) {
+    const productSelect = row.querySelector('[name$="-product"]');
+    setSelectValue(productSelect, values.product, values.productLabel);
+    const searchInput = row.querySelector("[data-autocomplete]");
+    if (searchInput) {
+      const option = productSelect ? productSelect.selectedOptions[0] : null;
+      searchInput.value = option && option.value ? option.text : "";
+    }
+    setFieldValue(row, '[name$="-description"]', values.description);
+    setFieldValue(row, '[name$="-qty"]', values.qty);
+    setSelectValue(row.querySelector('[name$="-uom"]'), values.uom);
+    setFieldValue(row, '[name$="-unit_price"]', values.unitPrice);
+    setFieldValue(row, '[name$="-discount_pct"]', values.discount);
+    setSelectValue(row.querySelector('[name$="-vat_rate"]'), values.vat);
+  }
+
+  function addRow(values) {
+    const index = parseInt(totalFormsInput.value, 10) || 0;
+    const html = templateEl.innerHTML.replace(/__prefix__/g, index);
+    const wrapper = document.createElement("tbody");
+    wrapper.innerHTML = html.trim();
+    const row = wrapper.firstElementChild;
+    if (!row) return null;
+    tableBody.appendChild(row);
+    totalFormsInput.value = index + 1;
+    bindRow(row);
+    if (values) fillRow(row, values);
+    recalc();
+    return row;
+  }
+
   const addButton = document.getElementById("add-line");
   if (addButton) {
-    addButton.addEventListener("click", function () {
-      const index = parseInt(totalFormsInput.value, 10) || 0;
-      const html = templateEl.innerHTML.replace(/__prefix__/g, index);
-      const wrapper = document.createElement("tbody");
-      wrapper.innerHTML = html.trim();
-      const row = wrapper.firstElementChild;
-      if (!row) return;
-      tableBody.appendChild(row);
-      totalFormsInput.value = index + 1;
-      bindRow(row);
-      recalc();
-    });
+    addButton.addEventListener("click", function () { addRow(); });
   }
+
+  /* API usata dagli altri script (modelli di preventivo, creazioni rapide) */
+  window.GestionaleLines = { addRow: addRow, recalc: recalc };
 
   tableBody.querySelectorAll("tr.line-row").forEach(bindRow);
   recalc();

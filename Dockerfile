@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 \
+    && apt-get install -y --no-install-recommends libpq5 tar \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,4 +19,13 @@ RUN chmod +x docker/entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["docker/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
+# Ottimizzato per 1 vCPU / 1 GB RAM: 2 worker con thread, riciclo periodico dei worker
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--worker-class", "gthread", \
+     "--workers", "2", \
+     "--threads", "2", \
+     "--timeout", "60", \
+     "--graceful-timeout", "30", \
+     "--max-requests", "800", \
+     "--max-requests-jitter", "100"]

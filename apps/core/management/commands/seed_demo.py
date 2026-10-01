@@ -118,6 +118,50 @@ class Command(BaseCommand):
             PriceListItem.objects.get_or_create(pricelist=pricelist, product=bullone, defaults={"price": Decimal("0.18")})
             PriceListItem.objects.get_or_create(pricelist=pricelist, product=tondino, defaults={"price": Decimal("0.70")})
 
+        from apps.sales.models import QuoteTemplate, QuoteTemplateLine
+
+        if not QuoteTemplate.objects.exists():
+            bagno = QuoteTemplate.objects.create(
+                name="Bagno completo – composizione base",
+                description="Mobile, lavabo, specchio e posa in opera",
+                payment_term=terms,
+                terms_text="Validità offerta 30 giorni.\nPosa inclusa; smaltimento a parte.",
+                sort_order=1,
+            )
+            QuoteTemplateLine.objects.create(
+                template=bagno, position=1, description="Mobile bagno 80 cm sospeso", qty=1, uom=pz,
+                unit_price=Decimal("450.00"), vat_rate=vat22,
+            )
+            QuoteTemplateLine.objects.create(
+                template=bagno, position=2, description="Specchio con luce LED 80 cm", qty=1, uom=pz,
+                unit_price=Decimal("180.00"), vat_rate=vat22,
+            )
+            QuoteTemplateLine.objects.create(
+                template=bagno, position=3, product=montaggio, description="Posa in opera", qty=Decimal("5"), uom=h,
+                unit_price=Decimal("45.00"), vat_rate=vat22,
+            )
+
+            piscina = QuoteTemplate.objects.create(
+                name="Piscina – manutenzione stagionale",
+                description="Apertura, chiusura e controlli stagionali",
+                payment_term=terms,
+                terms_text="Interventi programmati su appuntamento.",
+                sort_order=2,
+            )
+            QuoteTemplateLine.objects.create(
+                template=piscina, position=1, description="Apertura piscina (pulizia, avvio impianto, trattamento)", qty=1, uom=pz,
+                unit_price=Decimal("350.00"), vat_rate=vat22,
+            )
+            QuoteTemplateLine.objects.create(
+                template=piscina, position=2, description="Chiusura piscina (invernaggio e copertura)", qty=1, uom=pz,
+                unit_price=Decimal("320.00"), vat_rate=vat22,
+            )
+            QuoteTemplateLine.objects.create(
+                template=piscina, position=3, product=montaggio, description="Interventi in cantiere", qty=Decimal("4"), uom=h,
+                unit_price=Decimal("45.00"), vat_rate=vat22,
+            )
+            self.stdout.write(self.style.SUCCESS("Creati due modelli di preventivo di esempio (bagno e piscina)."))
+
         if not Quote.objects.exists():
             quote = Quote.objects.create(
                 customer=customer,

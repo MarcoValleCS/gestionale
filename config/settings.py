@@ -27,6 +27,27 @@ if env_bool("DJANGO_HTTPS", False):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = False
+
+# ------------------------------------------------------- Difese aggiuntive
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 60 * 60 * 12  # sessione di 12 ore
+SESSION_SAVE_EVERY_REQUEST = True
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB (import Excel)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
+
+# Limiti anti-abuso (finestra in secondi): usati da apps.core.middleware
+ABUSE_THROTTLE = {
+    "login": {"limit": 8, "window": 300},   # 8 tentativi di accesso ogni 5 minuti per IP
+    "search": {"limit": 120, "window": 60},  # 120 ricerche al minuto per IP
+}
 
 # ------------------------------------------------------------------- App
 INSTALLED_APPS = [
@@ -53,6 +74,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "apps.core.middleware.AbuseThrottleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -135,6 +157,17 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# -------------------------------------------------------------- Cache
+# Cache su file: condivisa tra i processi di gunicorn, nessuna tabella
+# aggiuntiva e nessun servizio esterno.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": BASE_DIR / ".cache",
+        "TIMEOUT": 300,
+    }
+}
 
 from django.contrib.messages import constants as message_constants  # noqa: E402
 

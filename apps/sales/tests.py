@@ -15,7 +15,7 @@ from apps.purchasing.models import PurchaseOrder, SupplierPriceList, PriceListIt
 from apps.purchasing.services import apply_pricelist_adjustment
 
 from . import analytics, services
-from .models import Quote, SalesOrder
+from .models import Quote, QuoteTemplate, SalesOrder
 
 User = get_user_model()
 
@@ -240,6 +240,72 @@ class AnalyticsTest(FlowTestBase):
                 self.assertContains(response, "Marginalità per articolo")
 
 
+class QuoteTemplateTest(FlowTestBase):
+    def test_crea_modello_tramite_vista(self):
+        self.login()
+        response = self.client.post(
+            reverse("sales:quote_template_create"),
+            {
+                "name": "Bagno completo",
+                "description": "Modello base bagno",
+                "payment_term": "",
+                "terms_text": "Validità 30 giorni. Posa inclusa.",
+                "notes": "Note interne del modello",
+                "sort_order": "1",
+                "is_active": "on",
+                "lines-TOTAL_FORMS": "1",
+                "lines-INITIAL_FORMS": "0",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-product": self.product.pk,
+                "lines-0-description": "",
+                "lines-0-qty": "4",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "10.00",
+                "lines-0-discount_pct": "0",
+                "lines-0-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        template = QuoteTemplate.objects.get()
+        self.assertEqual(template.name, "Bagno completo")
+        self.assertEqual(template.lines.count(), 1)
+        self.assertEqual(template.lines.first().description, "Bullone M8")
+
+    def test_dati_modello_json(self):
+        template = QuoteTemplate.objects.create(name="Piscina 8x4", terms_text="Incluso scavo")
+        template.lines.create(
+            product=self.product,
+            description="Scavo",
+            qty=Decimal("2.500"),
+            uom=self.uom,
+            unit_price=Decimal("100.00"),
+            discount_pct=Decimal("5"),
+            vat_rate=self.vat22,
+        )
+        self.login()
+        response = self.client.get(reverse("sales:quote_template_data", args=[template.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["template"]["name"], "Piscina 8x4")
+        self.assertEqual(data["template"]["terms_text"], "Incluso scavo")
+        self.assertEqual(len(data["lines"]), 1)
+        line = data["lines"][0]
+        self.assertEqual(line["qty"], "2.5")
+        self.assertEqual(line["unit_price"], "100")
+        self.assertEqual(line["discount_pct"], "5")
+        self.assertEqual(line["product"], self.product.pk)
+        self.assertEqual(line["vat_rate"], self.vat22.pk)
+
+    def test_form_preventivo_mostra_i_modelli(self):
+        QuoteTemplate.objects.create(name="Manutenzione annuale")
+        self.login()
+        response = self.client.get(reverse("sales:quote_create"))
+        self.assertContains(response, "Manutenzione annuale")
+        self.assertContains(response, "quote-template-select")
+        self.assertContains(response, "quote_template.js")
+
+
 class VatAndTotalsTest(FlowTestBase):
     def test_totali_con_iva_mista_e_sconto(self):
         quote = Quote.objects.create(customer=self.customer)
@@ -297,6 +363,8 @@ class PagesSmokeTest(FlowTestBase):
         po.recalculate()
         pricelist = SupplierPriceList.objects.create(supplier=self.supplier, name="Listino smoke")
         PriceListItem.objects.create(pricelist=pricelist, product=self.product, price=Decimal("5.00"))
+        quote_template = QuoteTemplate.objects.create(name="Modello smoke")
+        quote_template.lines.create(product=self.product, description="x", qty=Decimal("1"), uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22)
         register_movement(product=self.product, delta=Decimal("5"), movement_type="load", user=self.user)
 
         urls = [
@@ -331,6 +399,10 @@ class PagesSmokeTest(FlowTestBase):
             reverse("sales:quote_detail", args=[quote.pk]),
             reverse("sales:quote_update", args=[quote.pk]),
             reverse("sales:quote_print", args=[quote.pk]),
+            reverse("sales:quote_template_list"),
+            reverse("sales:quote_template_create"),
+            reverse("sales:quote_template_update", args=[quote_template.pk]),
+            reverse("sales:quote_template_data", args=[quote_template.pk]),
             reverse("sales:order_list"),
             reverse("sales:order_create"),
             reverse("sales:order_detail", args=[order.pk]),

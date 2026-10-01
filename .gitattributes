@@ -1,0 +1,7 @@
+* text=auto
+
+# Gli script e i file di configurazione devono restare con fine riga LF
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker/Caddyfile text eol=lf
+.env.example text eol=lf

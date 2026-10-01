@@ -9,7 +9,7 @@ from apps.contacts.models import Contact
 from apps.core.forms import BaseBootstrapModelForm, active_units, active_vat_rates
 from apps.core.models import CompanySettings
 
-from .models import Quote, QuoteLine, SalesOrder, SalesOrderLine
+from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine
 
 
 class CustomerChoiceFormMixin:
@@ -85,6 +85,24 @@ class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
             self.fields["terms_text"].initial = CompanySettings.load().quote_footer
+
+
+class QuoteTemplateForm(BaseBootstrapModelForm):
+    class Meta:
+        model = QuoteTemplate
+        fields = ["name", "description", "payment_term", "terms_text", "notes", "sort_order", "is_active"]
+
+
+class QuoteTemplateLineForm(LineFormMixin, BaseBootstrapModelForm):
+    defaults_context = "sale"
+
+    class Meta:
+        model = QuoteTemplateLine
+        fields = ["product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.apply_line_fields()
 
 
 class QuoteLineForm(LineFormMixin, BaseBootstrapModelForm):

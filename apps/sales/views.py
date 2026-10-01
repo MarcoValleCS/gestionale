@@ -1,8 +1,11 @@
 """Viste di vendite: preventivi e ordini cliente."""
+from decimal import Decimal
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.forms import modelformset_factory
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
@@ -12,11 +15,19 @@ from apps.contacts.models import Contact
 from apps.core.models import VatRate
 
 from . import services
-from .forms import QuoteForm, QuoteLineForm, SalesOrderForm, SalesOrderLineForm
-from .models import Quote, QuoteLine, SalesOrder, SalesOrderLine
+from .forms import (
+    QuoteForm,
+    QuoteLineForm,
+    QuoteTemplateForm,
+    QuoteTemplateLineForm,
+    SalesOrderForm,
+    SalesOrderLineForm,
+)
+from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine
 
 QuoteLineFormSet = modelformset_factory(QuoteLine, form=QuoteLineForm, extra=1, can_delete=True)
 SalesOrderLineFormSet = modelformset_factory(SalesOrderLine, form=SalesOrderLineForm, extra=1, can_delete=True)
+QuoteTemplateLineFormSet = modelformset_factory(QuoteTemplateLine, form=QuoteTemplateLineForm, extra=1, can_delete=True)
 
 QUOTE_ROLES = (ROLE_ADMIN, ROLE_SALES)
 ORDER_VIEW_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, ROLE_PURCHASING)
@@ -27,6 +38,14 @@ ORDER_DELIVER_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
 # ------------------------------------------------------------------ helper
 def fdate(value):
     return value.strftime("%d/%m/%Y") if value else ""
+
+
+def plain_number(value):
+    """Numero decimale senza zeri finali, per i campi dei form via JavaScript."""
+    text = f"{Decimal(value or 0):f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def build_print_context(
@@ -146,6 +165,7 @@ class QuoteCreateView(RoleRequiredMixin, CreateView):
         if "line_formset" not in context:
             context["line_formset"] = QuoteLineFormSet(prefix="lines", queryset=QuoteLine.objects.none())
         context["cancel_url"] = reverse("sales:quote_list")
+        context["quote_templates"] = QuoteTemplate.objects.filter(is_active=True)
         return with_vat_rates(context)
 
     def post(self, request, *args, **kwargs):
@@ -511,3 +531,118 @@ def order_delete(request, pk):
             messages.success(request, f"Ordine {number} eliminato.")
             return redirect("sales:order_list")
     return redirect("sales:order_detail", pk=order.pk)
+
+
+# --------------------------------------------------- modelli di preventivo
+class QuoteTemplateListView(RoleRequiredMixin, ListView):
+    allowed_roles = QUOTE_ROLES
+    model = QuoteTemplate
+    template_name = "sales/quotetemplate_list.html"
+    context_object_name = "templates"
+    paginate_by = 50
+
+    def get_queryset(self):
+        return QuoteTemplate.objects.annotate(line_count=Count("lines")).order_by("sort_order", "name")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Modelli di preventivo"
+        return context
+
+
+class QuoteTemplateCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = QUOTE_ROLES
+    model = QuoteTemplate
+    form_class = QuoteTemplateForm
+    template_name = "sales/quotetemplate_form.html"
+    success_url = reverse_lazy("sales:quote_template_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = "Nuovo modello di preventivo"
+        if "line_formset" not in context:
+            context["line_formset"] = QuoteTemplateLineFormSet(prefix="lines", queryset=QuoteTemplateLine.objects.none())
+        context["cancel_url"] = reverse("sales:quote_template_list")
+        return with_vat_rates(context)
+
+    def post(self, request, *args, **kwargs):
+        self.object = None
+        form = self.get_form()
+        formset = QuoteTemplateLineFormSet(request.POST, prefix="lines", queryset=QuoteTemplateLine.objects.none())
+        if form.is_valid() and formset.is_valid():
+            self.object = form.save(commit=False)
+            self.object.created_by = request.user
+            self.object.save()
+            save_document_lines(self.object, formset, "template")
+            messages.success(request, f"Modello «{self.object.name}» creato.")
+            return redirect(self.get_success_url())
+        return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
+
+
+class QuoteTemplateUpdateView(RoleRequiredMixin, UpdateView):
+    allowed_roles = QUOTE_ROLES
+    model = QuoteTemplate
+    form_class = QuoteTemplateForm
+    template_name = "sales/quotetemplate_form.html"
+    success_url = reverse_lazy("sales:quote_template_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = f"Modifica modello: {self.object.name}"
+        if "line_formset" not in context:
+            context["line_formset"] = QuoteTemplateLineFormSet(prefix="lines", queryset=self.object.lines.all())
+        context["cancel_url"] = reverse("sales:quote_template_list")
+        return with_vat_rates(context)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = QuoteTemplateLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        if form.is_valid() and formset.is_valid():
+            self.object = form.save()
+            save_document_lines(self.object, formset, "template")
+            messages.success(request, f"Modello «{self.object.name}» aggiornato.")
+            return redirect(self.get_success_url())
+        return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
+
+
+@role_required(*QUOTE_ROLES)
+def quote_template_delete(request, pk):
+    template = get_object_or_404(QuoteTemplate, pk=pk)
+    if request.method == "POST":
+        name = template.name
+        template.delete()
+        messages.success(request, f"Modello «{name}» eliminato.")
+    return redirect("sales:quote_template_list")
+
+
+@role_required(*QUOTE_ROLES)
+def quote_template_data(request, pk):
+    """Dati del modello per il riempimento del preventivo (JSON)."""
+    template = get_object_or_404(QuoteTemplate, pk=pk)
+    lines = []
+    for line in template.lines.select_related("product", "uom", "vat_rate"):
+        lines.append(
+            {
+                "product": line.product_id,
+                "product_label": f"{line.product.code} – {line.product.name}" if line.product_id else "",
+                "description": line.description or (line.product.name if line.product_id else ""),
+                "qty": plain_number(line.qty),
+                "uom": line.uom_id,
+                "unit_price": plain_number(line.unit_price),
+                "discount_pct": plain_number(line.discount_pct),
+                "vat_rate": line.vat_rate_id,
+            }
+        )
+    return JsonResponse(
+        {
+            "template": {
+                "id": template.pk,
+                "name": template.name,
+                "payment_term": template.payment_term_id,
+                "terms_text": template.terms_text,
+                "notes": template.notes,
+            },
+            "lines": lines,
+        }
+    )
