@@ -687,3 +687,65 @@ class CollaboratorOfficeTest(CollaboratorTestBase):
         self.login(estraneo)
         response = self.client.get(reverse("hr:collaborator_list"))
         self.assertEqual(response.status_code, 403)
+
+
+class MenuRuoliTest(CollaboratorTestBase):
+    """Il menu deve riflettere i ruoli: l'amministratore non va mai limitato.
+
+    Regressione: il context processor restituiva True per tutti i flag agli
+    amministratori, compreso «is_collaborator_only», quindi l'admin vedeva il
+    menu del collaboratore e sembrava aver perso i privilegi.
+    """
+
+    def test_i_flag_dell_amministratore_sono_corretti(self):
+        from apps.core.context_processors import roles
+
+        class Richiesta:
+            user = self.admin
+
+        flag = roles(Richiesta())["roles"]
+        self.assertTrue(flag["is_admin"])
+        self.assertTrue(flag["is_sales"])
+        self.assertTrue(flag["is_hr"])
+        self.assertFalse(
+            flag["is_collaborator_only"],
+            "l'amministratore non deve mai risultare limitato",
+        )
+
+    def test_l_amministratore_vede_il_menu_completo(self):
+        self.login(self.admin)
+        contenuto = self.client.get("/").content.decode("utf-8", "ignore")
+        for voce in ("Contatti", "Articoli", "Preventivi", "Fatture emesse", "Collaboratori", "Impostazioni"):
+            with self.subTest(voce=voce):
+                self.assertIn(voce, contenuto, f"l'amministratore deve vedere «{voce}»")
+        self.assertNotIn("Le mie ore", contenuto, "l'amministratore non deve vedere il menu del collaboratore")
+
+    def test_l_amministratore_accede_a_tutte_le_sezioni(self):
+        self.login(self.admin)
+        for url in ("/", "/articoli/", "/contatti/", "/vendite/preventivi/", "/impostazioni/", "/personale/collaboratori/"):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_il_collaboratore_vede_solo_le_sue_voci(self):
+        self.login(self.collab_user)
+        contenuto = self.client.get(reverse("hr:collaborator_area")).content.decode("utf-8", "ignore")
+        self.assertIn("Le mie ore", contenuto)
+        self.assertNotIn("Fatture emesse", contenuto)
+        self.assertNotIn("Preventivi", contenuto)
+
+    def test_chi_ha_anche_un_altro_ruolo_vede_il_menu_completo(self):
+        self.login(self.misto)
+        contenuto = self.client.get("/").content.decode("utf-8", "ignore")
+        self.assertIn("Preventivi", contenuto)
+        self.assertNotIn("Le mie ore", contenuto)
+
+    def test_utente_senza_ruoli_non_e_limitato_dal_menu(self):
+        """Un utente senza gruppi non è un collaboratore: vede il menu normale."""
+        from apps.core.context_processors import roles
+
+        semplice = User.objects.create_user("semplice", password="password123!")
+
+        class Richiesta:
+            user = semplice
+
+        self.assertFalse(roles(Richiesta())["roles"]["is_collaborator_only"])

@@ -1,6 +1,9 @@
 """Context processor per dati azienda e ruoli utente."""
 from .models import CompanySettings
 
+# Ruoli veri e propri: per l'amministratore sono tutti attivi
+ROLE_FLAGS = ("is_admin", "is_sales", "is_purchasing", "is_warehouse", "is_hr", "is_collaborator")
+
 
 def company(request):
     try:
@@ -10,22 +13,24 @@ def company(request):
 
 
 def roles(request):
+    """Flag dei ruoli per i template.
+
+    ``is_collaborator_only`` è a parte e non fa parte dei ruoli: indica che
+    l'utente va limitato alla sola area ore. Deve restare False per
+    l'amministratore, altrimenti gli si nasconde tutto il menu.
+    """
     user = getattr(request, "user", None)
-    empty = {
-        "is_admin": False,
-        "is_sales": False,
-        "is_purchasing": False,
-        "is_warehouse": False,
-        "is_hr": False,
-        "is_collaborator": False,
-        "is_collaborator_only": False,
-    }
+    spento = {flag: False for flag in ROLE_FLAGS}
+    spento["is_collaborator_only"] = False
+
     if not user or not user.is_authenticated:
-        return {"roles": empty}
+        return {"roles": spento}
+
     if user.is_superuser:
-        return {"roles": {k: True for k in empty}}
+        # l'amministratore ha tutti i ruoli e non è mai limitato
+        return {"roles": {**{flag: True for flag in ROLE_FLAGS}, "is_collaborator_only": False}}
+
     names = set(user.groups.values_list("name", flat=True))
-    solo_collaboratore = "Collaboratore" in names and names <= {"Collaboratore"}
     return {
         "roles": {
             "is_admin": "Amministratore" in names,
@@ -34,6 +39,7 @@ def roles(request):
             "is_warehouse": "Magazzino" in names,
             "is_hr": "Personale" in names,
             "is_collaborator": "Collaboratore" in names,
-            "is_collaborator_only": solo_collaboratore,
+            # limitato solo se ha il ruolo Collaboratore e nessun altro
+            "is_collaborator_only": "Collaboratore" in names and names <= {"Collaboratore"},
         }
     }
