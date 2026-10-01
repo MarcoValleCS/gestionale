@@ -36,7 +36,7 @@ class Category(models.Model):
 
 
 class Product(TimeStampedModel):
-    code = models.CharField("Codice", max_length=30, unique=True, blank=True)
+    code = models.CharField("Codice", max_length=40, unique=True, blank=True)
     name = models.CharField("Descrizione", max_length=200)
     description = models.TextField("Descrizione estesa", blank=True)
     category = models.ForeignKey(
