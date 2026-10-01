@@ -1,7 +1,7 @@
 {% load core_extras %}
-{# Editor delle note stampabili: toolbar semplice + area modificabile.
+{% comment %} Editor delle note stampabili: toolbar semplice + area modificabile.
    Il valore viaggia in una textarea nascosta, sincronizzata all'invio.
-   Il contenuto iniziale passa dal filtro «richtext», che lo ripulisce. #}
+   Il contenuto iniziale passa dal filtro «richtext», che lo ripulisce.{% endcomment %}
 <div class="mb-3 rich-editor">
   <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
   <div class="rich-toolbar" role="toolbar" aria-label="Formattazione del testo">

@@ -30,6 +30,8 @@ def quote_print_context(quote, *, back_url=None):
         notes=quote.terms_text,
         show_signature=True,
         signature_label="Per accettazione (data e firma)",
+        # lo sconto è una trattativa interna: al cliente va il prezzo già scontato
+        show_discount=False,
     )
     context["company"] = company
     context["logo_src"] = logo_data_uri() or (company.logo.url if company.logo else "")

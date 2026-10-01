@@ -216,7 +216,7 @@
           <th class="num" style="width:16mm">Q.tà</th>
           <th style="width:12mm">U.d.M.</th>
           <th class="num" style="width:20mm">Prezzo</th>
-          <th class="num" style="width:14mm">Sc. %</th>
+          {% if show_discount %}<th class="num" style="width:14mm">Sc. %</th>{% endif %}
           <th class="num" style="width:14mm">IVA</th>
           <th class="num" style="width:22mm">Importo</th>
           {% else %}
@@ -229,7 +229,7 @@
         {% for group in line_groups %}
         {% if group.section %}
         <tr class="section-row">
-          <td colspan="{% if show_prices %}8{% else %}4{% endif %}">{{ group.section }}</td>
+          <td colspan="{{ table_columns }}">{{ group.section }}</td>
         </tr>
         {% endif %}
         {% for line in group.lines %}
@@ -242,8 +242,8 @@
           <td class="num">{{ line.qty|qty }}</td>
           <td>{{ line.uom.code|default:"—" }}</td>
           {% if show_prices %}
-          <td class="num">{{ line.unit_price|money }} €</td>
-          <td class="num">{{ line.discount_pct|qty }}%</td>
+          <td class="num">{% if show_discount %}{{ line.unit_price|money }} €{% else %}{{ line.net_unit_price|net_price }} €{% endif %}</td>
+          {% if show_discount %}<td class="num">{{ line.discount_pct|qty }}%</td>{% endif %}
           <td class="num">{{ line.vat_rate.rate|qty }}%</td>
           <td class="num">{{ line.line_subtotal|money }} €</td>
           {% endif %}
@@ -251,12 +251,12 @@
         {% endfor %}
         {% if group.section and show_prices %}
         <tr class="section-total">
-          <td colspan="7" class="num">Totale {{ group.section }}</td>
+          <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ group.section }}</td>
           <td class="num">{{ group.subtotal|money }} €</td>
         </tr>
         {% endif %}
         {% empty %}
-        <tr><td colspan="{% if show_prices %}8{% else %}4{% endif %}" style="text-align:center; color:#9ca3af; padding:6mm">Nessuna riga</td></tr>
+        <tr><td colspan="{{ table_columns }}" style="text-align:center; color:#9ca3af; padding:6mm">Nessuna riga</td></tr>
         {% endfor %}
       </tbody>
     </table>

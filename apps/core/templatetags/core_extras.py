@@ -1,9 +1,11 @@
 """Filtri template personalizzati."""
+from decimal import Decimal
+
 from django import template
 from django.utils.safestring import mark_safe
 
 from ..richtext import clean_notes
-from ..utils import format_money, format_quantity
+from ..utils import format_money, format_quantity, to_decimal
 
 register = template.Library()
 
@@ -71,6 +73,22 @@ def richtext(value):
     dall'editor, dall'admin o da vecchi dati passa sempre dallo stesso controllo.
     """
     return mark_safe(clean_notes(value))
+
+
+@register.filter
+def net_price(value):
+    """Prezzo unitario per i documenti che vanno al cliente.
+
+    Lo sconto di riga non compare in stampa: il prezzo mostrato è quindi già
+    quello effettivo. Si usano due decimali quando bastano, quattro quando
+    servono davvero (prezzi bassi con sconto), così il cliente può rifare il
+    conto senza trovare differenze di un centesimo.
+    """
+    importo = to_decimal(value)
+    if importo == importo.quantize(Decimal("0.01")):
+        return format_money(importo)
+    testo = f"{importo.quantize(Decimal('0.0001')):,.4f}"
+    return testo.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 @register.filter

@@ -1,4 +1,5 @@
 """Test del flusso di vendita completo e delle pagine principali."""
+import re
 from decimal import Decimal
 from unittest import mock
 
@@ -1038,3 +1039,136 @@ class DiscountAndRoundingTest(FlowTestBase):
         quote = Quote.objects.latest("pk")
         self.assertEqual(quote.subtotal, Decimal("750.00"), "lo sconto inserito nel form deve essere salvato")
         self.assertEqual(quote.lines.get().discount_pct, Decimal("25.00"))
+
+
+class BugVariTest(FlowTestBase):
+    """Regressioni su difetti visti nella creazione dei preventivi."""
+
+    def setUp(self):
+        self.login()
+
+    # ------------------------------------------------ commenti visibili in pagina
+    def test_nessun_commento_su_piu_righe_nei_template(self):
+        """{# #} in Django vale solo su una riga: su più righe finisce in pagina."""
+        import re
+        from pathlib import Path
+
+        radice = Path(__file__).resolve().parent.parent.parent / "templates"
+        trovati = []
+        for percorso in radice.rglob("*.html"):
+            testo = percorso.read_text(encoding="utf-8")
+            for commento in re.finditer(r"\{#(.*?)#\}", testo, re.DOTALL):
+                if "\n" in commento.group(1):
+                    trovati.append(f"{percorso.name}:{testo[: commento.start()].count(chr(10)) + 1}")
+        self.assertEqual(trovati, [], "commenti {# #} su più righe: verrebbero mostrati all'utente")
+
+    def test_la_pagina_non_mostra_commenti(self):
+        response = self.client.get(reverse("sales:quote_create"))
+        contenuto = response.content.decode("utf-8")
+        self.assertNotIn("{#", contenuto)
+        self.assertNotIn("#}", contenuto)
+
+    # ------------------------------------------ descrizione e sezione allineate
+    def test_descrizione_viene_prima_della_sezione_come_nell_intestazione(self):
+        """Le celle della riga devono seguire l'ordine delle intestazioni."""
+        response = self.client.get(reverse("sales:quote_create"))
+        pagina = response.content.decode("utf-8")
+
+        # ordine dichiarato nelle intestazioni
+        intestazioni = [m.group(1) for m in re.finditer(r"<th[^>]*>(.*?)</th>", pagina, re.DOTALL)]
+        testi = [re.sub(r"<[^>]+>", "", t).strip() for t in intestazioni]
+        self.assertIn("Descrizione", testi)
+        self.assertIn("Sezione", testi)
+        self.assertLess(
+            testi.index("Descrizione"), testi.index("Sezione"),
+            "l'intestazione deve elencare prima Descrizione e poi Sezione",
+        )
+
+        # ordine effettivo dei campi nella prima riga (nomi completi, per non
+        # confondersi con «nav-section» della barra laterale)
+        posizione_descrizione = pagina.index('name="lines-0-description"')
+        posizione_sezione = pagina.index('name="lines-0-section"')
+        self.assertLess(
+            posizione_descrizione, posizione_sezione,
+            "il campo descrizione deve venire prima di quello della sezione, come nell'intestazione",
+        )
+
+    # ------------------------------------------------ sconto non in stampa
+    def _preventivo_scontato(self):
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(
+            product=self.product, description="Con sconto", qty=Decimal("10"),
+            uom=self.uom, unit_price=Decimal("100.00"), discount_pct=Decimal("20"),
+            vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        return quote
+
+    def test_il_preventivo_stampato_non_mostra_lo_sconto(self):
+        quote = self._preventivo_scontato()
+        response = self.client.get(reverse("sales:quote_print", args=[quote.pk]))
+        pagina = response.content.decode("utf-8")
+        self.assertNotIn("Sc. %", pagina, "lo sconto non deve comparire nel preventivo per il cliente")
+        self.assertNotIn("20%", pagina, "la percentuale di sconto non deve comparire")
+
+    def test_il_preventivo_stampato_mostra_il_prezzo_gia_scontato(self):
+        quote = self._preventivo_scontato()
+        response = self.client.get(reverse("sales:quote_print", args=[quote.pk]))
+        pagina = response.content.decode("utf-8")
+        # 100 meno il 20% = 80,00: è questo che deve leggere il cliente
+        self.assertIn("80,00", pagina, "deve comparire il prezzo netto, non quello di listino")
+        self.assertNotIn("100,00", pagina, "il prezzo di listino non deve comparire")
+
+    def test_il_totale_del_preventivo_stampato_e_quello_scontato(self):
+        quote = self._preventivo_scontato()
+        response = self.client.get(reverse("sales:quote_print", args=[quote.pk]))
+        pagina = response.content.decode("utf-8")
+        # imponibile 800, IVA 176, totale 976
+        self.assertIn("800,00", pagina)
+        self.assertIn("976,00", pagina)
+
+    def test_la_fattura_continua_a_mostrare_lo_sconto(self):
+        """Alla fattura non è stato chiesto: resta com'era."""
+        from apps.billing.models import SalesInvoice
+
+        fattura = SalesInvoice.objects.create(customer=self.customer, date=timezone.localdate())
+        fattura.lines.create(
+            product=self.product, description="Riga", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("50.00"), discount_pct=Decimal("10"),
+            vat_rate=self.vat22,
+        )
+        fattura.recalculate()
+        response = self.client.get(reverse("billing:salesinvoice_print", args=[fattura.pk]))
+        pagina = response.content.decode("utf-8")
+        self.assertIn("Sc. %", pagina, "la fattura mostra ancora lo sconto")
+
+    def test_le_colonne_della_stampa_sono_coerenti(self):
+        """Con lo sconto nascosto i colspan delle sezioni devono tornare."""
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(section="Bagno 1", product=self.product, description="a", qty=Decimal("1"), uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22)
+        quote.lines.create(section="Bagno 1", product=self.product, description="b", qty=Decimal("1"), uom=self.uom, unit_price=Decimal("5"), vat_rate=self.vat22)
+        quote.recalculate()
+        response = self.client.get(reverse("sales:quote_print", args=[quote.pk]))
+        pagina = response.content.decode("utf-8")
+        self.assertIn("Totale Bagno 1", pagina)
+        # senza la colonna sconto le colonne sono 7: il totale di sezione ne occupa 6
+        self.assertIn('colspan="7"', pagina, "la riga di sezione deve occupare 7 colonne")
+        self.assertIn('colspan="6"', pagina, "il totale di sezione deve occuparne 6 più il valore")
+
+    def test_il_prezzo_netto_arrotonda_bene_i_casi_bassi(self):
+        """0,35 scontato del 5% fa 0,3325: al cliente serve il valore esatto."""
+        from apps.core.templatetags.core_extras import net_price
+
+        self.assertEqual(net_price(Decimal("0.3325")), "0,3325")
+        self.assertEqual(net_price(Decimal("100")), "100,00")
+        self.assertEqual(net_price(Decimal("1234.5")), "1.234,50")
+
+    def test_prezzo_netto_della_riga(self):
+        quote = Quote.objects.create(customer=self.customer)
+        riga = quote.lines.create(
+            product=self.product, description="x", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("100.00"), discount_pct=Decimal("20"), vat_rate=self.vat22,
+        )
+        self.assertEqual(riga.net_unit_price, Decimal("80.0000"))
+        riga.discount_pct = Decimal("0")
+        self.assertEqual(riga.net_unit_price, Decimal("100.0000"))

@@ -13,7 +13,7 @@ ZERO = Decimal("0")
 
 # Gli arrotondamenti stanno in apps/core/rounding.py: qui restano importabili
 # come prima (apps.sales.models.round2 / round3) per non rompere i chiamanti.
-from apps.core.rounding import round2, round3  # noqa: E402  (dopo ZERO per chiarezza)
+from apps.core.rounding import round2, round3, round4  # noqa: E402  (dopo ZERO per chiarezza)
 
 
 class DocumentLine(TimeStampedModel):
@@ -59,6 +59,18 @@ class DocumentLine(TimeStampedModel):
     @property
     def line_total(self):
         return round2(self.line_subtotal + self.line_vat)
+
+    @property
+    def net_unit_price(self):
+        """Prezzo unitario al netto dello sconto di riga.
+
+        Serve ai documenti che vanno al cliente: lo sconto è una trattativa
+        interna e non compare, quindi il prezzo mostrato dev'essere già quello
+        effettivo.
+        """
+        prezzo = Decimal(self.unit_price or 0)
+        sconto = Decimal(self.discount_pct or 0)
+        return round4(prezzo * (1 - sconto / 100))
 
     @property
     def line_cost(self):

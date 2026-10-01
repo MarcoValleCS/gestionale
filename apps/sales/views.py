@@ -62,10 +62,17 @@ def build_print_context(
     show_signature=False,
     signature_label="",
     show_prices=True,
+    show_discount=True,
     extra_fields=None,
 ):
     """Contesto per il documento stampabile (templates/print/document.html)."""
     lines = document.lines.select_related("product", "uom", "vat_rate")
+    # numero di colonne della tabella righe: serve ai colspan delle sezioni.
+    # Viene calcolato qui per non lasciare aritmetica fragile nel template.
+    if show_prices:
+        colonne = 8 if show_discount else 7
+    else:
+        colonne = 4
     return {
         "document": document,
         "document_title": title,
@@ -81,6 +88,8 @@ def build_print_context(
         "show_signature": show_signature,
         "signature_label": signature_label,
         "show_prices": show_prices,
+        "show_discount": show_discount,
+        "table_columns": colonne,
     }
 
 
