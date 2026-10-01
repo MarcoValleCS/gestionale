@@ -76,3 +76,87 @@ class ContactSearchTest(TestCase):
         self.assertEqual(contact.tax_code, "RSSMRA80A01H501U")
         self.assertEqual(contact.vat_number, "09876543210")
         self.assertTrue(contact.is_customer)
+
+
+class ContactCreateTest(TestCase):
+    """Creazione di un contatto dalla sezione Contatti (non dal documento)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_superuser("admin", "admin@example.com", "password123!")
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def test_tutti_i_campi_obbligatori_sono_visibili_nella_pagina(self):
+        """Regressione: un campo obbligatorio non disegnato blocca il salvataggio.
+
+        Era il caso di «sconto abituale cliente»: il campo era obbligatorio nel
+        form ma non compariva nella pagina, quindi il browser non lo inviava mai
+        e il contatto non veniva salvato, senza mostrare alcun errore.
+        """
+        response = self.client.get(reverse("contacts:create"))
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        for nome, campo in form.fields.items():
+            if campo.required:
+                self.assertContains(
+                    response,
+                    f'name="{nome}"',
+                    msg_prefix=f"il campo obbligatorio «{nome}» non è disegnato nella pagina",
+                )
+
+    def test_creazione_contatto_dalla_sezione(self):
+        response = self.client.post(
+            reverse("contacts:create"),
+            {
+                "name": "Idraulica Verdi S.r.l.",
+                "is_customer": "on",
+                "country": "Italia",
+                "sale_discount_pct": "0",
+                "active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302, "il contatto deve essere salvato e si deve essere reindirizzati")
+        contatto = Contact.objects.get(name="Idraulica Verdi S.r.l.")
+        self.assertTrue(contatto.is_customer)
+        self.assertEqual(contatto.code[:3], "CLI")
+
+    def test_creazione_fornitore_dalla_sezione(self):
+        response = self.client.post(
+            reverse("contacts:create"),
+            {
+                "name": "Ricambi Blu S.p.A.",
+                "is_supplier": "on",
+                "country": "Italia",
+                "sale_discount_pct": "0",
+                "active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        contatto = Contact.objects.get(name="Ricambi Blu S.p.A.")
+        self.assertTrue(contatto.is_supplier)
+        self.assertEqual(contatto.code[:3], "FOR")
+
+    def test_sconto_abituale_viene_salvato(self):
+        self.client.post(
+            reverse("contacts:create"),
+            {
+                "name": "Cliente Scontato S.r.l.",
+                "is_customer": "on",
+                "country": "Italia",
+                "sale_discount_pct": "15",
+                "active": "on",
+            },
+        )
+        contatto = Contact.objects.get(name="Cliente Scontato S.r.l.")
+        self.assertEqual(str(contatto.sale_discount_pct), "15.00")
+
+    def test_senza_cliente_ne_fornitore_non_salva(self):
+        """Il contatto deve essere almeno cliente o fornitore."""
+        response = self.client.post(
+            reverse("contacts:create"),
+            {"name": "Contatto Vuoto S.r.l.", "country": "Italia", "sale_discount_pct": "0"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Contact.objects.filter(name="Contatto Vuoto S.r.l.").exists())
