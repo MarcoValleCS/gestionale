@@ -7,7 +7,6 @@ from .models import (
     PurchaseInvoiceLine,
     SalesInvoice,
     SalesInvoiceLine,
-    ScannedDocument,
 )
 
 
@@ -50,10 +49,3 @@ class PurchaseInvoiceAdmin(admin.ModelAdmin):
     search_fields = ("number", "supplier_reference", "supplier__name")
     inlines = [PurchaseInvoiceLineInline]
     readonly_fields = ("subtotal", "vat_total", "grand_total")
-
-
-@admin.register(ScannedDocument)
-class ScannedDocumentAdmin(admin.ModelAdmin):
-    list_display = ("original_name", "status", "supplier", "doc_number", "doc_date", "total_amount", "purchase_invoice")
-    list_filter = ("status",)
-    search_fields = ("original_name", "doc_number", "supplier__name")

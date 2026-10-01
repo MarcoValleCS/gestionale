@@ -82,20 +82,6 @@
         </table>
       </div>
     </div>
-
-    {% if scans %}
-    <div class="card">
-      <div class="card-header"><i class="bi bi-paperclip me-1"></i> Documenti acquisiti (OCR)</div>
-      <ul class="list-group list-group-flush">
-        {% for scan in scans %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <a href="{% url 'billing:scan_detail' scan.pk %}">{{ scan.original_name }}</a>
-          <span class="text-muted small">{{ scan.created_at|date:"d/m/Y H:i" }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
   </div>
 
   <div class="col-lg-4">

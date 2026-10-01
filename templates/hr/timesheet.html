@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Registro presenze{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <form method="get" class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label mb-1" for="mese">Mese</label>
+            <select class="form-select form-select-sm" id="mese" name="mese" onchange="this.form.submit()">
+              {% for value, label in months %}
+              <option value="{{ value }}" {% if month == value|add:"0" %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="form-label mb-1" for="anno">Anno</label>
+            <select class="form-select form-select-sm" id="anno" name="anno" onchange="this.form.submit()">
+              {% for value in years %}
+              <option value="{{ value }}" {% if year == value|add:"0" %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i> Mostra</button>
+          </div>
+        </form>
+      </div>
+      <div class="col-md-4 d-flex gap-2 justify-content-end flex-wrap">
+        <a class="btn btn-outline-secondary btn-sm" href="?anno={{ previous.0 }}&mese={{ previous.1 }}"><i class="bi bi-chevron-left"></i> Mese prec.</a>
+        <a class="btn btn-outline-secondary btn-sm" href="?anno={{ following.0 }}&mese={{ following.1 }}">Mese succ. <i class="bi bi-chevron-right"></i></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="small text-muted">
+      Totale ore del mese: <strong>{{ grand_total|floatformat:"-2" }} h</strong>
+      <span class="ms-3">Sigle assenze: <strong>F</strong> ferie · <strong>P</strong> permessi · <strong>M</strong> malattia · <strong>N</strong> non retribuito · <strong>A</strong> altro</span>
+    </div>
+    {% if roles.is_admin or roles.is_hr %}
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:timeentry_bulk' %}"><i class="bi bi-lightning"></i> Ore del giorno</a>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:leave_create' %}"><i class="bi bi-calendar-plus"></i> Nuova assenza</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered mb-0 presenze-table">
+      <thead>
+        <tr>
+          <th class="text-nowrap">Dipendente</th>
+          {% for day in days %}
+          <th class="text-center {% if day.weekend %}table-secondary{% endif %}" style="min-width: 34px;">
+            <div class="small">{{ day.number }}</div>
+            <div class="text-muted" style="font-size: .65rem;">{{ day.date|date:"D" }}</div>
+          </th>
+          {% endfor %}
+          <th class="text-center text-nowrap">Totale</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="text-nowrap">
+            <a class="text-decoration-none" href="{% url 'hr:employee_detail' row.employee.pk %}">{{ row.employee.full_name }}</a>
+          </td>
+          {% for cell in row.cells %}
+          <td class="text-center {% if cell.weekend %}table-secondary{% endif %}">
+            {% if cell.leave %}
+            <span class="badge text-bg-info">{{ cell.leave }}</span>
+            {% elif cell.hours %}
+            {{ cell.hours|floatformat:"-2" }}
+            {% else %}
+            <span class="text-muted">·</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td class="text-center fw-semibold text-nowrap">{{ row.total|floatformat:"-2" }} h</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ days|length|add:2 }}" class="text-center text-muted py-4">
+          Nessun dipendente attivo. Aggiungine uno per vedere il registro presenze.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

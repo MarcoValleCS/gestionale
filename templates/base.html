@@ -88,9 +88,6 @@
       <a class="nav-link {% if 'deliverynote' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'billing:deliverynote_list' %}">
         <i class="bi bi-truck"></i> DDT
       </a>
-      <a class="nav-link {% if 'scan' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'billing:scan_list' %}">
-        <i class="bi bi-camera"></i> Acquisisci documenti
-      </a>
 
       <div class="nav-section">Magazzino</div>
       <a class="nav-link {% if request.resolver_match.url_name == 'stock_list' %}active{% endif %}" href="{% url 'inventory:stock_list' %}">
@@ -98,6 +95,22 @@
       </a>
       <a class="nav-link {% if request.resolver_match.url_name == 'movement_list' %}active{% endif %}" href="{% url 'inventory:movement_list' %}">
         <i class="bi bi-arrow-left-right"></i> Movimenti
+      </a>
+
+      <div class="nav-section">Personale</div>
+      {% if roles.is_admin or roles.is_hr %}
+      <a class="nav-link {% if 'employee' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:employee_list' %}">
+        <i class="bi bi-people"></i> Dipendenti
+      </a>
+      <a class="nav-link {% if 'timeentry' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:timeentry_list' %}">
+        <i class="bi bi-clock-history"></i> Registrazione ore
+      </a>
+      {% endif %}
+      <a class="nav-link {% if 'leave' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:leave_list' %}">
+        <i class="bi bi-calendar-x"></i> Ferie e permessi
+      </a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'timesheet' %}active{% endif %}" href="{% url 'hr:timesheet' %}">
+        <i class="bi bi-calendar3"></i> Registro presenze
       </a>
 
       {% if roles.is_admin %}

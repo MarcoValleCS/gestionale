@@ -8,14 +8,16 @@ ROLE_ADMIN = "Amministratore"
 ROLE_SALES = "Vendite"
 ROLE_PURCHASING = "Acquisti"
 ROLE_WAREHOUSE = "Magazzino"
+ROLE_HR = "Personale"
 
-ALL_ROLES = [ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_WAREHOUSE]
+ALL_ROLES = [ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_WAREHOUSE, ROLE_HR]
 
 ROLE_DESCRIPTIONS = {
     ROLE_ADMIN: "Accesso completo a tutte le funzioni, impostazioni e utenti.",
     ROLE_SALES: "Contatti, articoli, preventivi e ordini cliente.",
     ROLE_PURCHASING: "Contatti, articoli, ordini fornitore e listini.",
     ROLE_WAREHOUSE: "Giacenze, movimenti di magazzino, ricezione merci e consegne.",
+    ROLE_HR: "Dipendenti, registrazione ore, ferie e permessi.",
 }
 
 

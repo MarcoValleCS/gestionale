@@ -1,4 +1,4 @@
-"""Viste di DDT, fatture emesse/ricevute e acquisizione documenti con OCR."""
+"""Viste di DDT, fatture emesse e ricevute."""
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum
@@ -10,10 +10,11 @@ from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
+from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
 from apps.sales.views import build_print_context, fdate, save_document_lines, with_vat_rates
 
-from . import emailing, ocr, pdf, sdi, services
+from . import emailing, pdf, sdi, services
 from .forms import (
     DeliveryNoteForm,
     DeliveryNoteLineForm,
@@ -21,7 +22,6 @@ from .forms import (
     PurchaseInvoiceLineForm,
     SalesInvoiceForm,
     SalesInvoiceLineForm,
-    ScanUploadForm,
 )
 from .models import (
     DeliveryNote,
@@ -30,7 +30,6 @@ from .models import (
     PurchaseInvoiceLine,
     SalesInvoice,
     SalesInvoiceLine,
-    ScannedDocument,
 )
 
 DeliveryNoteLineFormSet = modelformset_factory(DeliveryNoteLine, form=DeliveryNoteLineForm, extra=1, can_delete=True)
@@ -41,7 +40,6 @@ DDT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
 DDT_VIEW_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, ROLE_PURCHASING)
 SALES_INVOICE_ROLES = (ROLE_ADMIN, ROLE_SALES)
 PURCHASE_INVOICE_ROLES = (ROLE_ADMIN, ROLE_PURCHASING)
-SCAN_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_WAREHOUSE)
 
 
 # ---------------------------------------------------------------------- DDT
@@ -127,7 +125,7 @@ class DeliveryNoteCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class DeliveryNoteUpdateView(RoleRequiredMixin, UpdateView):
+class DeliveryNoteUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = DDT_ROLES
     model = DeliveryNote
     form_class = DeliveryNoteForm
@@ -363,7 +361,7 @@ class SalesInvoiceCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class SalesInvoiceUpdateView(RoleRequiredMixin, UpdateView):
+class SalesInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = SALES_INVOICE_ROLES
     model = SalesInvoice
     form_class = SalesInvoiceForm
@@ -633,7 +631,6 @@ class PurchaseInvoiceDetailView(RoleRequiredMixin, DetailView):
 
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
-        context["scans"] = self.object.scans.all()
         return context
 
 
@@ -669,7 +666,7 @@ class PurchaseInvoiceCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class PurchaseInvoiceUpdateView(RoleRequiredMixin, UpdateView):
+class PurchaseInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = PURCHASE_INVOICE_ROLES
     model = PurchaseInvoice
     form_class = PurchaseInvoiceForm
@@ -758,112 +755,8 @@ def purchaseinvoice_delete(request, pk):
     return redirect("billing:purchaseinvoice_detail", pk=invoice.pk)
 
 
-# ------------------------------------------------------- acquisizione OCR
-class ScanListView(RoleRequiredMixin, ListView):
-    allowed_roles = SCAN_ROLES
-    model = ScannedDocument
-    template_name = "billing/scan_list.html"
-    context_object_name = "scans"
-    paginate_by = 25
+# --------------------------------------------------------------- documenti
+# L'acquisizione automatica con OCR è stata rimossa su richiesta: richiedeva
+# Tesseract e Poppler, consumava risorse e non era utilizzata. Le fatture
+# ricevute si registrano a mano o dagli ordini fornitore ricevuti.
 
-    def get_queryset(self):
-        return ScannedDocument.objects.select_related("supplier", "purchase_invoice", "uploaded_by").order_by("-created_at", "-pk")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["page_title"] = "Acquisisci documenti (OCR)"
-        context["form"] = ScanUploadForm()
-        context["ocr_available"] = ocr.ocr_available()
-        return context
-
-
-@role_required(*SCAN_ROLES)
-def scan_upload(request):
-    if request.method != "POST":
-        return redirect("billing:scan_list")
-    form = ScanUploadForm(request.POST, request.FILES)
-    if form.is_valid():
-        scan = ScannedDocument.objects.create(file=form.cleaned_data["file"], uploaded_by=request.user)
-        ocr.process_scan(scan)
-        if scan.status == ScannedDocument.STATUS_OK:
-            messages.success(request, "Documento elaborato: controlla i dati letti e crea la fattura.")
-        else:
-            messages.warning(request, scan.error_message or "Documento salvato, ma l'OCR non ha prodotto risultati utili.")
-        return redirect("billing:scan_detail", pk=scan.pk)
-    messages.error(request, "Carica un file valido (foto o PDF).")
-    return redirect("billing:scan_list")
-
-
-class ScanDetailView(RoleRequiredMixin, DetailView):
-    allowed_roles = SCAN_ROLES
-    model = ScannedDocument
-    template_name = "billing/scan_detail.html"
-    context_object_name = "scan"
-
-    def get_queryset(self):
-        return ScannedDocument.objects.select_related("supplier", "purchase_invoice")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        scan = self.object
-        context["page_title"] = f"Documento acquisito: {scan.original_name}"
-        context["suppliers"] = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
-        context["guess_lines"] = ocr.guess_lines(scan.extracted_text) if scan.extracted_text else []
-        return context
-
-
-@role_required(*SCAN_ROLES)
-def scan_create_invoice(request, pk):
-    scan = get_object_or_404(ScannedDocument, pk=pk)
-    if request.method != "POST":
-        return redirect("billing:scan_detail", pk=scan.pk)
-
-    supplier_id = request.POST.get("supplier")
-    supplier = Contact.objects.filter(pk=supplier_id, is_supplier=True).first()
-    if supplier is None:
-        messages.error(request, "Scegli il fornitore a cui si riferisce il documento.")
-        return redirect("billing:scan_detail", pk=scan.pk)
-
-    document_date = scan.doc_date or timezone.localdate()
-    invoice = PurchaseInvoice.objects.create(
-        supplier=supplier,
-        date=document_date,
-        supplier_reference=scan.doc_number,
-        notes=f"Creato dal documento acquisito «{scan.original_name}»."
-        + (f" Totale letto con OCR: {scan.total_amount} € (da riconciliare)." if scan.total_amount else ""),
-        created_by=request.user,
-    )
-    for position, row in enumerate(ocr.guess_lines(scan.extracted_text), start=1):
-        from decimal import Decimal, InvalidOperation
-
-        from apps.core.models import VatRate
-
-        try:
-            qty = Decimal(row["qty"])
-        except (InvalidOperation, KeyError):
-            qty = Decimal("1")
-        PurchaseInvoiceLine.objects.create(
-            invoice=invoice,
-            position=position,
-            description=row["description"],
-            qty=qty,
-            unit_price=Decimal("0"),
-            vat_rate=VatRate.default_for_purchase(),
-        )
-    invoice.recalculate()
-    scan.purchase_invoice = invoice
-    scan.save(update_fields=["purchase_invoice"])
-    messages.success(request, f"Creata la fattura ricevuta {invoice.number} dal documento: completa prezzi e aliquote e poi registrala.")
-    return redirect("billing:purchaseinvoice_detail", pk=invoice.pk)
-
-
-@role_required(*SCAN_ROLES)
-def scan_delete(request, pk):
-    scan = get_object_or_404(ScannedDocument, pk=pk)
-    if request.method == "POST":
-        name = scan.original_name
-        scan.file.delete(save=False)
-        scan.delete()
-        messages.success(request, f"Documento «{name}» eliminato.")
-        return redirect("billing:scan_list")
-    return redirect("billing:scan_detail", pk=scan.pk)

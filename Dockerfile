@@ -5,7 +5,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 tar \
-       tesseract-ocr tesseract-ocr-ita poppler-utils \
        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b fontconfig fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 

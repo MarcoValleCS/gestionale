@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Registrazione ore{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="dipendente">Dipendente</label>
+        <select class="form-select form-select-sm" id="dipendente" name="dipendente">
+          <option value="">Tutti</option>
+          {% for employee in employees %}
+          <option value="{{ employee.pk }}" {% if employee_id == employee.pk|stringformat:"s" %}selected{% endif %}>{{ employee.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="mese">Mese</label>
+        <select class="form-select form-select-sm" id="mese" name="mese">
+          <option value="">Tutti</option>
+          {% for value, label in months %}
+          <option value="{{ value }}" {% if month == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="anno">Anno</label>
+        <select class="form-select form-select-sm" id="anno" name="anno">
+          {% for value in years %}
+          <option value="{{ value }}" {% if year == value|add:"0" %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="tipo">Tipo</label>
+        <select class="form-select form-select-sm" id="tipo" name="tipo">
+          <option value="">Tutti</option>
+          {% for value, label in kinds %}
+          <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_hr %}
+        <a class="btn btn-primary btn-sm" href="{% url 'hr:timeentry_bulk' %}"><i class="bi bi-lightning"></i> Ore del giorno</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="text-muted small">Totale ore filtrate: <strong>{{ filtered_total|floatformat:"-2" }} h</strong></span>
+    {% if roles.is_admin or roles.is_hr %}
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:timeentry_create' %}"><i class="bi bi-plus-lg"></i> Nuova registrazione</a>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th class="text-center">Data</th>
+          <th>Dipendente</th>
+          <th class="text-center">Ore</th>
+          <th>Tipo</th>
+          <th>Cantiere</th>
+          <th>Descrizione</th>
+          <th class="text-center">Addebitabile</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="text-center">{{ entry.date|date:"d/m/Y" }}</td>
+          <td><a class="text-decoration-none" href="{% url 'hr:employee_detail' entry.employee.pk %}">{{ entry.employee.full_name }}</a></td>
+          <td class="text-center">{{ entry.hours|floatformat:"-2" }}</td>
+          <td>{{ entry.get_kind_display }}</td>
+          <td>{% if entry.job %}{{ entry.job.name }}{% else %}—{% endif %}</td>
+          <td class="text-muted small">{{ entry.description|default:"—" }}</td>
+          <td class="text-center">{% if entry.billable %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+          <td class="text-end">
+            {% if roles.is_admin or roles.is_hr %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:timeentry_update' entry.pk %}"><i class="bi bi-pencil"></i></a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          Nessuna ora registrata. Usa «Ore del giorno» per inserire in una volta sola le ore di tutta la squadra.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

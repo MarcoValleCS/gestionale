@@ -1,4 +1,4 @@
-"""DDT (documenti di trasporto), fatture emesse e ricevute, scansioni OCR."""
+"""DDT (documenti di trasporto), fatture emesse e ricevute."""
 from decimal import Decimal
 
 from django.conf import settings
@@ -259,46 +259,3 @@ class PurchaseInvoice(TotalsDocument, TimeStampedModel):
 class PurchaseInvoiceLine(DocumentLine):
     invoice = models.ForeignKey(PurchaseInvoice, on_delete=models.CASCADE, related_name="lines", verbose_name="Fattura")
 
-
-class ScannedDocument(TimeStampedModel):
-    """Documento acquisito (foto/PDF di DDT o fattura) con testo estratto via OCR."""
-
-    STATUS_NEW = "new"
-    STATUS_OK = "ok"
-    STATUS_ERROR = "error"
-    STATUS_CHOICES = [
-        (STATUS_NEW, "Da elaborare"),
-        (STATUS_OK, "Elaborato"),
-        (STATUS_ERROR, "Errore"),
-    ]
-
-    file = models.FileField("File", upload_to="scans/%Y/%m/")
-    original_name = models.CharField("Nome file", max_length=200, blank=True)
-    extracted_text = models.TextField("Testo estratto (OCR)", blank=True)
-    supplier = models.ForeignKey(
-        Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name="scanned_documents", verbose_name="Fornitore riconosciuto"
-    )
-    doc_number = models.CharField("Numero documento", max_length=50, blank=True)
-    doc_date = models.DateField("Data documento", null=True, blank=True)
-    total_amount = models.DecimalField("Totale letto", max_digits=12, decimal_places=2, null=True, blank=True)
-    status = models.CharField("Stato", max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
-    error_message = models.CharField("Errore", max_length=300, blank=True)
-    purchase_invoice = models.ForeignKey(
-        PurchaseInvoice, on_delete=models.SET_NULL, null=True, blank=True, related_name="scans", verbose_name="Fattura collegata"
-    )
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="scanned_documents", verbose_name="Caricato da"
-    )
-
-    class Meta:
-        verbose_name = "Documento acquisito"
-        verbose_name_plural = "Documenti acquisiti"
-        ordering = ["-created_at", "-pk"]
-
-    def __str__(self):
-        return f"{self.original_name or self.file.name} ({self.get_status_display()})"
-
-    def save(self, *args, **kwargs):
-        if not self.original_name and self.file:
-            self.original_name = self.file.name.rsplit("/", 1)[-1]
-        return super().save(*args, **kwargs)

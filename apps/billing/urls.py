@@ -41,10 +41,4 @@ urlpatterns = [
     path("fatture/ricevute/<int:pk>/registra/", views.purchaseinvoice_register, name="purchaseinvoice_register"),
     path("fatture/ricevute/<int:pk>/pagata/", views.purchaseinvoice_pay, name="purchaseinvoice_pay"),
     path("fatture/ricevute/<int:pk>/elimina/", views.purchaseinvoice_delete, name="purchaseinvoice_delete"),
-    # Acquisizione OCR
-    path("documenti/", views.ScanListView.as_view(), name="scan_list"),
-    path("documenti/carica/", views.scan_upload, name="scan_upload"),
-    path("documenti/<int:pk>/", views.ScanDetailView.as_view(), name="scan_detail"),
-    path("documenti/<int:pk>/crea-fattura/", views.scan_create_invoice, name="scan_create_invoice"),
-    path("documenti/<int:pk>/elimina/", views.scan_delete, name="scan_delete"),
 ]

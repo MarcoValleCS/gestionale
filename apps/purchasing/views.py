@@ -8,6 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
+from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
 from apps.core.models import VatRate
 from apps.sales.views import build_print_context, fdate, save_document_lines
@@ -101,7 +102,7 @@ class PriceListCreateView(RoleRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class PriceListUpdateView(RoleRequiredMixin, UpdateView):
+class PriceListUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = PRICELIST_ROLES
     model = SupplierPriceList
     form_class = SupplierPriceListForm
@@ -157,7 +158,7 @@ def pricelist_item_create(request, pk):
     return redirect("purchasing:pricelist_detail", pk=pricelist.pk)
 
 
-class PriceListItemUpdateView(RoleRequiredMixin, UpdateView):
+class PriceListItemUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = PRICELIST_ROLES
     model = PriceListItem
     form_class = PriceListItemForm
@@ -293,7 +294,7 @@ class PurchaseOrderCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class PurchaseOrderUpdateView(RoleRequiredMixin, UpdateView):
+class PurchaseOrderUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = PO_EDIT_ROLES
     model = PurchaseOrder
     form_class = PurchaseOrderForm

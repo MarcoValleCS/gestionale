@@ -51,10 +51,12 @@ def home(request):
         .order_by("name")
     )
 
-    margin_by_product = analytics.by_product(period)[:10]
-    margin_by_supplier = analytics.by_supplier(period)[:10]
-    margin_by_customer = analytics.by_customer(period)[:10]
-    margin_by_job = analytics.by_job(period)[:10]
+    # Un solo passaggio sulle righe consegnate: evita cinque query pesanti
+    stats = analytics.breakdowns(period, limit=10)
+    margin_by_product = stats["by_product"]
+    margin_by_supplier = stats["by_supplier"]
+    margin_by_customer = stats["by_customer"]
+    margin_by_job = stats["by_job"]
 
     # Finestra temporale del grafico: 1 / 3 / 6 / 12 mesi, spostabile indietro
     try:
@@ -113,7 +115,7 @@ def home(request):
         # Statistiche
         "period": period,
         "period_choices": analytics.PERIOD_CHOICES,
-        "stats": analytics.summary(period),
+        "stats": stats["summary"],
         "inventory_value": inventory_value,
         "margin_by_product": margin_by_product,
         "margin_by_supplier": margin_by_supplier,
@@ -134,6 +136,24 @@ def home(request):
         "invoices_to_pay": invoices_to_pay,
         "ddt_draft_count": DeliveryNote.objects.filter(status=DeliveryNote.STATUS_DRAFT).count(),
     }
+
+    # Personale: numeri sintetici per la dashboard
+    from apps.hr.models import Employee, LeaveRequest, TimeEntry
+
+    today = timezone.localdate()
+    context["employees_active"] = Employee.objects.filter(active=True).count()
+    context["hours_this_month"] = (
+        TimeEntry.objects.filter(date__year=today.year, date__month=today.month).aggregate(total=Sum("hours"))["total"] or 0
+    )
+    context["leaves_pending"] = LeaveRequest.objects.filter(status=LeaveRequest.STATUS_REQUESTED).count()
+    context["leaves_this_month"] = (
+        LeaveRequest.objects.filter(
+            status=LeaveRequest.STATUS_APPROVED, start_date__lte=today, end_date__gte=today
+        )
+        .select_related("employee")
+        .order_by("start_date")
+    )
+
     return render(request, "core/dashboard.html", context)
 
 

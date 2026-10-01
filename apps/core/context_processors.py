@@ -11,7 +11,7 @@ def company(request):
 
 def roles(request):
     user = getattr(request, "user", None)
-    empty = {"is_admin": False, "is_sales": False, "is_purchasing": False, "is_warehouse": False}
+    empty = {"is_admin": False, "is_sales": False, "is_purchasing": False, "is_warehouse": False, "is_hr": False}
     if not user or not user.is_authenticated:
         return {"roles": empty}
     if user.is_superuser:
@@ -23,5 +23,6 @@ def roles(request):
             "is_sales": "Vendite" in names,
             "is_purchasing": "Acquisti" in names,
             "is_warehouse": "Magazzino" in names,
+            "is_hr": "Personale" in names,
         }
     }

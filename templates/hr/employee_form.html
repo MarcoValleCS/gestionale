@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">Dati anagrafici</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.first_name col=4 %}
+            {% include "partials/field.html" with field=form.last_name col=4 %}
+            {% include "partials/field.html" with field=form.fiscal_code col=4 %}
+            {% include "partials/field.html" with field=form.email col=6 %}
+            {% include "partials/field.html" with field=form.phone col=3 %}
+            {% include "partials/field.html" with field=form.qualification col=3 %}
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header">Rapporto di lavoro</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.hired_on col=3 %}
+            {% include "partials/field.html" with field=form.terminated_on col=3 %}
+            {% include "partials/field.html" with field=form.contract_weekly_hours col=3 %}
+            {% include "partials/field.html" with field=form.hourly_cost col=3 %}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Ferie e permessi</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.holiday_days_per_year col=6 %}
+            {% include "partials/field.html" with field=form.rol_hours_per_year col=6 %}
+          </div>
+          <div class="form-text">
+            Servono a calcolare il residuo mostrato nella scheda del dipendente: ferie in giorni, permessi (ROL) in ore.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">Accesso e stato</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.user col=12 %}
+          {% include "partials/field.html" with field=form.active col=12 %}
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header">Note</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.notes col=12 %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva dipendente</button>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

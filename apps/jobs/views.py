@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
+from apps.core.concurrency import ConflictAwareUpdateView
 
 from .forms import AssetForm, JobForm, MaintenancePlanForm
 from .models import Asset, Job, MaintenancePlan
@@ -94,7 +95,7 @@ class JobCreateView(RoleRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class JobUpdateView(RoleRequiredMixin, UpdateView):
+class JobUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = JOB_EDIT_ROLES
     model = Job
     form_class = JobForm
@@ -175,7 +176,7 @@ class MaintenancePlanCreateView(RoleRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class MaintenancePlanUpdateView(RoleRequiredMixin, UpdateView):
+class MaintenancePlanUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = SERVICE_EDIT_ROLES
     model = MaintenancePlan
     form_class = MaintenancePlanForm
@@ -305,7 +306,7 @@ class AssetCreateView(RoleRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class AssetUpdateView(RoleRequiredMixin, UpdateView):
+class AssetUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = SERVICE_EDIT_ROLES
     model = Asset
     form_class = AssetForm

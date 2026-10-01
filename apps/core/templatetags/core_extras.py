@@ -39,6 +39,9 @@ BADGE_CLASSES = {
     "rejected": "danger",
     "failed": "danger",
     "not_sent": "secondary",
+    # Ferie e permessi
+    "requested": "warning",
+    "approved": "success",
 }
 
 

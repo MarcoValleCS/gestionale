@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card mb-3">
+        <div class="card-header">Ore lavorate</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.employee col=12 %}
+            {% include "partials/field.html" with field=form.date col=4 %}
+            {% include "partials/field.html" with field=form.hours col=4 %}
+            {% include "partials/field.html" with field=form.kind col=4 %}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Attività</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.job col=12 %}
+            {% include "partials/field.html" with field=form.description col=12 %}
+            {% include "partials/field.html" with field=form.billable col=12 %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-body small text-muted">
+          <p class="mb-2"><i class="bi bi-info-circle me-1"></i> Le ore si indicano in frazioni di quarto d'ora: <strong>7.5</strong> significa 7 ore e 30 minuti.</p>
+          <p class="mb-0">Collega la registrazione a un cantiere per sapere quanto tempo è stato dedicato a ogni lavoro.</p>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva registrazione</button>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

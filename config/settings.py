@@ -38,7 +38,11 @@ SECURE_REFERRER_POLICY = "same-origin"
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 60 * 60 * 12  # sessione di 12 ore
-SESSION_SAVE_EVERY_REQUEST = True
+# Non riscrivere la sessione a ogni richiesta: con più utenti collegati è una
+# scrittura sul database per ogni pagina aperta. La sessione viene salvata solo
+# quando cambia davvero. Effetto: la scadenza non si sposta a ogni clic, quindi
+# dopo 12 ore dall'accesso occorre rientrare.
+SESSION_SAVE_EVERY_REQUEST = False
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB (import Excel)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
@@ -48,9 +52,6 @@ ABUSE_THROTTLE = {
     "login": {"limit": 8, "window": 300},   # 8 tentativi di accesso ogni 5 minuti per IP
     "search": {"limit": 120, "window": 60},  # 120 ricerche al minuto per IP
 }
-
-# OCR dei documenti acquisiti (DDT/fatture): lingue di Tesseract
-OCR_LANGUAGES = env("OCR_LANGUAGES", "ita+eng")
 
 # ------------------------------------------------------------ Email (SMTP)
 # Usata per inviare fatture/preventivi; per lo SDI va bene la casella PEC.
@@ -86,6 +87,7 @@ INSTALLED_APPS = [
     "apps.purchasing",
     "apps.jobs",
     "apps.billing",
+    "apps.hr",
 ]
 
 MIDDLEWARE = [
@@ -137,10 +139,28 @@ if env("DB_ENGINE", "").lower() in {"postgres", "postgresql"}:
         }
     }
 else:
+    # SQLite, tarato anche per più utenti in contemporanea:
+    #  - WAL: i lettori non bloccano chi scrive (e viceversa);
+    #  - busy_timeout: attende il blocco invece di fallire subito con
+    #    «database is locked»;
+    #  - transaction_mode «IMMEDIATE»: il blocco di scrittura viene preso
+    #    all'inizio della transazione, così due richieste non possono leggere
+    #    lo stesso dato e sovrascriversi (Django lo supporta da 5.1).
+    # In produzione su VPS si usa PostgreSQL (vedi docker-compose.yml), che
+    # gestisce la concorrenza con blocchi di riga.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            "OPTIONS": {
+                "timeout": 20,
+                "init_command": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=20000;",
+                "transaction_mode": "IMMEDIATE",
+            },
+            # I test usano un file e non un database in memoria: WAL e
+            # busy_timeout non hanno effetto in memoria, quindi i test di
+            # concorrenza non riprodurrebbero le condizioni reali.
+            "TEST": {"NAME": BASE_DIR / "test_db.sqlite3"},
         }
     }
 

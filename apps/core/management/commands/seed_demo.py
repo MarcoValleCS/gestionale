@@ -2,6 +2,7 @@
 
 Uso: python manage.py seed_demo
 """
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
@@ -249,5 +250,92 @@ class Command(BaseCommand):
             sales_services.deliver_sales_order(order)
             self.stdout.write(self.style.SUCCESS(f"Creato ordine consegnato di esempio {order.number} (visibile in dashboard)."))
 
+        # Personale di esempio: dipendenti, ore registrate e ferie
+        self._seed_hr(Job.objects.first())
+
         self.stdout.write(self.style.SUCCESS("Dati di esempio pronti."))
         self.stdout.write("Suggerimento: apri l'articolo «Bullone M8 zincato» per vedere la scorta minima e poi crea un ordine cliente per provare la generazione automatica dell'ordine fornitore.")
+
+    # ------------------------------------------------------------- personale
+    def _seed_hr(self, job):
+        """Dipendenti di esempio con ore registrate e una richiesta di ferie."""
+        from apps.hr.models import Employee, LeaveRequest, TimeEntry
+
+        if Employee.objects.exists():
+            return
+
+        today = timezone.localdate()
+        people = [
+            ("Luca", "Bianchi", "Idraulico", Decimal("22.50"), Decimal("40")),
+            ("Sara", "Rossi", "Impiegata ufficio", Decimal("18.00"), Decimal("40")),
+            ("Marco", "Ferrari", "Elettricista", Decimal("21.00"), Decimal("40")),
+        ]
+        employees = []
+        for first_name, last_name, qualification, cost, weekly in people:
+            employees.append(
+                Employee.objects.create(
+                    first_name=first_name,
+                    last_name=last_name,
+                    qualification=qualification,
+                    hourly_cost=cost,
+                    contract_weekly_hours=weekly,
+                    holiday_days_per_year=Decimal("26"),
+                    rol_hours_per_year=Decimal("40"),
+                    hired_on=today.replace(year=today.year - 2, month=3, day=1),
+                )
+            )
+
+        # Ore delle ultime due settimane feriali, per due dipendenti sul cantiere
+        for employee in employees[:2]:
+            for offset in range(14):
+                day = today - timedelta(days=offset)
+                if day.weekday() >= 5:
+                    continue
+                TimeEntry.objects.create(
+                    employee=employee,
+                    date=day,
+                    hours=Decimal("8") if offset % 3 else Decimal("7.5"),
+                    kind=TimeEntry.KIND_ORDINARY,
+                    job=job,
+                    description="Installazione e montaggio",
+                    billable=True,
+                )
+            TimeEntry.objects.create(
+                employee=employee,
+                date=today - timedelta(days=1),
+                hours=Decimal("2"),
+                kind=TimeEntry.KIND_OVERTIME,
+                job=job,
+                description="Straordinario per consegna",
+            )
+
+        # Una richiesta di ferie da approvare e una già approvata
+        LeaveRequest.objects.create(
+            employee=employees[1],
+            kind=LeaveRequest.KIND_HOLIDAY,
+            start_date=today + timedelta(days=7),
+            end_date=today + timedelta(days=11),
+            reason="Vacanza programmata",
+        )
+        approved = LeaveRequest.objects.create(
+            employee=employees[2],
+            kind=LeaveRequest.KIND_HOLIDAY,
+            start_date=today - timedelta(days=21),
+            end_date=today - timedelta(days=18),
+            reason="Permesso personale",
+        )
+        approved.approve(None)
+        LeaveRequest.objects.create(
+            employee=employees[0],
+            kind=LeaveRequest.KIND_ROL,
+            start_date=today + timedelta(days=2),
+            end_date=today + timedelta(days=2),
+            hours=Decimal("3"),
+            reason="Visita medica",
+        )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Creati {len(employees)} dipendenti con ore registrate e richieste di ferie (sezione Personale)."
+            )
+        )

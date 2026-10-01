@@ -1,4 +1,4 @@
-"""Test di DDT, fatture emesse/ricevute e acquisizione OCR."""
+"""Test di DDT, fatture emesse e ricevute."""
 import shutil
 import tempfile
 from datetime import date
@@ -21,19 +21,10 @@ from apps.purchasing.models import PurchaseOrder
 from apps.sales import services as sales_services
 from apps.sales.models import SalesOrder
 
-from . import ocr, sdi, services
-from .models import DeliveryNote, PurchaseInvoice, SalesInvoice, ScannedDocument
+from . import sdi, services
+from .models import DeliveryNote, PurchaseInvoice, SalesInvoice
 
 User = get_user_model()
-
-OCR_TEXT = """FERRAMENTA BIANCHI S.P.A.
-Via Roma 1 - Torino
-P.IVA 09876543210
-DDT n. 245/2026 del 28/09/2026
-Bullone M8 zincato PZ 10,00
-Tondino ferro 8 mm PZ 5,00
-Totale documento 1.234,56
-"""
 
 
 class BillingTestBase(TestCase):
@@ -149,61 +140,6 @@ class PurchaseInvoiceTest(BillingTestBase):
         services.mark_purchase_invoice_paid(invoice)
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, PurchaseInvoice.STATUS_PAID)
-
-
-class OcrParsingTest(BillingTestBase):
-    def test_lettura_dati_documento(self):
-        data = ocr.parse_document_text(OCR_TEXT)
-        self.assertEqual(data["doc_number"], "245/2026")
-        self.assertEqual(data["doc_date"], date(2026, 9, 28))
-        self.assertEqual(data["total_amount"], Decimal("1234.56"))
-        self.assertEqual(data["supplier"], self.supplier)
-
-    def test_lettura_righe(self):
-        rows = ocr.guess_lines(OCR_TEXT)
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["description"], "Bullone M8 zincato")
-        self.assertEqual(rows[0]["qty"], "10.00")
-
-    def test_righe_con_quantita_prima(self):
-        rows = ocr.guess_lines("Vaso sospeso bianco 2 PZ\n")
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["qty"], "2")
-
-
-class ScanWorkflowTest(BillingTestBase):
-    def test_caricamento_ocr_e_creazione_fattura(self):
-        self.login()
-        with mock.patch("apps.billing.ocr.ocr_available", return_value=True), mock.patch(
-            "apps.billing.ocr.extract_text", return_value=OCR_TEXT
-        ):
-            upload = SimpleUploadedFile("ddt_bianchi.jpg", b"finta-immagine", content_type="image/jpeg")
-            response = self.client.post(reverse("billing:scan_upload"), {"file": upload})
-        self.assertEqual(response.status_code, 302)
-        scan = ScannedDocument.objects.get()
-        self.assertEqual(scan.status, ScannedDocument.STATUS_OK)
-        self.assertEqual(scan.supplier, self.supplier)
-        self.assertEqual(scan.doc_number, "245/2026")
-        self.assertEqual(scan.total_amount, Decimal("1234.56"))
-
-        # crea la fattura dal documento
-        response = self.client.post(reverse("billing:scan_create_invoice", args=[scan.pk]), {"supplier": self.supplier.pk})
-        self.assertEqual(response.status_code, 302)
-        invoice = PurchaseInvoice.objects.get()
-        self.assertEqual(invoice.supplier, self.supplier)
-        self.assertEqual(invoice.supplier_reference, "245/2026")
-        self.assertEqual(invoice.lines.count(), 2)
-        scan.refresh_from_db()
-        self.assertEqual(scan.purchase_invoice, invoice)
-
-    def test_ocr_non_disponibile(self):
-        self.login()
-        with mock.patch("apps.billing.ocr.ocr_available", return_value=False):
-            upload = SimpleUploadedFile("ddt.jpg", b"finta", content_type="image/jpeg")
-            self.client.post(reverse("billing:scan_upload"), {"file": upload})
-        scan = ScannedDocument.objects.get()
-        self.assertEqual(scan.status, ScannedDocument.STATUS_ERROR)
-        self.assertIn("OCR non disponibile", scan.error_message)
 
 
 class EmailAndSdiTest(BillingTestBase):
@@ -390,7 +326,6 @@ class BillingPagesSmokeTest(BillingTestBase):
             uom=self.uom, unit_price=Decimal("5.00"), vat_rate=self.vat22,
         )
         po.recalculate()
-        scan = ScannedDocument.objects.create(file=SimpleUploadedFile("scan.jpg", b"x"), uploaded_by=self.user)
 
         urls = [
             reverse("billing:deliverynote_list"),
@@ -402,8 +337,6 @@ class BillingPagesSmokeTest(BillingTestBase):
             reverse("billing:salesinvoice_create"),
             reverse("billing:purchaseinvoice_list"),
             reverse("billing:purchaseinvoice_create"),
-            reverse("billing:scan_list"),
-            reverse("billing:scan_detail", args=[scan.pk]),
             reverse("core:home"),
         ]
         for url in urls:

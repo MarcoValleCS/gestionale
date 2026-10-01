@@ -11,6 +11,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
+from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
 from apps.core.models import VatRate
 
@@ -194,7 +195,7 @@ class QuoteCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class QuoteUpdateView(RoleRequiredMixin, UpdateView):
+class QuoteUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = QUOTE_ROLES
     model = Quote
     form_class = QuoteForm
@@ -409,7 +410,7 @@ class SalesOrderCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class SalesOrderUpdateView(RoleRequiredMixin, UpdateView):
+class SalesOrderUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = ORDER_EDIT_ROLES
     model = SalesOrder
     form_class = SalesOrderForm
@@ -595,7 +596,7 @@ class QuoteTemplateCreateView(RoleRequiredMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form, line_formset=formset))
 
 
-class QuoteTemplateUpdateView(RoleRequiredMixin, UpdateView):
+class QuoteTemplateUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     allowed_roles = QUOTE_ROLES
     model = QuoteTemplate
     form_class = QuoteTemplateForm

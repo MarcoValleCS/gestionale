@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import F
 
 from .models import StockLevel, StockMovement, Warehouse
 
@@ -34,15 +35,22 @@ def register_movement(
     if delta == 0:
         return None
 
-    level, _created = StockLevel.objects.select_for_update().get_or_create(product=product, warehouse=warehouse)
-    new_quantity = level.quantity + delta
-    if new_quantity < 0 and not allow_negative:
-        raise ValidationError(
-            f"Giacenza insufficiente di «{product.name}»: disponibili {level.quantity}, richiesti {abs(delta)}."
-        )
+    level, _created = StockLevel.objects.get_or_create(product=product, warehouse=warehouse)
 
-    level.quantity = new_quantity
-    level.save(update_fields=["quantity", "updated_at"])
+    # L'incremento avviene con un UPDATE atomico a livello di database, non con
+    # una lettura seguita da una scrittura: così due scarichi contemporanei dello
+    # stesso articolo non possono leggere la stessa giacenza e sovrascriversi.
+    # Serve perché ``select_for_update`` non ha effetto su SQLite (che non
+    # supporta il blocco di riga): l'UPDATE prende comunque il blocco di
+    # scrittura e mette in coda l'altra transazione.
+    StockLevel.objects.filter(pk=level.pk).update(quantity=F("quantity") + delta)
+    level.refresh_from_db(fields=["quantity"])
+
+    available = level.quantity - delta  # giacenza com'era prima del movimento
+    if level.quantity < 0 and not allow_negative:
+        raise ValidationError(
+            f"Giacenza insufficiente di «{product.name}»: disponibili {available}, richiesti {abs(delta)}."
+        )
 
     return StockMovement.objects.create(
         product=product,

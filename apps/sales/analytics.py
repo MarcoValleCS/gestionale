@@ -94,6 +94,80 @@ def _group_lines(period, key_func):
     return result
 
 
+def _finalize(rows, limit=None):
+    result = list(rows.values())
+    for entry in result:
+        entry["margin"] = entry["revenue"] - entry["cost"]
+        entry["margin_pct"] = round2(entry["margin"] / entry["revenue"] * 100) if entry["revenue"] else ZERO
+    result.sort(key=lambda row: row["margin"], reverse=True)
+    return result[:limit] if limit else result
+
+
+def _accumulate(rows, key, label, revenue, cost):
+    entry = rows.get(key)
+    if entry is None:
+        entry = rows[key] = {"label": label, "revenue": ZERO, "cost": ZERO}
+    entry["revenue"] += revenue
+    entry["cost"] += cost
+
+
+def breakdowns(period, limit=10):
+    """Fatturato, margine e raggruppamenti in un unico passaggio sulle righe.
+
+    Le singole funzioni (``summary``, ``by_product``…) scorrono ciascuna le
+    stesse righe: usarle tutte insieme costa cinque query pesanti. Qui le righe
+    vengono lette una volta sola e ripartite fra tutti i raggruppamenti.
+    """
+    revenue = ZERO
+    cost = ZERO
+    order_ids = set()
+    product_rows, supplier_rows, customer_rows, job_rows = {}, {}, {}, {}
+
+    for line in delivered_lines(period):
+        line_revenue = line.line_subtotal
+        row_cost = line_cost(line)
+        revenue += line_revenue
+        cost += row_cost
+        order_ids.add(line.order_id)
+
+        if line.product_id:
+            _accumulate(product_rows, f"p{line.product_id}", line.product.name, line_revenue, row_cost)
+            supplier = line.product.main_supplier
+        else:
+            _accumulate(product_rows, "none", line.description or "Voci libere", line_revenue, row_cost)
+            supplier = None
+
+        if supplier:
+            _accumulate(supplier_rows, f"s{supplier.pk}", supplier.name, line_revenue, row_cost)
+        else:
+            _accumulate(supplier_rows, "none", "Senza fornitore", line_revenue, row_cost)
+
+        customer = line.order.customer
+        _accumulate(customer_rows, f"c{customer.pk}", customer.name, line_revenue, row_cost)
+
+        job = line.order.job if line.order.job_id else None
+        if job:
+            _accumulate(job_rows, f"j{job.pk}", f"{job.code} – {job.name}", line_revenue, row_cost)
+        else:
+            _accumulate(job_rows, "none", "Senza cantiere", line_revenue, row_cost)
+
+    margin = revenue - cost
+    return {
+        "summary": {
+            "period": period,
+            "revenue": revenue,
+            "cost": cost,
+            "margin": margin,
+            "margin_pct": round2(margin / revenue * 100) if revenue else ZERO,
+            "orders": len(order_ids),
+        },
+        "by_product": _finalize(product_rows, limit),
+        "by_supplier": _finalize(supplier_rows, limit),
+        "by_customer": _finalize(customer_rows, limit),
+        "by_job": _finalize(job_rows, limit),
+    }
+
+
 def by_product(period):
     def key_func(line):
         if line.product_id:

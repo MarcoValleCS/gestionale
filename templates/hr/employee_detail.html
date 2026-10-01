@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge text-bg-{% if employee.active %}success{% else %}secondary{% endif %}">
+      {% if employee.active %}Attivo{% else %}Cessato{% endif %}
+    </span>
+    <span class="text-muted small">{{ employee.code }}{% if employee.qualification %} · {{ employee.qualification }}{% endif %}</span>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if roles.is_admin or roles.is_hr %}
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:timeentry_create' %}?dipendente={{ employee.pk }}"><i class="bi bi-clock"></i> Registra ore</a>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:leave_create' %}?dipendente={{ employee.pk }}"><i class="bi bi-calendar-plus"></i> Nuova assenza</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:employee_update' employee.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Ore registrate — {{ year }}</span>
+        <form method="get" class="d-flex align-items-center gap-2">
+          <select class="form-select form-select-sm w-auto" name="anno" onchange="this.form.submit()">
+            {% for value in years %}
+            <option value="{{ value }}" {% if value == year|stringformat:"s" %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      <div class="card-body">
+        <div class="row text-center g-3">
+          <div class="col-6 col-md-3">
+            <div class="text-muted small">Ore anno</div>
+            <div class="fs-5 fw-semibold">{{ hours_year|floatformat:"-2" }} h</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="text-muted small">Ore mese corrente</div>
+            <div class="fs-5 fw-semibold">{{ hours_month|floatformat:"-2" }} h</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="text-muted small">Straordinari</div>
+            <div class="fs-5 fw-semibold">{{ overtime_year|floatformat:"-2" }} h</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="text-muted small">Trasferte</div>
+            <div class="fs-5 fw-semibold">{{ travel_year|floatformat:"-2" }} h</div>
+          </div>
+        </div>
+        <hr>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 text-center">
+            <thead><tr>{% for m in monthly %}<th class="small text-muted">{{ m.label }}</th>{% endfor %}</tr></thead>
+            <tbody><tr>{% for m in monthly %}<td class="small">{% if m.hours %}{{ m.hours|floatformat:"-2" }}{% else %}—{% endif %}</td>{% endfor %}</tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Ultime registrazioni ore</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr><th class="text-center">Data</th><th class="text-center">Ore</th><th>Tipo</th><th>Cantiere</th><th>Descrizione</th></tr>
+          </thead>
+          <tbody>
+            {% for entry in entries %}
+            <tr>
+              <td class="text-center">{{ entry.date|date:"d/m/Y" }}</td>
+              <td class="text-center">{{ entry.hours|floatformat:"-2" }}</td>
+              <td>{{ entry.get_kind_display }}</td>
+              <td>{% if entry.job %}<a class="text-decoration-none" href="{% url 'jobs:job_detail' entry.job.pk %}">{{ entry.job.name }}</a>{% else %}—{% endif %}</td>
+              <td class="text-muted small">{{ entry.description|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-3">Nessuna ora registrata.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Ferie e permessi — {{ year }}</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-1">
+          <span>Ferie residue</span>
+          <span class="fw-semibold">{{ holiday_balance|floatformat:"-2" }} giorni</span>
+        </div>
+        <div class="progress mb-3" style="height: 6px;">
+          {% widthratio holiday_used employee.holiday_days_per_year 100 as holiday_pct %}
+          <div class="progress-bar" style="width: {{ holiday_pct }}%"></div>
+        </div>
+        <div class="d-flex justify-content-between mb-1">
+          <span>Permessi residui (ROL)</span>
+          <span class="fw-semibold">{{ rol_balance|floatformat:"-2" }} h</span>
+        </div>
+        <hr>
+        <ul class="list-unstyled mb-0 small">
+          <li class="d-flex justify-content-between"><span class="text-muted">Ferie godute</span><span>{{ holiday_used|floatformat:"-2" }} g</span></li>
+          <li class="d-flex justify-content-between"><span class="text-muted">Permessi goduti</span><span>{{ rol_used|floatformat:"-2" }} h</span></li>
+          <li class="d-flex justify-content-between"><span class="text-muted">Malattia</span><span>{{ sick_used|floatformat:"-2" }} g</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Assenze</div>
+      <ul class="list-group list-group-flush">
+        {% for leave in leaves %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small">{{ leave.get_kind_display }} · {{ leave.duration_label }}</div>
+            <div class="text-muted small">{{ leave.start_date|date:"d/m/Y" }}{% if leave.end_date != leave.start_date %} – {{ leave.end_date|date:"d/m/Y" }}{% endif %}</div>
+          </div>
+          <span class="badge text-bg-{{ leave.status|badge_class }}">{{ leave.get_status_display }}</span>
+        </li>
+        {% empty %}
+        <li class="list-group-item text-center text-muted py-3">Nessuna assenza registrata.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Contatti</div>
+      <div class="card-body small">
+        <div><i class="bi bi-envelope me-1"></i> {{ employee.email|default:"—" }}</div>
+        <div><i class="bi bi-telephone me-1"></i> {{ employee.phone|default:"—" }}</div>
+        <div><i class="bi bi-person-badge me-1"></i> {{ employee.fiscal_code|default:"—" }}</div>
+        {% if employee.hired_on %}<div class="mt-2 text-muted">Assunto il {{ employee.hired_on|date:"d/m/Y" }}</div>{% endif %}
+        {% if employee.terminated_on %}<div class="text-muted">Cessato il {{ employee.terminated_on|date:"d/m/Y" }}</div>{% endif %}
+      </div>
+    </div>
+
+    {% if employee.notes %}
+    <div class="card mt-3">
+      <div class="card-header">Note</div>
+      <div class="card-body small">{{ employee.notes|linebreaksbr }}</div>
+    </div>
+    {% endif %}
+
+    {% if roles.is_admin or roles.is_hr %}
+    <form method="post" action="{% url 'hr:employee_delete' employee.pk %}" class="mt-3"
+          onsubmit="return confirm('Eliminare {{ employee.full_name }} e tutte le sue registrazioni ore e assenze?');">
+      {% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Elimina dipendente</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

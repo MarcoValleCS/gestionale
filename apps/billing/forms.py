@@ -115,9 +115,3 @@ class PurchaseInvoiceLineForm(LineFormMixin, BaseBootstrapModelForm):
         super().__init__(*args, **kwargs)
         self.apply_line_fields()
 
-
-class ScanUploadForm(BootstrapFormMixin, forms.Form):
-    file = forms.FileField(
-        label="Foto o PDF del documento",
-        help_text="Carica la scansione o la foto del DDT/fattura: il testo verrà letto automaticamente (OCR).",
-    )

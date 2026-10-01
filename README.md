@@ -36,6 +36,12 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   «Preventivo» crea il preventivo dal modello collegato.
 - **Seriali e garanzie** – registro dei numeri di serie installati (pompe, filtri, robot) con
   cliente, cantiere, data di installazione e garanzia (stato in garanzia/scaduta).
+- **Personale e presenze** – anagrafica dipendenti (mansione, costo orario, ferie e permessi
+  annui); **registrazione ore** per giornata con tipo (ordinario, straordinario, trasferta) e
+  collegamento al cantiere, con inserimento rapido delle ore di tutta la squadra in una sola
+  schermata; **ferie e permessi** con richiesta, approvazione/rifiuto e calcolo automatico del
+  residuo (ferie in giorni, permessi in ore); **registro presenze** mensile con ore e assenze
+  giorno per giorno e sigle (F ferie, P permessi, M malattia).
 - **Allegati** – carica foto, schede tecniche e documenti su articoli e cantieri; i file sono
   serviti solo agli utenti autenticati.
 - **Varianti articolo** – genera le versioni colore/finitura di un articolo in un clic
@@ -54,10 +60,6 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   scadenza, stato (emessa, inviata, pagata) e stampa grafica; fatture fornitore da ordini
   d'acquisto o manuali, con stato da pagare/pagata. In dashboard gli alert «da incassare»
   e «da pagare».
-- **Acquisizione documenti con OCR** – carichi la foto o il PDF del DDT/fattura del
-  fornitore: il testo viene letto (Tesseract) e i dati principali (fornitore, numero, data,
-  totale) riconosciuti; da lì crei la fattura ricevuta in bozza con le righe già abbozzate
-  e il file allegato.
 - **Invio fatture via email** – dalla scheda della fattura invii al cliente l'email con
   **PDF in allegato** (generato dal gestionale) e il messaggio che preferisci; lo stato
   passa automaticamente a «Inviata».
@@ -233,12 +235,6 @@ python manage.py runserver
 
 Apri <http://127.0.0.1:8000> e accedi con l'utente creato.
 
-> **OCR dei documenti (Windows in locale):** la lettura automatica di DDT e fatture
-> richiede Tesseract. In Docker (VPS) è già incluso; su Windows puoi installarlo da
-> <https://github.com/UB-Mannheim/tesseract/wiki> (inclusa la lingua italiana) per
-> provare la funzione anche in locale. Senza Tesseract il caricamento funziona
-> comunque: il file viene archiviato e la fattura si compila a mano.
-
 ## Ruoli
 
 | Ruolo          | Permessi principali                                                       |
@@ -247,6 +243,33 @@ Apri <http://127.0.0.1:8000> e accedi con l'utente creato.
 | Vendite        | Contatti, articoli, preventivi, ordini cliente                            |
 | Acquisti       | Contatti, articoli, ordini fornitore, listini fornitori                   |
 | Magazzino      | Giacenze, movimenti, rettifiche, ricezione merci, consegna ordini cliente |
+| Personale      | Dipendenti, registrazione ore, ferie e permessi                           |
+
+## Più utenti in contemporanea
+
+Il gestionale è pensato per essere usato da più persone insieme (es. 8 utenti).
+Sui dati condivisi sono attive queste protezioni:
+
+- **Numeri documento mai duplicati.** Il contatore dei documenti (preventivi, ordini,
+  DDT, fatture) viene incrementato con un `UPDATE` atomico a livello di database, non
+  con una lettura seguita da una scrittura. Due utenti che creano un documento nello
+  stesso istante ottengono numeri diversi. Il numero è anche `unique` nel database,
+  come ultima rete di sicurezza.
+- **Giacenze sempre corrette.** Anche il magazzino viene aggiornato con un `UPDATE`
+  aritmetico: due scarichi contemporanei dello stesso articolo si sommano invece di
+  sovrascriversi, e il controllo sulla disponibilità resta valido.
+- **Modifiche contemporanee segnalate.** Se due utenti aprono lo stesso documento e lo
+  salvano entrambi, il secondo riceve un avviso e la sua modifica **non** viene salvata:
+  la pagina si ricarica con i dati aggiornati, evitando di perdere il lavoro dell'altro.
+- **SQLite configurato per la concorrenza** (uso locale): `WAL` attivo, attesa di 20
+  secondi sui blocchi e transazioni `IMMEDIATE`. In produzione su VPS si usa PostgreSQL,
+  che gestisce la concorrenza con blocchi di riga.
+- **Sessione salvata solo quando cambia**, non a ogni pagina aperta: con più utenti
+  collegati significa molte scritture in meno.
+
+> Nota: la sessione dura 12 ore dall'accesso e non si prolunga a ogni clic. Dopo 12 ore
+> occorre rientrare.
+
 
 ## Flusso di lavoro tipico
 
@@ -393,7 +416,8 @@ apps/
   sales/                preventivi, ordini cliente, statistiche (fatturato/marginalità)
   purchasing/           ordini fornitore e listini
   jobs/                 cantieri, manutenzioni programmate, seriali/garanzie
-  billing/              DDT, fatture emesse/ricevute, acquisizione OCR
+  hr/                   dipendenti, registrazione ore, ferie/permessi, registro presenze
+  billing/              DDT, fatture emesse/ricevute
 templates/              interfaccia (Bootstrap 5, in italiano) e documenti stampabili
 static/js/quick_create.js   creazione al volo di contatti e articoli
 static/js/autocomplete.js   ricerca a digitazione
@@ -410,10 +434,11 @@ python manage.py test apps
 ```
 
 Coprono il flusso completo (preventivo → ordine → ordine fornitore → ricezione →
-consegna), DDT e fatture emesse/ricevute, email e XML FatturaPA (SDI), l'OCR dei documenti
-acquisiti, il calcolo di totali e IVA mista, l'adeguamento dei listini, l'importazione
+consegna), DDT e fatture emesse/ricevute, email e XML FatturaPA (SDI), il calcolo di
+totali e IVA mista, l'adeguamento dei listini, l'importazione
 CSV/Excel, la creazione rapida, i modelli di preventivo, cantieri, manutenzioni, seriali,
-allegati, varianti, kit, sezioni, statistiche di marginalità, le PWA (manifest e service
+allegati, varianti, kit, sezioni, statistiche di marginalità, il personale (dipendenti,
+ore, ferie e registro presenze), le PWA (manifest e service
 worker), le protezioni anti-abuso e i permessi dei ruoli.
 
 ## Prossime tappe suggerite

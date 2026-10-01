@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from .utils import format_quantity
@@ -156,15 +157,29 @@ class NumberSequence(models.Model):
         return obj
 
     def take_next_number(self):
-        """Restituisce il prossimo numero del documento e incrementa il contatore."""
+        """Restituisce il prossimo numero del documento e incrementa il contatore.
+
+        L'incremento è un ``UPDATE`` atomico a livello di database, non una
+        lettura seguita da una scrittura: due utenti che creano un documento
+        nello stesso istante non possono quindi ottenere lo stesso numero.
+
+        Serve perché ``select_for_update`` non ha effetto su SQLite (non
+        supporta il blocco di riga). Con l'UPDATE il blocco di scrittura viene
+        preso comunque e la seconda transazione si mette in coda, leggendo il
+        valore già incrementato. Su PostgreSQL l'UPDATE blocca la riga e
+        l'altra transazione attende il commit.
+
+        Il vincolo ``unique`` sul numero dei documenti resta come ultima rete
+        di sicurezza.
+        """
         with transaction.atomic():
-            sequence = type(self).objects.select_for_update().get(pk=self.pk)
-            number = sequence.next_number
-            sequence.next_number = number + 1
-            sequence.save(update_fields=["next_number"])
-        self.next_number = number + 1
-        base = f"{sequence.prefix}{(sequence.year or '')}-" if sequence.year else sequence.prefix
-        return f"{base}{number:0{sequence.padding}d}"
+            type(self).objects.filter(pk=self.pk).update(next_number=F("next_number") + 1)
+            after = type(self).objects.values_list("next_number", flat=True).get(pk=self.pk)
+            number = after - 1
+
+        self.next_number = after
+        base = f"{self.prefix}{(self.year or '')}-" if self.year else self.prefix
+        return f"{base}{number:0{self.padding}d}"
 
 
 class CompanySettings(models.Model):

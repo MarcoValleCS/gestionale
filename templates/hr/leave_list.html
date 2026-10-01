@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Ferie e permessi{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="dipendente">Dipendente</label>
+        <select class="form-select form-select-sm" id="dipendente" name="dipendente">
+          <option value="">Tutti</option>
+          {% for employee in employees %}
+          <option value="{{ employee.pk }}" {% if employee_id == employee.pk|stringformat:"s" %}selected{% endif %}>{{ employee.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="tipo">Tipo</label>
+        <select class="form-select form-select-sm" id="tipo" name="tipo">
+          <option value="">Tutti</option>
+          {% for value, label in kinds %}
+          <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="stato">Stato</label>
+        <select class="form-select form-select-sm" id="stato" name="stato">
+          <option value="">Tutti</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="anno">Anno</label>
+        <select class="form-select form-select-sm" id="anno" name="anno">
+          {% for value in years %}
+          <option value="{{ value }}" {% if year == value|add:"0" %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_hr %}
+        <a class="btn btn-primary btn-sm" href="{% url 'hr:leave_create' %}"><i class="bi bi-calendar-plus"></i> Nuova assenza</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  {% if pending_count %}
+  <div class="card-body py-2">
+    <a class="btn btn-sm btn-outline-warning" href="?stato=requested">
+      <i class="bi bi-hourglass-split"></i> Da approvare <span class="badge text-bg-warning ms-1">{{ pending_count }}</span>
+    </a>
+  </div>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Dipendente</th>
+          <th>Tipo</th>
+          <th class="text-center">Dal</th>
+          <th class="text-center">Al</th>
+          <th class="text-center">Durata</th>
+          <th>Motivo</th>
+          <th class="text-center">Stato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for leave in leaves %}
+        <tr>
+          <td><a class="text-decoration-none" href="{% url 'hr:employee_detail' leave.employee.pk %}">{{ leave.employee.full_name }}</a></td>
+          <td>{{ leave.get_kind_display }}</td>
+          <td class="text-center">{{ leave.start_date|date:"d/m/Y" }}</td>
+          <td class="text-center">{{ leave.end_date|date:"d/m/Y" }}</td>
+          <td class="text-center">{{ leave.duration_label }}</td>
+          <td class="text-muted small">{{ leave.reason|default:"—" }}</td>
+          <td class="text-center"><span class="badge text-bg-{{ leave.status|badge_class }}">{{ leave.get_status_display }}</span></td>
+          <td class="text-end text-nowrap">
+            {% if roles.is_admin or roles.is_hr %}
+              {% if leave.is_pending %}
+              <form method="post" action="{% url 'hr:leave_approve' leave.pk %}" class="d-inline">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="btn btn-outline-success btn-sm" type="submit" title="Approva"><i class="bi bi-check-lg"></i></button>
+              </form>
+              <form method="post" action="{% url 'hr:leave_reject' leave.pk %}" class="d-inline">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="btn btn-outline-danger btn-sm" type="submit" title="Rifiuta"><i class="bi bi-x-lg"></i></button>
+              </form>
+              {% endif %}
+              <a class="btn btn-outline-secondary btn-sm" href="{% url 'hr:leave_update' leave.pk %}" title="Modifica"><i class="bi bi-pencil"></i></a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          Nessuna assenza registrata. Le ferie approvate compaiono nel registro presenze con la sigla «F».
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}
