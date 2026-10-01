@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ invoice.number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">Fattura <span class="number-badge">{{ invoice.number }}</span></h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ invoice.status|badge_class }}">{{ invoice.get_status_display }}</span>
+      {% if invoice.is_overdue %}<span class="badge text-bg-danger">Scaduta il {{ invoice.due_date|date:"d/m/Y" }}</span>{% endif %}
+      <a class="text-decoration-none" href="{% url 'contacts:detail' invoice.customer.pk %}">{{ invoice.customer.name }}</a>
+      {% if invoice.job %}<span class="text-muted small">cantiere <a href="{% url 'jobs:job_detail' invoice.job.pk %}">{{ invoice.job.code }}</a></span>{% endif %}
+      {% if invoice.source_delivery_note %}<span class="text-muted small">da DDT <a href="{% url 'billing:deliverynote_detail' invoice.source_delivery_note.pk %}">{{ invoice.source_delivery_note.number }}</a></span>{% endif %}
+      {% if invoice.source_order %}<span class="text-muted small">da ordine <a href="{% url 'sales:order_detail' invoice.source_order.pk %}">{{ invoice.source_order.number }}</a></span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_print' invoice.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa / PDF</a>
+    {% if invoice.is_editable and roles.is_admin or invoice.is_editable and roles.is_sales %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_update' invoice.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    <form method="post" action="{% url 'billing:salesinvoice_issue' invoice.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-send-check"></i> Emetti</button>
+    </form>
+    <form method="post" action="{% url 'billing:salesinvoice_delete' invoice.pk %}" onsubmit="return confirm('Eliminare la fattura {{ invoice.number }}?');">
+      {% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+    </form>
+    {% endif %}
+    {% if invoice.status == "issued" and roles.is_admin or invoice.status == "issued" and roles.is_sales %}
+    <form method="post" action="{% url 'billing:salesinvoice_send' invoice.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-envelope-check"></i> Segna come inviata</button>
+    </form>
+    {% endif %}
+    {% if invoice.status == "issued" or invoice.status == "sent" %}
+      {% if roles.is_admin or roles.is_sales %}
+      <form method="post" action="{% url 'billing:salesinvoice_pay' invoice.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-cash-coin"></i> Segna come pagata</button>
+      </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Righe</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Articolo / Descrizione</th>
+              <th class="text-end">Q.tà</th>
+              <th>U.d.M.</th>
+              <th class="text-end">Prezzo</th>
+              <th class="text-end">Sc. %</th>
+              <th class="text-end">IVA</th>
+              <th class="text-end">Totale</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for group in line_groups %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="8" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
+            </tr>
+            {% endif %}
+            {% for line in group.lines %}
+            <tr>
+              <td class="text-muted">{{ line.row_number }}</td>
+              <td>
+                {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+                {{ line.description|default:"—" }}
+              </td>
+              <td class="text-end">{{ line.qty|qty }}</td>
+              <td>{{ line.uom.code|default:"—" }}</td>
+              <td class="text-end">{{ line.unit_price|money }} €</td>
+              <td class="text-end">{{ line.discount_pct|qty }}%</td>
+              <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
+              <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+            </tr>
+            {% endfor %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="7" class="text-end small text-muted">Totale {{ group.section }}</td>
+              <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>
+            </tr>
+            {% endif %}
+            {% empty %}
+            <tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if invoice.notes %}
+    <div class="card">
+      <div class="card-header">Note</div>
+      <div class="card-body" style="white-space: pre-line">{{ invoice.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">Data</dt><dd class="col-6">{{ invoice.date|date:"d/m/Y" }}</dd>
+          <dt class="col-6 text-muted">Scadenza</dt><dd class="col-6">{{ invoice.due_date|date:"d/m/Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Pagamento</dt><dd class="col-6">{{ invoice.payment_term.name|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Riferimento</dt><dd class="col-6">{{ invoice.reference|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Emessa il</dt><dd class="col-6">{{ invoice.issued_at|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Inviata il</dt><dd class="col-6">{{ invoice.sent_at|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Pagata il</dt><dd class="col-6">{{ invoice.paid_at|date:"d/m/Y"|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Totali</div>
+      <div class="card-body">
+        <dl class="doc-totals mb-0">
+          <div class="d-flex justify-content-between"><dt>Imponibile</dt><dd>{{ invoice.subtotal|money }} €</dd></div>
+          {% for row in vat_rows %}
+          <div class="d-flex justify-content-between">
+            <dt>IVA {{ row.rate.rate|qty }}%</dt><dd>{{ row.vat|money }} €</dd>
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-between border-top pt-2 mt-1">
+            <dt class="grand-total">Totale</dt>
+            <dd class="grand-total">{{ invoice.grand_total|money }} €</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

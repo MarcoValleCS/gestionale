@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Fatture emesse{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Numero, cliente, riferimento…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="stato">Stato</label>
+        <select class="form-select form-select-sm" id="stato" name="stato">
+          <option value="">Tutti</option>
+          <option value="aperte" {% if status == "aperte" %}selected{% endif %}>Da incassare</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="cliente">Cliente</label>
+        <select class="form-select form-select-sm" id="cliente" name="cliente">
+          <option value="">Tutti</option>
+          {% for customer in customers %}
+          <option value="{{ customer.pk }}" {% if customer_id == customer.pk|stringformat:"s" %}selected{% endif %}>{{ customer.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2 justify-content-end align-items-center">
+        {% if open_count %}<span class="badge text-bg-warning">{{ open_count }} da incassare · {{ open_total|money }} €</span>{% endif %}
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_sales %}
+        <a class="btn btn-primary btn-sm" href="{% url 'billing:salesinvoice_create' %}"><i class="bi bi-plus-lg"></i> Nuova fattura</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Numero</th>
+          <th>Data</th>
+          <th>Cliente</th>
+          <th>Scadenza</th>
+          <th class="text-end">Imponibile</th>
+          <th class="text-end">Totale</th>
+          <th class="text-center">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+        <tr>
+          <td><a class="fw-semibold text-decoration-none number-badge" href="{% url 'billing:salesinvoice_detail' invoice.pk %}">{{ invoice.number }}</a></td>
+          <td>{{ invoice.date|date:"d/m/Y" }}</td>
+          <td>{{ invoice.customer.name }}</td>
+          <td class="{% if invoice.is_overdue %}text-danger fw-semibold{% endif %}">
+            {{ invoice.due_date|date:"d/m/Y"|default:"—" }}
+            {% if invoice.is_overdue %}<span class="badge text-bg-danger">scaduta</span>{% endif %}
+          </td>
+          <td class="text-end">{{ invoice.subtotal|money }} €</td>
+          <td class="text-end fw-semibold">{{ invoice.grand_total|money }} €</td>
+          <td class="text-center"><span class="badge text-bg-{{ invoice.status|badge_class }}">{{ invoice.get_status_display }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          Nessuna fattura emessa. Puoi crearla da un ordine cliente o da un DDT emesso, oppure manualmente qui.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

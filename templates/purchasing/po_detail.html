@@ -16,6 +16,13 @@
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:po_print' order.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+    {% if roles.is_admin or roles.is_purchasing %}
+    <form method="post" action="{% url 'billing:purchaseinvoice_from_po' order.pk %}">{% csrf_token %}
+      <button class="btn btn-outline-primary btn-sm" type="submit" title="Registra la fattura ricevuta da questo ordine (in bozza)">
+        <i class="bi bi-receipt"></i> Registra fattura
+      </button>
+    </form>
+    {% endif %}
     {% if order.is_editable and roles.is_admin or order.is_editable and roles.is_purchasing %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:po_update' order.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
     {% endif %}

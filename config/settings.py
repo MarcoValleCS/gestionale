@@ -49,6 +49,9 @@ ABUSE_THROTTLE = {
     "search": {"limit": 120, "window": 60},  # 120 ricerche al minuto per IP
 }
 
+# OCR dei documenti acquisiti (DDT/fatture): lingue di Tesseract
+OCR_LANGUAGES = env("OCR_LANGUAGES", "ita+eng")
+
 # ------------------------------------------------------------------- App
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -65,6 +68,7 @@ INSTALLED_APPS = [
     "apps.sales",
     "apps.purchasing",
     "apps.jobs",
+    "apps.billing",
 ]
 
 MIDDLEWARE = [

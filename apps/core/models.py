@@ -111,15 +111,24 @@ class NumberSequence(models.Model):
     DOC_TYPE_QUOTE = "quote"
     DOC_TYPE_SALES_ORDER = "sales_order"
     DOC_TYPE_PURCHASE_ORDER = "purchase_order"
+    DOC_TYPE_DELIVERY_NOTE = "delivery_note"
+    DOC_TYPE_SALES_INVOICE = "sales_invoice"
+    DOC_TYPE_PURCHASE_INVOICE = "purchase_invoice"
     DOC_TYPE_CHOICES = [
         (DOC_TYPE_QUOTE, "Preventivo"),
         (DOC_TYPE_SALES_ORDER, "Ordine cliente"),
         (DOC_TYPE_PURCHASE_ORDER, "Ordine fornitore"),
+        (DOC_TYPE_DELIVERY_NOTE, "DDT"),
+        (DOC_TYPE_SALES_INVOICE, "Fattura emessa"),
+        (DOC_TYPE_PURCHASE_INVOICE, "Fattura ricevuta"),
     ]
     DEFAULT_PREFIXES = {
         DOC_TYPE_QUOTE: "PRE-",
         DOC_TYPE_SALES_ORDER: "OC-",
         DOC_TYPE_PURCHASE_ORDER: "OF-",
+        DOC_TYPE_DELIVERY_NOTE: "DDT-",
+        DOC_TYPE_SALES_INVOICE: "FT-",
+        DOC_TYPE_PURCHASE_INVOICE: "FA-",
     }
 
     doc_type = models.CharField("Tipo documento", max_length=30, choices=DOC_TYPE_CHOICES)

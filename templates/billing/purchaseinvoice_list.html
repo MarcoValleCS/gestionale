@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Fatture ricevute{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Numero, fornitore, n. documento…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="stato">Stato</label>
+        <select class="form-select form-select-sm" id="stato" name="stato">
+          <option value="">Tutti</option>
+          <option value="aperte" {% if status == "aperte" %}selected{% endif %}>Da pagare</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="fornitore">Fornitore</label>
+        <select class="form-select form-select-sm" id="fornitore" name="fornitore">
+          <option value="">Tutti</option>
+          {% for supplier in suppliers %}
+          <option value="{{ supplier.pk }}" {% if supplier_id == supplier.pk|stringformat:"s" %}selected{% endif %}>{{ supplier.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2 justify-content-end align-items-center">
+        {% if open_count %}<span class="badge text-bg-warning">{{ open_count }} da pagare · {{ open_total|money }} €</span>{% endif %}
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_purchasing %}
+        <a class="btn btn-primary btn-sm" href="{% url 'billing:purchaseinvoice_create' %}"><i class="bi bi-plus-lg"></i> Nuova fattura ricevuta</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Numero interno</th>
+          <th>N. documento fornitore</th>
+          <th>Data</th>
+          <th>Fornitore</th>
+          <th>Scadenza</th>
+          <th class="text-end">Totale</th>
+          <th class="text-center">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+        <tr>
+          <td><a class="fw-semibold text-decoration-none number-badge" href="{% url 'billing:purchaseinvoice_detail' invoice.pk %}">{{ invoice.number }}</a></td>
+          <td>{{ invoice.supplier_reference|default:"—" }}</td>
+          <td>{{ invoice.date|date:"d/m/Y" }}</td>
+          <td>{{ invoice.supplier.name }}</td>
+          <td>{{ invoice.due_date|date:"d/m/Y"|default:"—" }}</td>
+          <td class="text-end fw-semibold">{{ invoice.grand_total|money }} €</td>
+          <td class="text-center"><span class="badge text-bg-{{ invoice.status|badge_class }}">{{ invoice.get_status_display }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          Nessuna fattura ricevuta. Registrale qui, da un ordine fornitore ricevuto, oppure acquisisci il documento con l'OCR.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

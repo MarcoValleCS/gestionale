@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ note.number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">DDT <span class="number-badge">{{ note.number }}</span></h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ note.status|badge_class }}">{{ note.get_status_display }}</span>
+      {% if note.invoiced %}<span class="badge text-bg-success">Fatturato</span>{% endif %}
+      <a class="text-decoration-none" href="{% url 'contacts:detail' note.customer.pk %}">{{ note.customer.name }}</a>
+      {% if note.job %}<span class="text-muted small">cantiere <a href="{% url 'jobs:job_detail' note.job.pk %}">{{ note.job.code }}</a></span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:deliverynote_print' note.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+    {% if note.is_editable and roles.is_admin or note.is_editable and roles.is_sales or note.is_editable and roles.is_warehouse %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:deliverynote_update' note.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    <form method="post" action="{% url 'billing:deliverynote_issue' note.pk %}" onsubmit="return confirm('Emettere il DDT e scaricare il magazzino?');">
+      {% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-box-arrow-right"></i> Emetti e scarica magazzino</button>
+    </form>
+    <form method="post" action="{% url 'billing:deliverynote_delete' note.pk %}" onsubmit="return confirm('Eliminare il DDT {{ note.number }}?');">
+      {% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+    </form>
+    {% endif %}
+    {% if note.status == "issued" and not note.invoiced and roles.is_admin or note.status == "issued" and not note.invoiced and roles.is_sales %}
+    <form method="post" action="{% url 'billing:deliverynote_invoice' note.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-file-earmark-plus"></i> Crea fattura da questo DDT</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Righe</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Articolo / Descrizione</th>
+              <th>Sezione</th>
+              <th class="text-end">Quantità</th>
+              <th>U.d.M.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in lines %}
+            <tr>
+              <td class="text-muted">{{ forloop.counter }}</td>
+              <td>
+                {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+                {{ line.description|default:"—" }}
+              </td>
+              <td class="text-muted">{{ line.section|default:"—" }}</td>
+              <td class="text-end fw-semibold">{{ line.qty|qty }}</td>
+              <td>{{ line.uom.code|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-3">Nessuna riga</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if invoices %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-file-earmark-text me-1"></i> Fatture collegate</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Numero</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+          <tbody>
+            {% for invoice in invoices %}
+            <tr>
+              <td><a href="{% url 'billing:salesinvoice_detail' invoice.pk %}">{{ invoice.number }}</a></td>
+              <td>{{ invoice.date|date:"d/m/Y" }}</td>
+              <td class="text-end">{{ invoice.grand_total|money }} €</td>
+              <td class="text-center"><span class="badge text-bg-{{ invoice.status|badge_class }}">{{ invoice.get_status_display }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">Data</dt><dd class="col-6">{{ note.date|date:"d/m/Y" }}</dd>
+          <dt class="col-6 text-muted">Causale trasporto</dt><dd class="col-6">{{ note.transport_reason|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Vettore</dt><dd class="col-6">{{ note.carrier|default:"—" }}</dd>
+          <dt class="col-6 text-muted">N. colli</dt><dd class="col-6">{{ note.packages|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Peso</dt><dd class="col-6">{% if note.weight %}{{ note.weight|qty }} kg{% else %}—{% endif %}</dd>
+          <dt class="col-6 text-muted">Destinazione</dt><dd class="col-6">{{ note.destination_address|default:"—" }}</dd>
+          {% if note.source_order %}
+          <dt class="col-6 text-muted">Da ordine</dt>
+          <dd class="col-6"><a href="{% url 'sales:order_detail' note.source_order.pk %}">{{ note.source_order.number }}</a></dd>
+          {% endif %}
+          <dt class="col-6 text-muted">Emesso il</dt><dd class="col-6">{{ note.issued_at|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Creato da</dt><dd class="col-6">{{ note.created_by|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    {% if note.notes %}
+    <div class="card">
+      <div class="card-header">Note</div>
+      <div class="card-body small" style="white-space: pre-line">{{ note.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

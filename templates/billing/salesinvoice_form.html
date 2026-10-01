@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate id="document-form">
+  {% csrf_token %}
+  {{ line_formset.management_form }}
+  {{ customer_discounts_json|json_script:"customer-discounts" }}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">Dati fattura</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field_quick.html" with field=form.customer col=6 kind="customer" title="Crea nuovo cliente" %}
+            {% include "partials/field.html" with field=form.job col=6 %}
+            {% include "partials/field.html" with field=form.date col=3 %}
+            {% include "partials/field.html" with field=form.due_date col=3 %}
+            {% include "partials/field.html" with field=form.reference col=6 %}
+            {% include "partials/field.html" with field=form.payment_term col=6 %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Righe della fattura</span>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="add-line"><i class="bi bi-plus-lg"></i> Aggiungi riga</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm doc-lines mb-0" id="lines-table">
+            <thead>
+              <tr>
+                <th style="width:15%">Articolo</th>
+                <th>Descrizione</th>
+                <th style="width:10%">Sezione</th>
+                <th style="width:6%">Q.tà</th>
+                <th style="width:8%">U.d.M.</th>
+                <th style="width:9%">Prezzo</th>
+                <th style="width:6%">Sc. %</th>
+                <th style="width:9%">IVA</th>
+                <th style="width:8%" class="text-end">Totale</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody id="lines-body">
+              {% for lineform in line_formset %}
+              {% include "sales/_line_row.html" %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if line_formset.non_form_errors %}
+        <div class="card-body py-2 text-danger small">{% for error in line_formset.non_form_errors %}{{ error }}<br>{% endfor %}</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-header">Note</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.notes col=12 %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-3 position-sticky" style="top: 80px">
+        <div class="card-header">Totali</div>
+        <div class="card-body">
+          <dl class="doc-totals mb-0">
+            <div class="d-flex justify-content-between"><dt>Imponibile</dt><dd id="totals-subtotal">0,00 €</dd></div>
+            <div class="d-flex justify-content-between"><dt>Totale IVA</dt><dd id="totals-vat">0,00 €</dd></div>
+            <div class="d-flex justify-content-between border-top pt-2 mt-1">
+              <dt class="grand-total">Totale</dt>
+              <dd class="grand-total" id="totals-grand">0,00 €</dd>
+            </div>
+          </dl>
+          <div id="vat-breakdown" class="mt-2"></div>
+          <p class="text-muted small mt-3 mb-0">I totali definitivi vengono ricalcolati dal server al salvataggio.</p>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva fattura</button>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
+      </div>
+    </div>
+  </div>
+  <template id="empty-line-template">{% include "sales/_line_row.html" with lineform=line_formset.empty_form %}</template>
+</form>
+{% include "sales/_quick_modals.html" %}
+{% endblock %}
+
+{% block extra_js %}
+{% include "sales/_lines_script.html" %}
+<script src="{% static 'js/quick_create.js' %}"></script>
+<script src="{% static 'js/autocomplete.js' %}"></script>
+{% endblock %}

@@ -40,6 +40,27 @@
   <a class="btn btn-sm btn-outline-secondary" href="{% url 'jobs:asset_list' %}">
     <i class="bi bi-upc-scan"></i> Seriali installati <span class="badge text-bg-light border ms-1">{{ assets_count }}</span>
   </a>
+  {% if roles.is_admin or roles.is_sales %}
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:salesinvoice_list' %}?stato=aperte">
+    <i class="bi bi-receipt"></i> Da incassare
+    <span class="badge {% if invoices_to_collect.count %}text-bg-warning{% else %}text-bg-light border{% endif %} ms-1">
+      {% if invoices_to_collect.total %}{{ invoices_to_collect.total|money }} € · {% endif %}{{ invoices_to_collect.count }}
+    </span>
+  </a>
+  {% endif %}
+  {% if roles.is_admin or roles.is_purchasing %}
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:purchaseinvoice_list' %}?stato=aperte">
+    <i class="bi bi-receipt-cutoff"></i> Da pagare
+    <span class="badge {% if invoices_to_pay.count %}text-bg-warning{% else %}text-bg-light border{% endif %} ms-1">
+      {% if invoices_to_pay.total %}{{ invoices_to_pay.total|money }} € · {% endif %}{{ invoices_to_pay.count }}
+    </span>
+  </a>
+  {% endif %}
+  {% if ddt_draft_count %}
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:deliverynote_list' %}?stato=aperti">
+    <i class="bi bi-truck"></i> DDT in bozza <span class="badge text-bg-secondary ms-1">{{ ddt_draft_count }}</span>
+  </a>
+  {% endif %}
 </div>
 
 <div class="row g-3 mb-1">
@@ -143,15 +164,15 @@
       <div class="btn-group btn-group-sm" role="group" aria-label="Ampiezza del periodo">
         {% for choice in months_choices %}
         <a class="btn {% if months == choice %}btn-primary{% else %}btn-outline-primary{% endif %}"
-           href="?{% querystring finestra=choice indietro=0 %}" title="Mostra {{ choice }} mesi">{{ choice }}</a>
+           href="{% querystring finestra=choice indietro=0 %}" title="Mostra {{ choice }} mesi">{{ choice }}</a>
         {% endfor %}
       </div>
       <div class="btn-group btn-group-sm" role="group" aria-label="Navigazione periodo">
-        <a class="btn btn-outline-secondary" href="?{% querystring indietro=offset|add:1 %}" title="Periodo precedente">
+        <a class="btn btn-outline-secondary" href="{% querystring indietro=offset|add:1 %}" title="Periodo precedente">
           <i class="bi bi-chevron-left"></i>
         </a>
         {% if offset > 0 %}
-        <a class="btn btn-outline-secondary" href="?{% querystring indietro=offset|add:-1 %}" title="Periodo successivo">
+        <a class="btn btn-outline-secondary" href="{% querystring indietro=offset|add:-1 %}" title="Periodo successivo">
           <i class="bi bi-chevron-right"></i>
         </a>
         {% else %}
@@ -164,7 +185,7 @@
     Periodo mostrato: <strong>{{ series.start_label }}</strong> – <strong>{{ series.end_label }}</strong>
     ({{ series.months }} {% if series.months == 1 %}mese{% else %}mesi{% endif %})
     · fatturato al netto dell'IVA sugli ordini consegnati
-    {% if offset %}· <a href="?{% querystring indietro=0 %}">torna al periodo corrente</a>{% endif %}
+    {% if offset %}· <a href="{% querystring indietro=0 %}">torna al periodo corrente</a>{% endif %}
   </div>
   <div class="card-body chart-box">
     <canvas id="chart-monthly"></canvas>

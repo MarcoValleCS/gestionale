@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ invoice.number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">Fattura ricevuta <span class="number-badge">{{ invoice.number }}</span></h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ invoice.status|badge_class }}">{{ invoice.get_status_display }}</span>
+      <a class="text-decoration-none" href="{% url 'contacts:detail' invoice.supplier.pk %}">{{ invoice.supplier.name }}</a>
+      {% if invoice.supplier_reference %}<span class="badge text-bg-light border">Doc. fornitore {{ invoice.supplier_reference }}</span>{% endif %}
+      {% if invoice.job %}<span class="text-muted small">cantiere <a href="{% url 'jobs:job_detail' invoice.job.pk %}">{{ invoice.job.code }}</a></span>{% endif %}
+      {% if invoice.source_po %}<span class="text-muted small">da ordine <a href="{% url 'purchasing:po_detail' invoice.source_po.pk %}">{{ invoice.source_po.number }}</a></span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    {% if invoice.is_editable and roles.is_admin or invoice.is_editable and roles.is_purchasing %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:purchaseinvoice_update' invoice.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    <form method="post" action="{% url 'billing:purchaseinvoice_register' invoice.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg"></i> Registra (da pagare)</button>
+    </form>
+    <form method="post" action="{% url 'billing:purchaseinvoice_delete' invoice.pk %}" onsubmit="return confirm('Eliminare la fattura ricevuta {{ invoice.number }}?');">
+      {% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+    </form>
+    {% endif %}
+    {% if invoice.status == "registered" and roles.is_admin or invoice.status == "registered" and roles.is_purchasing %}
+    <form method="post" action="{% url 'billing:purchaseinvoice_pay' invoice.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-cash-coin"></i> Segna come pagata</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Righe</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Articolo / Descrizione</th>
+              <th class="text-end">Q.tà</th>
+              <th>U.d.M.</th>
+              <th class="text-end">Prezzo</th>
+              <th class="text-end">Sc. %</th>
+              <th class="text-end">IVA</th>
+              <th class="text-end">Totale</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for group in line_groups %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="8" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
+            </tr>
+            {% endif %}
+            {% for line in group.lines %}
+            <tr>
+              <td class="text-muted">{{ line.row_number }}</td>
+              <td>
+                {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+                {{ line.description|default:"—" }}
+              </td>
+              <td class="text-end">{{ line.qty|qty }}</td>
+              <td>{{ line.uom.code|default:"—" }}</td>
+              <td class="text-end">{{ line.unit_price|money }} €</td>
+              <td class="text-end">{{ line.discount_pct|qty }}%</td>
+              <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
+              <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+            </tr>
+            {% endfor %}
+            {% empty %}
+            <tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if scans %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-paperclip me-1"></i> Documenti acquisiti (OCR)</div>
+      <ul class="list-group list-group-flush">
+        {% for scan in scans %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <a href="{% url 'billing:scan_detail' scan.pk %}">{{ scan.original_name }}</a>
+          <span class="text-muted small">{{ scan.created_at|date:"d/m/Y H:i" }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">Data documento</dt><dd class="col-6">{{ invoice.date|date:"d/m/Y" }}</dd>
+          <dt class="col-6 text-muted">Scadenza</dt><dd class="col-6">{{ invoice.due_date|date:"d/m/Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Pagamento</dt><dd class="col-6">{{ invoice.payment_term.name|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Registrata il</dt><dd class="col-6">{{ invoice.registered_at|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Pagata il</dt><dd class="col-6">{{ invoice.paid_at|date:"d/m/Y"|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Totali</div>
+      <div class="card-body">
+        <dl class="doc-totals mb-0">
+          <div class="d-flex justify-content-between"><dt>Imponibile</dt><dd>{{ invoice.subtotal|money }} €</dd></div>
+          {% for row in vat_rows %}
+          <div class="d-flex justify-content-between">
+            <dt>IVA {{ row.rate.rate|qty }}%</dt><dd>{{ row.vat|money }} €</dd>
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-between border-top pt-2 mt-1">
+            <dt class="grand-total">Totale</dt>
+            <dd class="grand-total">{{ invoice.grand_total|money }} €</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -59,6 +59,8 @@ def build_print_context(
     notes="",
     show_signature=False,
     signature_label="",
+    show_prices=True,
+    extra_fields=None,
 ):
     """Contesto per il documento stampabile (templates/print/document.html)."""
     lines = document.lines.select_related("product", "uom", "vat_rate")
@@ -68,13 +70,15 @@ def build_print_context(
         "counterparty": counterparty,
         "counterparty_label": counterparty_label,
         "meta_rows": meta_rows,
+        "extra_fields": extra_fields or [],
         "back_url": back_url,
         "lines": lines,
         "line_groups": group_lines_by_section(lines),
-        "vat_rows": document.vat_breakdown(),
+        "vat_rows": document.vat_breakdown() if show_prices else [],
         "notes": notes,
         "show_signature": show_signature,
         "signature_label": signature_label,
+        "show_prices": show_prices,
     }
 
 

@@ -47,6 +47,17 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   «Finiture») con subtotale per sezione in schermo e in stampa.
 - **Sconto abituale cliente** – percentuale proposta automaticamente nelle righe di
   preventivi e ordini.
+- **DDT** – documenti di trasporto creati dagli ordini cliente (o manuali), con causale,
+  vettore, colli, peso e destinazione; all'emissione scaricano il magazzino e aggiornano
+  l'ordine. Stampa A4 senza prezzi con firma del destinatario.
+- **Fatture emesse e ricevute** – fatture in bozza create da ordini/DDT o manuali, con
+  scadenza, stato (emessa, inviata, pagata) e stampa grafica; fatture fornitore da ordini
+  d'acquisto o manuali, con stato da pagare/pagata. In dashboard gli alert «da incassare»
+  e «da pagare».
+- **Acquisizione documenti con OCR** – carichi la foto o il PDF del DDT/fattura del
+  fornitore: il testo viene letto (Tesseract) e i dati principali (fornitore, numero, data,
+  totale) riconosciuti; da lì crei la fattura ricevuta in bozza con le righe già abbozzate
+  e il file allegato.
 - **Listini fornitori** – prezzo e sconto per articolo, validità temporale e
   **adeguamento percentuale di tutto il listino** (es. +3%) con storico delle variazioni.
 - **Dashboard** – fatturato, margine e marginalità % del periodo (mese, anno, ultimi 12
@@ -145,6 +156,12 @@ python manage.py runserver
 ```
 
 Apri <http://127.0.0.1:8000> e accedi con l'utente creato.
+
+> **OCR dei documenti (Windows in locale):** la lettura automatica di DDT e fatture
+> richiede Tesseract. In Docker (VPS) è già incluso; su Windows puoi installarlo da
+> <https://github.com/UB-Mannheim/tesseract/wiki> (inclusa la lingua italiana) per
+> provare la funzione anche in locale. Senza Tesseract il caricamento funziona
+> comunque: il file viene archiviato e la fattura si compila a mano.
 
 ## Ruoli
 
@@ -300,6 +317,7 @@ apps/
   sales/                preventivi, ordini cliente, statistiche (fatturato/marginalità)
   purchasing/           ordini fornitore e listini
   jobs/                 cantieri, manutenzioni programmate, seriali/garanzie
+  billing/              DDT, fatture emesse/ricevute, acquisizione OCR
 templates/              interfaccia (Bootstrap 5, in italiano) e documenti stampabili
 static/js/quick_create.js   creazione al volo di contatti e articoli
 static/js/autocomplete.js   ricerca a digitazione
@@ -316,10 +334,10 @@ python manage.py test apps
 ```
 
 Coprono il flusso completo (preventivo → ordine → ordine fornitore → ricezione →
-consegna), il calcolo di totali e IVA mista, l'adeguamento dei listini, l'importazione
-CSV/Excel, la creazione rapida, i modelli di preventivo, cantieri, manutenzioni, seriali,
-allegati, varianti, kit, sezioni, statistiche di marginalità, protezioni anti-abuso e
-permessi dei ruoli.
+consegna), DDT e fatture emesse/ricevute, l'OCR dei documenti acquisiti, il calcolo di
+totali e IVA mista, l'adeguamento dei listini, l'importazione CSV/Excel, la creazione
+rapida, i modelli di preventivo, cantieri, manutenzioni, seriali, allegati, varianti,
+kit, sezioni, statistiche di marginalità, protezioni anti-abuso e permessi dei ruoli.
 
 ## Prossime tappe suggerite
 

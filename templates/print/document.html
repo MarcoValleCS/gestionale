@@ -201,6 +201,9 @@
         {% for label, value in meta_rows %}
         <tr><td class="label">{{ label }}</td><td class="value">{{ value|default:"—" }}</td></tr>
         {% endfor %}
+        {% for label, value in extra_fields %}
+        <tr><td class="label">{{ label }}</td><td class="value">{{ value|default:"—" }}</td></tr>
+        {% endfor %}
       </table>
     </section>
 
@@ -209,19 +212,24 @@
         <tr>
           <th style="width:9mm">#</th>
           <th>Articolo / Descrizione</th>
+          {% if show_prices %}
           <th class="num" style="width:16mm">Q.tà</th>
           <th style="width:12mm">U.d.M.</th>
           <th class="num" style="width:20mm">Prezzo</th>
           <th class="num" style="width:14mm">Sc. %</th>
           <th class="num" style="width:14mm">IVA</th>
           <th class="num" style="width:22mm">Importo</th>
+          {% else %}
+          <th class="num" style="width:18mm">Q.tà</th>
+          <th style="width:14mm">U.d.M.</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
         {% for group in line_groups %}
         {% if group.section %}
         <tr class="section-row">
-          <td colspan="8">{{ group.section }}</td>
+          <td colspan="{% if show_prices %}8{% else %}4{% endif %}">{{ group.section }}</td>
         </tr>
         {% endif %}
         {% for line in group.lines %}
@@ -233,20 +241,22 @@
           </td>
           <td class="num">{{ line.qty|qty }}</td>
           <td>{{ line.uom.code|default:"—" }}</td>
+          {% if show_prices %}
           <td class="num">{{ line.unit_price|money }} €</td>
           <td class="num">{{ line.discount_pct|qty }}%</td>
           <td class="num">{{ line.vat_rate.rate|qty }}%</td>
           <td class="num">{{ line.line_subtotal|money }} €</td>
+          {% endif %}
         </tr>
         {% endfor %}
-        {% if group.section %}
+        {% if group.section and show_prices %}
         <tr class="section-total">
           <td colspan="7" class="num">Totale {{ group.section }}</td>
           <td class="num">{{ group.subtotal|money }} €</td>
         </tr>
         {% endif %}
         {% empty %}
-        <tr><td colspan="8" style="text-align:center; color:#9ca3af; padding:6mm">Nessuna riga</td></tr>
+        <tr><td colspan="{% if show_prices %}8{% else %}4{% endif %}" style="text-align:center; color:#9ca3af; padding:6mm">Nessuna riga</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -258,6 +268,7 @@
         {{ notes }}
         {% endif %}
       </div>
+      {% if show_prices %}
       <table class="totals">
         <tr><td class="label">Imponibile</td><td class="value">{{ document.subtotal|money }} €</td></tr>
         {% for row in vat_rows %}
@@ -271,6 +282,7 @@
           <td class="value">{{ document.grand_total|money }} €</td>
         </tr>
       </table>
+      {% endif %}
     </section>
 
     {% if show_signature %}

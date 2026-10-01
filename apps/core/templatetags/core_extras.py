@@ -25,6 +25,13 @@ BADGE_CLASSES = {
     "in_progress": "warning",
     "testing": "info",
     "closed": "success",
+    # Fatturazione
+    "issued": "primary",
+    "paid": "success",
+    "registered": "warning",
+    "new": "info",
+    "ok": "success",
+    "error": "danger",
 }
 
 

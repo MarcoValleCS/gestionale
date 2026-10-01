@@ -70,6 +70,28 @@ class DashboardParamsTest(TestCase):
                 response = self.client.get(reverse("core:home") + params)
                 self.assertEqual(response.status_code, 200)
 
+    def test_link_del_grafico_puliti(self):
+        user = User.objects.create_superuser("dash2", "d2@example.com", "password123!")
+        self.client.force_login(user)
+        response = self.client.get(reverse("core:home") + "?finestra=3&indietro=2")
+        html = response.content.decode()
+        self.assertNotIn("??", html)
+        self.assertIn("finestra=1", html)
+        self.assertIn("indietro=3", html)  # freccia "periodo precedente"
+        self.assertIn("indietro=1", html)  # freccia "periodo successivo"
+
+    def test_paginazione_senza_doppio_punto_interrogativo(self):
+        from apps.contacts.models import Contact
+
+        user = User.objects.create_superuser("dash3", "d3@example.com", "password123!")
+        self.client.force_login(user)
+        for index in range(30):
+            Contact.objects.create(name=f"Cliente Pagina {index:02d}", is_customer=True)
+        response = self.client.get(reverse("contacts:list"))
+        html = response.content.decode()
+        self.assertNotIn("??", html)
+        self.assertIn("page=2", html)
+
 
 class AttachmentTest(TestCase):
     @classmethod

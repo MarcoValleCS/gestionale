@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Coalesce
 from django.forms import modelformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
@@ -72,6 +72,7 @@ def home(request):
 
     from apps.inventory.models import StockLevel
     from apps.jobs.models import Asset, Job, MaintenancePlan
+    from apps.billing.models import DeliveryNote, PurchaseInvoice, SalesInvoice
 
     inventory_value = (
         StockLevel.objects.aggregate(
@@ -83,6 +84,13 @@ def home(request):
             )
         )["total"]
         or 0
+    )
+
+    invoices_to_collect = SalesInvoice.objects.filter(
+        status__in=[SalesInvoice.STATUS_ISSUED, SalesInvoice.STATUS_SENT]
+    ).aggregate(total=Sum("grand_total"), count=Count("pk"))
+    invoices_to_pay = PurchaseInvoice.objects.filter(status=PurchaseInvoice.STATUS_REGISTERED).aggregate(
+        total=Sum("grand_total"), count=Count("pk")
     )
 
     due_limit = timezone.localdate() + timedelta(days=30)
@@ -121,6 +129,10 @@ def home(request):
         "maintenance_due": maintenance_due_qs[:6],
         "maintenance_due_count": maintenance_due_qs.count(),
         "assets_count": Asset.objects.count(),
+        # Fatturazione
+        "invoices_to_collect": invoices_to_collect,
+        "invoices_to_pay": invoices_to_pay,
+        "ddt_draft_count": DeliveryNote.objects.filter(status=DeliveryNote.STATUS_DRAFT).count(),
     }
     return render(request, "core/dashboard.html", context)
 

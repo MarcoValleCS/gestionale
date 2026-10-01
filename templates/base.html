@@ -66,6 +66,24 @@
       </a>
       {% endif %}
 
+      <div class="nav-section">Fatturazione</div>
+      {% if roles.is_admin or roles.is_sales %}
+      <a class="nav-link {% if request.resolver_match.url_name == 'salesinvoice_list' %}active{% endif %}" href="{% url 'billing:salesinvoice_list' %}">
+        <i class="bi bi-receipt"></i> Fatture emesse
+      </a>
+      {% endif %}
+      {% if roles.is_admin or roles.is_purchasing %}
+      <a class="nav-link {% if request.resolver_match.url_name == 'purchaseinvoice_list' %}active{% endif %}" href="{% url 'billing:purchaseinvoice_list' %}">
+        <i class="bi bi-receipt-cutoff"></i> Fatture ricevute
+      </a>
+      {% endif %}
+      <a class="nav-link {% if 'deliverynote' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'billing:deliverynote_list' %}">
+        <i class="bi bi-truck"></i> DDT
+      </a>
+      <a class="nav-link {% if 'scan' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'billing:scan_list' %}">
+        <i class="bi bi-camera"></i> Acquisisci documenti
+      </a>
+
       <div class="nav-section">Magazzino</div>
       <a class="nav-link {% if request.resolver_match.url_name == 'stock_list' %}active{% endif %}" href="{% url 'inventory:stock_list' %}">
         <i class="bi bi-boxes"></i> Giacenze
