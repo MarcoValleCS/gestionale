@@ -176,6 +176,38 @@ Il gestionale è una **webapp installabile**, con interfaccia ottimizzata per il
 L'installazione richiede **HTTPS** (con Caddy e dominio è automatico; `localhost` va bene
 per le prove).
 
+## Lavorare da un altro computer
+
+Il repository contiene il **codice**, non il database. Su un nuovo PC:
+
+```bash
+git clone https://github.com/<tuo-utente>/gestionale.git
+cd gestionale
+
+# ambiente virtuale
+py -m venv .venv                  # Windows
+python3 -m venv .venv             # Linux/macOS
+.venv\Scripts\activate            # Windows
+source .venv/bin/activate         # Linux/macOS
+
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_demo        # dati di esempio (facoltativo)
+python manage.py runserver
+```
+
+In locale **non serve il file `.env`**: di default il gestionale usa SQLite e le impostazioni
+di sviluppo. Il file `.env` è pensato per il VPS (PostgreSQL, HTTPS, credenziali).
+
+Ogni computer ha il proprio database di sviluppo (`db.sqlite3`, non versionato); i dati veri
+sono sul VPS, che si aggiorna con `git pull && docker compose up -d --build`.
+
+## Test automatici su GitHub
+
+Il repository include un workflow GitHub Actions (`.github/workflows/tests.yml`) che esegue
+tutti i test a ogni push o pull request: nella pagina del repository, scheda **Actions**,
+vedi se il codice è a posto prima di metterlo online.
+
 ## Avvio in locale (Windows / Linux / macOS)
 
 ```bash
