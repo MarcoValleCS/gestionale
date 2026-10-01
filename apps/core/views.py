@@ -419,3 +419,27 @@ def attachment_delete(request, pk):
         attachment.delete()
         messages.success(request, f"Allegato «{name}» rimosso.")
     return _attachment_redirect(request, product_id, job_id)
+
+
+# ------------------------------------------------------- webapp (PWA)
+from django.contrib.auth.decorators import login_not_required  # noqa: E402
+
+
+@login_not_required
+def manifest(request):
+    """Manifest della webapp (installabile su Android/iPhone)."""
+    return render(request, "manifest.webmanifest", content_type="application/manifest+json")
+
+
+@login_not_required
+def service_worker(request):
+    """Service worker servito dalla radice per poter controllare tutto il sito."""
+    response = render(request, "sw.js", content_type="application/javascript")
+    response["Service-Worker-Allowed"] = "/"
+    response["Cache-Control"] = "no-cache, max-age=0"
+    return response
+
+
+@login_not_required
+def offline(request):
+    return render(request, "core/offline.html")

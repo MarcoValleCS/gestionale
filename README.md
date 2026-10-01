@@ -58,6 +58,15 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   fornitore: il testo viene letto (Tesseract) e i dati principali (fornitore, numero, data,
   totale) riconosciuti; da lì crei la fattura ricevuta in bozza con le righe già abbozzate
   e il file allegato.
+- **Invio fatture via email** – dalla scheda della fattura invii al cliente l'email con
+  **PDF in allegato** (generato dal gestionale) e il messaggio che preferisci; lo stato
+  passa automaticamente a «Inviata».
+- **Fatturazione elettronica (SDI)** – genera il file **XML FatturaPA** (formato FPR12)
+  con i controlli sui dati obbligatori, lo scarica o lo **trasmette allo SDI via PEC**;
+  registri l'esito (consegnata, accettata, scartata…) sulla scheda della fattura.
+- **Webapp installabile** – il gestionale è una **PWA**: su Android si installa da Chrome
+  («Installa app»), su iPhone da Safari («Aggiungi a Home»), con icona, avvio a pieno
+  schermo e pagina offline quando manca la connessione.
 - **Listini fornitori** – prezzo e sconto per articolo, validità temporale e
   **adeguamento percentuale di tutto il listino** (es. +3%) con storico delle variazioni.
 - **Dashboard** – fatturato, margine e marginalità % del periodo (mese, anno, ultimi 12
@@ -131,6 +140,41 @@ Preventivi, conferme d'ordine e ordini fornitore hanno un **modello grafico in A
 
 Dal pulsante «Stampa / Salva PDF» si ottiene un PDF pronto da inviare al cliente o al
 fornitore.
+
+## Fatturazione elettronica (SDI)
+
+Dalla scheda di una fattura emessa, il riquadro **«Fattura elettronica (SDI)»** permette di:
+
+1. **Generare l'XML FatturaPA** (versione FPR12, tipo documento TD01): il sistema controlla
+   prima i dati obbligatori (P.IVA e indirizzo azienda, P.IVA/CF del cliente, codice
+   destinatario o PEC, codice natura per le aliquote a 0%) e segnala cosa manca.
+2. **Scaricare l'XML** per caricarlo su un intermediario o sul portale del commercialista.
+3. **Trasmettere allo SDI via PEC**: usa le credenziali `EMAIL_*` del file `.env` (impostale
+   sulla casella PEC aziendale) e invia il file a `SDI_PEC_ADDRESS`
+   (predefinito `sdi01@pec.fatturapa.it`).
+4. **Aggiornare l'esito** (inviata, consegnata, accettata, scartata, mancata consegna) con
+   una nota, così hai lo storico sulla fattura.
+
+Impostazioni consigliate in `.env`: `EMAIL_HOST` = SMTP del provider PEC,
+`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD` = casella PEC, `DEFAULT_FROM_EMAIL` = indirizzo PEC.
+
+> Nota: la **conservazione sostitutiva a norma** (che tiene l'XML a valore legale per 10 anni)
+> va fatta con un conservatore accreditato (AgID) o tramite il vostro commercialista; il
+> gestionale genera e trasmette il file, non sostituisce il conservatore.
+
+## Webapp su telefono (PWA)
+
+Il gestionale è una **webapp installabile**, con interfaccia ottimizzata per il telefono
+(menu a scomparsa, tabelle scorrevoli, spaziature compatte, area sicura per i notch).
+
+- **Android (Chrome)**: apri il gestionale, menu ⋮ → **«Aggiungi a schermata Home»** /
+  «Installa app» (oppure usa la voce «Installa app sul telefono» nel menu utente).
+- **iPhone (Safari)**: Condividi → **«Aggiungi a Home»**.
+- All'apertura dalla home parte a pieno schermo, con icona dedicata; se manca la
+  connessione compare una pagina «Sei offline» con il tasto Riprova.
+
+L'installazione richiede **HTTPS** (con Caddy e dominio è automatico; `localhost` va bene
+per le prove).
 
 ## Avvio in locale (Windows / Linux / macOS)
 
@@ -334,10 +378,11 @@ python manage.py test apps
 ```
 
 Coprono il flusso completo (preventivo → ordine → ordine fornitore → ricezione →
-consegna), DDT e fatture emesse/ricevute, l'OCR dei documenti acquisiti, il calcolo di
-totali e IVA mista, l'adeguamento dei listini, l'importazione CSV/Excel, la creazione
-rapida, i modelli di preventivo, cantieri, manutenzioni, seriali, allegati, varianti,
-kit, sezioni, statistiche di marginalità, protezioni anti-abuso e permessi dei ruoli.
+consegna), DDT e fatture emesse/ricevute, email e XML FatturaPA (SDI), l'OCR dei documenti
+acquisiti, il calcolo di totali e IVA mista, l'adeguamento dei listini, l'importazione
+CSV/Excel, la creazione rapida, i modelli di preventivo, cantieri, manutenzioni, seriali,
+allegati, varianti, kit, sezioni, statistiche di marginalità, le PWA (manifest e service
+worker), le protezioni anti-abuso e i permessi dei ruoli.
 
 ## Prossime tappe suggerite
 

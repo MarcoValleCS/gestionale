@@ -32,6 +32,13 @@ BADGE_CLASSES = {
     "new": "info",
     "ok": "success",
     "error": "danger",
+    # Fatturazione elettronica
+    "generated": "info",
+    "delivered": "success",
+    "accepted": "success",
+    "rejected": "danger",
+    "failed": "danger",
+    "not_sent": "secondary",
 }
 
 

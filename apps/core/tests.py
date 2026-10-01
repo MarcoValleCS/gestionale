@@ -93,6 +93,28 @@ class DashboardParamsTest(TestCase):
         self.assertIn("page=2", html)
 
 
+class PwaTest(TestCase):
+    def test_manifest_disponibile_anche_da_anonimo(self):
+        response = self.client.get(reverse("core:manifest"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/manifest+json", response["Content-Type"])
+        content = response.content.decode()
+        self.assertIn("theme_color", content)
+        self.assertIn("icon-192.png", content)
+
+    def test_service_worker_alla_radice(self):
+        response = self.client.get(reverse("core:service_worker"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Service-Worker-Allowed"], "/")
+        self.assertIn("javascript", response["Content-Type"])
+        self.assertIn("CACHE_NAME", response.content.decode())
+
+    def test_pagina_offline(self):
+        response = self.client.get(reverse("core:offline"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sei offline")
+
+
 class AttachmentTest(TestCase):
     @classmethod
     def setUpClass(cls):

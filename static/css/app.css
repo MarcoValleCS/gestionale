@@ -535,6 +535,75 @@ a:hover {
   .app-main {
     margin-left: 0;
   }
+
+  .sidebar-backdrop.show {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1029;
+    background: rgba(15, 23, 42, 0.5);
+  }
+}
+
+/* ------------------------------------------------ rifiniture per telefono */
+@media (max-width: 767.98px) {
+  body {
+    font-size: 0.9rem;
+  }
+
+  .app-main > main {
+    padding: 1rem 0.75rem !important;
+  }
+
+  .topbar {
+    padding: 0.6rem 0.85rem;
+  }
+
+  .topbar h1 {
+    font-size: 1rem;
+  }
+
+  .card-body {
+    padding: 0.85rem;
+  }
+
+  .card-header {
+    padding: 0.7rem 0.85rem;
+  }
+
+  .kpi-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    border-radius: 11px;
+    font-size: 1.05rem;
+  }
+
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-dialog {
+    margin: 0.6rem;
+  }
+
+  .btn-group .btn {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+}
+
+@supports (padding: env(safe-area-inset-left)) {
+  @media (max-width: 767.98px) {
+    .topbar {
+      padding-left: max(0.85rem, env(safe-area-inset-left));
+      padding-right: max(0.85rem, env(safe-area-inset-right));
+    }
+  }
+}
+
+.sidebar-backdrop {
+  display: none;
 }
 
 /* -------------------------------------------------------------- stampa */

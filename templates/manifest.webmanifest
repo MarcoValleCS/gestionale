@@ -1,0 +1,17 @@
+{% load static %}{
+  "name": "{{ company.name|default:'Gestionale' }}",
+  "short_name": "{{ company.name|default:'Gestionale' }}",
+  "description": "Gestionale aziendale",
+  "lang": "it",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e1730",
+  "theme_color": "#2563eb",
+  "icons": [
+    {"src": "{% static 'icons/icon-192.png' %}", "sizes": "192x192", "type": "image/png"},
+    {"src": "{% static 'icons/icon-512.png' %}", "sizes": "512x512", "type": "image/png"},
+    {"src": "{% static 'icons/icon-maskable-512.png' %}", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

@@ -24,4 +24,8 @@ urlpatterns = [
     # Allegati
     path("allegati/carica/", views.attachment_upload, name="attachment_upload"),
     path("allegati/<int:pk>/elimina/", views.attachment_delete, name="attachment_delete"),
+    # Webapp (PWA)
+    path("manifest.webmanifest", views.manifest, name="manifest"),
+    path("sw.js", views.service_worker, name="service_worker"),
+    path("offline/", views.offline, name="offline"),
 ]

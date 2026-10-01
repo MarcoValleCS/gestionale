@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from .utils import format_quantity
 
-
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField("Creato il", auto_now_add=True)
     updated_at = models.DateTimeField("Aggiornato il", auto_now=True)
@@ -174,6 +173,24 @@ class CompanySettings(models.Model):
     name = models.CharField("Ragione sociale", max_length=200, default="La mia azienda")
     vat_number = models.CharField("Partita IVA", max_length=20, blank=True)
     tax_code = models.CharField("Codice fiscale", max_length=20, blank=True)
+    pec = models.EmailField("PEC", blank=True, help_text="Usata anche per l'invio delle fatture elettroniche allo SDI.")
+    fiscal_regime = models.CharField(
+        "Regime fiscale",
+        max_length=10,
+        default="RF01",
+        choices=[
+            ("RF01", "RF01 – Ordinario"),
+            ("RF02", "RF02 – Contribuenti minimi"),
+            ("RF04", "RF04 – Agricoltura e pesca"),
+            ("RF05", "RF05 – Vendita sali e tabacchi"),
+            ("RF15", "RF15 – Agenzie viaggi"),
+            ("RF16", "RF16 – Agenti e rappresentanti"),
+            ("RF17", "RF17 – Vendita porta a porta"),
+            ("RF18", "RF18 – Altri casi"),
+            ("RF19", "RF19 – Regime forfettario"),
+        ],
+        help_text="Serve per la fatturazione elettronica (campo RegimeFiscale).",
+    )
     address = models.CharField("Indirizzo", max_length=200, blank=True)
     zip_code = models.CharField("CAP", max_length=10, blank=True)
     city = models.CharField("Città", max_length=100, blank=True)

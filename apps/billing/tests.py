@@ -1,11 +1,15 @@
 """Test di DDT, fatture emesse/ricevute e acquisizione OCR."""
+import shutil
+import tempfile
 from datetime import date
 from decimal import Decimal
 from unittest import mock
+from xml.etree import ElementTree as ET
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from apps.catalog.models import Product
@@ -17,7 +21,7 @@ from apps.purchasing.models import PurchaseOrder
 from apps.sales import services as sales_services
 from apps.sales.models import SalesOrder
 
-from . import ocr, services
+from . import ocr, sdi, services
 from .models import DeliveryNote, PurchaseInvoice, SalesInvoice, ScannedDocument
 
 User = get_user_model()
@@ -200,6 +204,173 @@ class ScanWorkflowTest(BillingTestBase):
         scan = ScannedDocument.objects.get()
         self.assertEqual(scan.status, ScannedDocument.STATUS_ERROR)
         self.assertIn("OCR non disponibile", scan.error_message)
+
+
+class EmailAndSdiTest(BillingTestBase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_dir = tempfile.mkdtemp()
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_dir)
+        cls._media_override.enable()
+
+        # Dati azienda e cliente completi per la fatturazione elettronica
+        from apps.core.models import CompanySettings
+
+        company = CompanySettings.load()
+        company.vat_number = "01234567890"
+        company.tax_code = "01234567890"
+        company.address = "Via Test 1"
+        company.zip_code = "20100"
+        company.city = "Milano"
+        company.province = "MI"
+        company.pec = "azienda@pec.example.com"
+        company.save()
+
+        cls.customer.vat_number = "09876543210"
+        cls.customer.tax_code = "09876543210"
+        cls.customer.address = "Via Cliente 2"
+        cls.customer.zip_code = "10100"
+        cls.customer.city = "Torino"
+        cls.customer.province = "TO"
+        cls.customer.save()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_dir, ignore_errors=True)
+        super().tearDownClass()
+
+    def issued_invoice(self):
+        order = self.confirmed_order("2")
+        invoice = services.create_sales_invoice_from_order(order, user=self.user)
+        services.issue_sales_invoice(invoice)
+        return invoice
+
+    def test_composizione_xml_fatturapa(self):
+        invoice = self.issued_invoice()
+        self.customer.sdi_code = "ABC1234"
+        self.customer.save(update_fields=["sdi_code"])
+
+        xml = sdi.build_fattura_xml(invoice)
+        root = ET.fromstring(xml)
+        ns = {"f": sdi.NS}
+        self.assertEqual(root.tag, f"{{{sdi.NS}}}FatturaElettronica")
+        self.assertEqual(root.attrib["versione"], "FPR12")
+
+        codice = root.findtext("f:FatturaElettronicaHeader/f:DatiTrasmissione/f:CodiceDestinatario", namespaces=ns)
+        self.assertEqual(codice, "ABC1234")
+        denominazione = root.findtext(
+            "f:FatturaElettronicaHeader/f:CedentePrestatore/f:DatiAnagrafici/f:Anagrafica/f:Denominazione", namespaces=ns
+        )
+        self.assertEqual(denominazione, "La mia azienda")
+
+        body = "f:FatturaElettronicaBody"
+        self.assertEqual(
+            root.findtext(f"{body}/f:DatiGenerali/f:DatiGeneraliDocumento/f:Numero", namespaces=ns), invoice.number
+        )
+        self.assertEqual(
+            root.findtext(f"{body}/f:DatiGenerali/f:DatiGeneraliDocumento/f:ImportoTotaleDocumento", namespaces=ns),
+            "24.40",  # 20 + 22%
+        )
+        lines = root.findall(f"{body}/f:DatiBeniServizi/f:DettaglioLinee", namespaces=ns)
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0].findtext("f:AliquotaIVA", namespaces=ns), "22.00")
+        riepilogo = root.findall(f"{body}/f:DatiBeniServizi/f:DatiRiepilogo", namespaces=ns)
+        self.assertEqual(len(riepilogo), 1)
+        self.assertEqual(riepilogo[0].findtext("f:Imposta", namespaces=ns), "4.40")
+
+    def test_xml_segnala_dati_mancanti(self):
+        invoice = self.issued_invoice()
+        self.customer.sdi_code = ""
+        self.customer.pec = ""
+        self.customer.save(update_fields=["sdi_code", "pec"])
+        with self.assertRaises(ValidationError) as ctx:
+            sdi.build_fattura_xml(invoice)
+        self.assertTrue(any("codice destinatario" in message for message in ctx.exception.messages))
+
+    def test_xml_con_aliquota_esente(self):
+        vat_exempt = VatRate.objects.get(code="0")  # esente N1 dal seed
+        invoice = self.issued_invoice()
+        self.customer.sdi_code = "ABC1234"
+        self.customer.save(update_fields=["sdi_code"])
+        invoice.lines.create(
+            invoice=invoice, position=2, description="Voce esente", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=vat_exempt,
+        )
+        invoice.recalculate()
+        xml = sdi.build_fattura_xml(invoice)
+        root = ET.fromstring(xml)
+        ns = {"f": sdi.NS}
+        nature = root.findall(f"f:FatturaElettronicaBody/f:DatiBeniServizi/f:DettaglioLinee/f:Natura", namespaces=ns)
+        self.assertEqual(nature[0].text, "N1")
+
+    def test_invio_email_con_pdf(self):
+        invoice = self.issued_invoice()
+        self.login()
+        with override_settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", EMAIL_IS_CONFIGURED=True
+        ), mock.patch("apps.billing.emailing.render_invoice_pdf", return_value=b"%PDF-1.4 finto"):
+            response = self.client.post(
+                reverse("billing:salesinvoice_email", args=[invoice.pk]),
+                {"to": "cliente@example.com", "subject": "Fattura di prova", "message": "Buongiorno"},
+            )
+        self.assertEqual(response.status_code, 302)
+        from django.core import mail
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ["cliente@example.com"])
+        self.assertEqual(message.attachments[0][0], f"Fattura_{invoice.number}.pdf")
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, SalesInvoice.STATUS_SENT)
+
+    def test_invio_email_non_configurato(self):
+        invoice = self.issued_invoice()
+        self.login()
+        with override_settings(EMAIL_IS_CONFIGURED=False):
+            response = self.client.post(
+                reverse("billing:salesinvoice_email", args=[invoice.pk]),
+                {"to": "cliente@example.com", "subject": "x", "message": "y"},
+                follow=True,
+            )
+        self.assertContains(response, "Invio email non configurato")
+
+    def test_generazione_invio_sdi_e_esito(self):
+        invoice = self.issued_invoice()
+        self.customer.sdi_code = "ABC1234"
+        self.customer.save(update_fields=["sdi_code"])
+        self.login()
+
+        self.client.post(reverse("billing:salesinvoice_sdi_generate", args=[invoice.pk]))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.sdi_status, SalesInvoice.SDI_GENERATED)
+        self.assertTrue(invoice.xml_file.name.endswith(".xml"))
+
+        with override_settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", EMAIL_IS_CONFIGURED=True
+        ):
+            self.client.post(reverse("billing:salesinvoice_sdi_send", args=[invoice.pk]))
+        from django.core import mail
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to[0], "sdi01@pec.fatturapa.it")
+        self.assertTrue(mail.outbox[0].attachments[0][0].startswith("IT"))
+        self.assertIn("Fattura ABC1234", mail.outbox[0].subject)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.sdi_status, SalesInvoice.SDI_SENT)
+        self.assertIsNotNone(invoice.sdi_sent_at)
+
+        response = self.client.get(reverse("billing:salesinvoice_sdi_download", args=[invoice.pk]))
+        self.assertEqual(response.status_code, 200)
+
+        self.client.post(
+            reverse("billing:salesinvoice_sdi_status", args=[invoice.pk]),
+            {"sdi_status": "accepted", "sdi_note": "Ricevuta accettazione"},
+        )
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.sdi_status, "accepted")
+        self.assertEqual(invoice.sdi_note, "Ricevuta accettazione")
 
 
 class BillingPagesSmokeTest(BillingTestBase):

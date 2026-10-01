@@ -78,6 +78,8 @@ class CompanySettingsForm(BaseBootstrapModelForm):
             "name",
             "vat_number",
             "tax_code",
+            "pec",
+            "fiscal_regime",
             "address",
             "zip_code",
             "city",

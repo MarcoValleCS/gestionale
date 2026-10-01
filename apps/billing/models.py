@@ -128,6 +128,29 @@ class SalesInvoice(TotalsDocument, TimeStampedModel):
     issued_at = models.DateTimeField("Emessa il", null=True, blank=True)
     sent_at = models.DateTimeField("Inviata il", null=True, blank=True)
     paid_at = models.DateTimeField("Pagata il", null=True, blank=True)
+
+    # Fatturazione elettronica
+    SDI_NOT_SENT = "not_sent"
+    SDI_GENERATED = "generated"
+    SDI_SENT = "sent"
+    SDI_DELIVERED = "delivered"
+    SDI_ACCEPTED = "accepted"
+    SDI_REJECTED = "rejected"
+    SDI_FAILED = "failed"
+    SDI_STATUS_CHOICES = [
+        (SDI_NOT_SENT, "Non inviata"),
+        (SDI_GENERATED, "XML generato"),
+        (SDI_SENT, "Inviata allo SDI"),
+        (SDI_DELIVERED, "Consegnata"),
+        (SDI_ACCEPTED, "Accettata"),
+        (SDI_REJECTED, "Scartata"),
+        (SDI_FAILED, "Mancata consegna"),
+    ]
+    xml_file = models.FileField("File XML (FatturaPA)", upload_to="sdi/%Y/", blank=True)
+    sdi_status = models.CharField("Stato SDI", max_length=20, choices=SDI_STATUS_CHOICES, default=SDI_NOT_SENT)
+    sdi_sent_at = models.DateTimeField("Inviata allo SDI il", null=True, blank=True)
+    sdi_note = models.CharField("Esito / nota SDI", max_length=300, blank=True)
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="sales_invoices", verbose_name="Creato da"
     )

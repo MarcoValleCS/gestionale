@@ -52,6 +52,23 @@ ABUSE_THROTTLE = {
 # OCR dei documenti acquisiti (DDT/fatture): lingue di Tesseract
 OCR_LANGUAGES = env("OCR_LANGUAGES", "ita+eng")
 
+# ------------------------------------------------------------ Email (SMTP)
+# Usata per inviare fatture/preventivi; per lo SDI va bene la casella PEC.
+EMAIL_HOST = env("EMAIL_HOST", "")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Gestionale <no-reply@example.com>")
+EMAIL_IS_CONFIGURED = bool(EMAIL_HOST)
+if not EMAIL_HOST:
+    # In sviluppo (o senza SMTP configurato) le email finiscono nei log del server
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# ------------------------------------------------ Fatturazione elettronica
+SDI_PEC_ADDRESS = env("SDI_PEC_ADDRESS", "sdi01@pec.fatturapa.it")
+
 # ------------------------------------------------------------------- App
 INSTALLED_APPS = [
     "django.contrib.admin",

@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum
 from django.forms import modelformset_factory
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -12,7 +13,7 @@ from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, R
 from apps.contacts.models import Contact
 from apps.sales.views import build_print_context, fdate, save_document_lines, with_vat_rates
 
-from . import ocr, services
+from . import emailing, ocr, pdf, sdi, services
 from .forms import (
     DeliveryNoteForm,
     DeliveryNoteLineForm,
@@ -317,6 +318,12 @@ class SalesInvoiceDetailView(RoleRequiredMixin, DetailView):
 
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
+        from django.conf import settings as django_settings
+
+        context["email_configured"] = emailing.email_configured()
+        context["pdf_available"] = pdf.pdf_available()
+        context["sdi_statuses"] = SalesInvoice.SDI_STATUS_CHOICES
+        context["sdi_pec_address"] = django_settings.SDI_PEC_ADDRESS
         return context
 
 
@@ -481,6 +488,92 @@ def salesinvoice_delete(request, pk):
             invoice.delete()
             messages.success(request, f"Fattura {number} eliminata.")
             return redirect("billing:salesinvoice_list")
+    return redirect("billing:salesinvoice_detail", pk=invoice.pk)
+
+
+@role_required(*SALES_INVOICE_ROLES)
+def salesinvoice_email(request, pk):
+    """Invia la fattura per email (con PDF in allegato se disponibile)."""
+    invoice = get_object_or_404(SalesInvoice.objects.select_related("customer"), pk=pk)
+    if request.method == "POST":
+        to_email = (request.POST.get("to") or invoice.customer.email or "").strip()
+        subject = (request.POST.get("subject") or f"Fattura {invoice.number}").strip()
+        message_body = (request.POST.get("message") or "").strip()
+
+        if not to_email:
+            messages.error(request, "Indica l'indirizzo email del cliente.")
+        elif not emailing.email_configured():
+            messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        elif invoice.status == SalesInvoice.STATUS_DRAFT:
+            messages.error(request, "Emetti prima la fattura, poi inviala al cliente.")
+        else:
+            try:
+                pdf_attached = emailing.send_invoice_email(invoice, to_email=to_email, subject=subject, message=message_body)
+            except Exception as exc:
+                messages.error(request, f"Invio non riuscito: {exc}")
+            else:
+                if invoice.status == SalesInvoice.STATUS_ISSUED:
+                    services.mark_sales_invoice_sent(invoice)
+                extra = "" if pdf_attached else " (senza allegato PDF: non disponibile su questo sistema)"
+                messages.success(request, f"Fattura {invoice.number} inviata a {to_email}{extra}.")
+    return redirect("billing:salesinvoice_detail", pk=invoice.pk)
+
+
+@role_required(*SALES_INVOICE_ROLES)
+def salesinvoice_sdi_generate(request, pk):
+    invoice = get_object_or_404(SalesInvoice, pk=pk)
+    if request.method == "POST":
+        try:
+            sdi.save_invoice_xml(invoice)
+        except ValidationError as exc:
+            for error in exc.messages:
+                messages.error(request, error)
+        else:
+            messages.success(request, f"XML FatturaPA generato per la fattura {invoice.number}.")
+    return redirect("billing:salesinvoice_detail", pk=invoice.pk)
+
+
+@role_required(*SALES_INVOICE_ROLES)
+def salesinvoice_sdi_download(request, pk):
+    invoice = get_object_or_404(SalesInvoice, pk=pk)
+    if not invoice.xml_file:
+        messages.error(request, "Genera prima l'XML della fattura.")
+        return redirect("billing:salesinvoice_detail", pk=invoice.pk)
+    filename = invoice.xml_file.name.rsplit("/", 1)[-1]
+    return FileResponse(invoice.xml_file.open("rb"), as_attachment=True, filename=filename, content_type="application/xml")
+
+
+@role_required(*SALES_INVOICE_ROLES)
+def salesinvoice_sdi_send(request, pk):
+    invoice = get_object_or_404(SalesInvoice, pk=pk)
+    if request.method == "POST":
+        try:
+            sdi.send_invoice_sdi(invoice)
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        except Exception as exc:
+            messages.error(request, f"Invio allo SDI non riuscito: {exc}")
+        else:
+            messages.success(
+                request,
+                f"Fattura {invoice.number} trasmessa allo SDI via PEC. Quando arrivano le ricevute, aggiorna l'esito qui sotto.",
+            )
+    return redirect("billing:salesinvoice_detail", pk=invoice.pk)
+
+
+@role_required(*SALES_INVOICE_ROLES)
+def salesinvoice_sdi_status(request, pk):
+    invoice = get_object_or_404(SalesInvoice, pk=pk)
+    if request.method == "POST":
+        new_status = request.POST.get("sdi_status")
+        valid = dict(SalesInvoice.SDI_STATUS_CHOICES)
+        if new_status not in valid:
+            messages.error(request, "Stato SDI non valido.")
+        else:
+            invoice.sdi_status = new_status
+            invoice.sdi_note = (request.POST.get("sdi_note") or "")[:300]
+            invoice.save(update_fields=["sdi_status", "sdi_note", "updated_at"])
+            messages.success(request, f"Esito SDI aggiornato: {valid[new_status]}.")
     return redirect("billing:salesinvoice_detail", pk=invoice.pk)
 
 

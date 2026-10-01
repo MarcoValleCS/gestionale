@@ -139,6 +139,99 @@
         </dl>
       </div>
     </div>
+
+    <div class="card mb-3 no-print">
+      <div class="card-header"><i class="bi bi-envelope me-1"></i> Invia al cliente</div>
+      <div class="card-body">
+        {% if not email_configured %}
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="bi bi-exclamation-triangle"></i> Invio email non configurato: imposta le variabili <code>EMAIL_*</code> nel file <code>.env</code>.
+        </div>
+        {% endif %}
+        <form method="post" action="{% url 'billing:salesinvoice_email' invoice.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label" for="email-to">Email del cliente</label>
+            <input class="form-control form-control-sm" type="email" id="email-to" name="to" value="{{ invoice.customer.email }}" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="email-subject">Oggetto</label>
+            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="Fattura {{ invoice.number }} – {{ company.name }}">
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="email-message">Messaggio</label>
+            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="5">Buongiorno,
+in allegato la fattura {{ invoice.number }} del {{ invoice.date|date:"d/m/Y" }} di {{ invoice.grand_total|money }} €.
+
+Cordiali saluti
+{{ company.name }}</textarea>
+          </div>
+          <button class="btn btn-outline-primary btn-sm w-100" type="submit" {% if invoice.status == "draft" %}disabled title="Emetti prima la fattura"{% endif %}>
+            <i class="bi bi-send"></i> Invia la fattura
+          </button>
+          <p class="text-muted small mt-2 mb-0">
+            {% if pdf_available %}La fattura viaggia in allegato PDF.{% else %}PDF non disponibile su questo sistema: l'email partirà senza allegato (puoi salvare il PDF dal browser con «Stampa / PDF»).{% endif %}
+          </p>
+        </form>
+      </div>
+    </div>
+
+    <div class="card no-print">
+      <div class="card-header"><i class="bi bi-cloud-arrow-up me-1"></i> Fattura elettronica (SDI)</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small">Stato SDI</span>
+          <span class="badge text-bg-{{ invoice.sdi_status|badge_class }}">{{ invoice.get_sdi_status_display }}</span>
+        </div>
+        <dl class="row mb-3 small">
+          <dt class="col-6 text-muted">Codice destinatario</dt><dd class="col-6">{{ invoice.customer.sdi_code|default:"—" }}</dd>
+          <dt class="col-6 text-muted">PEC destinatario</dt><dd class="col-6">{{ invoice.customer.pec|default:"—" }}</dd>
+          {% if invoice.sdi_sent_at %}<dt class="col-6 text-muted">Trasmessa il</dt><dd class="col-6">{{ invoice.sdi_sent_at|date:"d/m/Y H:i" }}</dd>{% endif %}
+          {% if invoice.sdi_note %}<dt class="col-6 text-muted">Nota</dt><dd class="col-6">{{ invoice.sdi_note }}</dd>{% endif %}
+        </dl>
+        <div class="d-flex gap-2 flex-wrap mb-3">
+          <form method="post" action="{% url 'billing:salesinvoice_sdi_generate' invoice.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-primary btn-sm" type="submit" {% if invoice.status == "draft" %}disabled title="Emetti prima la fattura"{% endif %}>
+              <i class="bi bi-filetype-xml"></i> Genera XML
+            </button>
+          </form>
+          {% if invoice.xml_file %}
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_sdi_download' invoice.pk %}">
+            <i class="bi bi-download"></i> Scarica XML
+          </a>
+          {% endif %}
+          <form method="post" action="{% url 'billing:salesinvoice_sdi_send' invoice.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-primary btn-sm" type="submit" {% if invoice.status == "draft" %}disabled title="Emetti prima la fattura"{% endif %}
+                        onclick="return confirm('Trasmettere la fattura allo SDI via PEC?');">
+              <i class="bi bi-send-check"></i> Invia allo SDI
+            </button>
+          </form>
+        </div>
+        <form method="post" action="{% url 'billing:salesinvoice_sdi_status' invoice.pk %}" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <div class="col-7">
+            <label class="form-label" for="sdi-status">Aggiorna esito</label>
+            <select class="form-select form-select-sm" id="sdi-status" name="sdi_status">
+              {% for value, label in sdi_statuses %}
+              <option value="{{ value }}" {% if invoice.sdi_status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-5">
+            <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Aggiorna</button>
+          </div>
+          <div class="col-12">
+            <input class="form-control form-control-sm" type="text" name="sdi_note" placeholder="Nota (es. scartata: codice destinatario errato)" value="{{ invoice.sdi_note }}">
+          </div>
+        </form>
+        <p class="text-muted small mt-2 mb-0">
+          «Invia allo SDI» trasmette l'XML via PEC a <code>{{ sdi_pec_address }}</code> usando le credenziali <code>EMAIL_*</code>.
+          Le ricevute arrivano sulla casella PEC: aggiorna qui l'esito.
+        </p>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

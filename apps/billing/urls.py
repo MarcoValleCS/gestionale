@@ -26,6 +26,12 @@ urlpatterns = [
     path("fatture/emesse/<int:pk>/inviata/", views.salesinvoice_send, name="salesinvoice_send"),
     path("fatture/emesse/<int:pk>/pagata/", views.salesinvoice_pay, name="salesinvoice_pay"),
     path("fatture/emesse/<int:pk>/elimina/", views.salesinvoice_delete, name="salesinvoice_delete"),
+    # Email e fatturazione elettronica
+    path("fatture/emesse/<int:pk>/email/", views.salesinvoice_email, name="salesinvoice_email"),
+    path("fatture/emesse/<int:pk>/sdi/genera/", views.salesinvoice_sdi_generate, name="salesinvoice_sdi_generate"),
+    path("fatture/emesse/<int:pk>/sdi/scarica/", views.salesinvoice_sdi_download, name="salesinvoice_sdi_download"),
+    path("fatture/emesse/<int:pk>/sdi/invia/", views.salesinvoice_sdi_send, name="salesinvoice_sdi_send"),
+    path("fatture/emesse/<int:pk>/sdi/esito/", views.salesinvoice_sdi_status, name="salesinvoice_sdi_status"),
     # Fatture ricevute
     path("fatture/ricevute/", views.PurchaseInvoiceListView.as_view(), name="purchaseinvoice_list"),
     path("fatture/ricevute/nuova/", views.PurchaseInvoiceCreateView.as_view(), name="purchaseinvoice_create"),
