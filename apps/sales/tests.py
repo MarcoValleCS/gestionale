@@ -5,17 +5,19 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from datetime import timedelta
 
 from apps.catalog.models import Category, Product
 from apps.contacts.models import Contact
 from apps.core.models import CompanySettings, Tag, UnitOfMeasure, VatRate
 from apps.inventory.models import StockLevel, Warehouse
 from apps.inventory.services import register_movement
+from apps.jobs.models import Job
 from apps.purchasing.models import PurchaseOrder, SupplierPriceList, PriceListItem
 from apps.purchasing.services import apply_pricelist_adjustment
 
 from . import analytics, services
-from .models import Quote, QuoteTemplate, SalesOrder
+from .models import Quote, QuoteTemplate, SalesOrder, group_lines_by_section
 
 User = get_user_model()
 
@@ -168,6 +170,37 @@ class FullFlowTest(FlowTestBase):
         self.assertEqual(new_quote.grand_total, quote.grand_total)
         self.assertEqual(new_quote.lines.count(), 1)
 
+    def test_conferma_con_riordino_scorte(self):
+        # min_stock = 20, ordine 10, giacenza 0 → il riordino porta a 20
+        order = SalesOrder.objects.create(customer=self.customer)
+        order.lines.create(product=self.product, description="x", qty=Decimal("10"), uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22)
+        order.recalculate()
+        result = services.confirm_sales_order(order, user=self.user, replenish=True)
+        po = result["purchase_orders"][0]
+        self.assertEqual(po.lines.get().qty, Decimal("20"))
+
+    def test_ordine_fornitore_usa_giorni_consegna(self):
+        self.product.supplier_lead_days = 5
+        self.product.save(update_fields=["supplier_lead_days"])
+        order = SalesOrder.objects.create(customer=self.customer)
+        order.lines.create(product=self.product, description="x", qty=Decimal("3"), uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22)
+        order.recalculate()
+        result = services.confirm_sales_order(order, user=self.user)
+        po = result["purchase_orders"][0]
+        self.assertEqual(po.expected_date, timezone.localdate() + timedelta(days=5))
+
+    def test_raggruppamento_per_sezioni(self):
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(section="Bagno 1", product=self.product, description="a", qty=Decimal("2"), uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22)
+        quote.lines.create(section="Bagno 1", product=self.product, description="b", qty=Decimal("1"), uom=self.uom, unit_price=Decimal("5"), vat_rate=self.vat22)
+        quote.lines.create(section="Bagno 2", product=self.product, description="c", qty=Decimal("1"), uom=self.uom, unit_price=Decimal("100"), vat_rate=self.vat22)
+        groups = group_lines_by_section(quote.lines.order_by("position", "pk"))
+        self.assertEqual(len(groups), 2)
+        self.assertEqual(groups[0]["section"], "Bagno 1")
+        self.assertEqual(groups[0]["subtotal"], Decimal("25.00"))
+        self.assertEqual(groups[1]["subtotal"], Decimal("100.00"))
+        self.assertEqual(groups[1]["lines"][0].row_number, 3)
+
 
 class AnalyticsTest(FlowTestBase):
     def _delivered_order(self, qty="10", price="10.00", unit_cost="4.00"):
@@ -238,6 +271,35 @@ class AnalyticsTest(FlowTestBase):
                 response = self.client.get(reverse("core:home") + f"?periodo={period}")
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, "Marginalità per articolo")
+                self.assertContains(response, "Fatturato per cliente")
+
+    def test_fatturato_per_cliente_e_per_cantiere(self):
+        job = Job.objects.create(name="Piscina Rossi", customer=self.customer)
+        order = self._delivered_order()
+        order.job = job
+        order.save(update_fields=["job"])
+
+        by_customer = analytics.by_customer(analytics.PERIOD_YEAR)
+        self.assertEqual(by_customer[0]["label"], "Cliente Test S.r.l.")
+        self.assertEqual(by_customer[0]["revenue"], Decimal("100.00"))
+
+        by_job = analytics.by_job(analytics.PERIOD_YEAR)
+        self.assertEqual(len(by_job), 1)
+        self.assertIn("Piscina Rossi", by_job[0]["label"])
+        self.assertEqual(by_job[0]["margin"], Decimal("60.00"))
+
+    def test_serie_mensile_finestra_e_periodo_precedente(self):
+        self._delivered_order()
+        series = analytics.monthly_series(3)
+        self.assertEqual(len(series["labels"]), 3)
+        self.assertEqual(len(series["rows"]), 3)
+        self.assertEqual(series["revenue"][-1], 100.0)
+        self.assertEqual(series["rows"][-1]["revenue"], Decimal("100.00"))
+
+        previous = analytics.monthly_series(3, end_offset=1)
+        self.assertEqual(len(previous["labels"]), 3)
+        self.assertEqual(previous["revenue"][-1], 0.0)
+        self.assertNotEqual(previous["labels"], series["labels"])
 
 
 class QuoteTemplateTest(FlowTestBase):

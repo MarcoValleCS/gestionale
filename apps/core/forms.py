@@ -1,7 +1,7 @@
 """Form condivisi: mixin Bootstrap e form di impostazione."""
 from django import forms
 
-from .models import CompanySettings, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .models import Attachment, CompanySettings, PaymentTerm, Tag, UnitOfMeasure, VatRate
 
 
 def active_units():
@@ -96,3 +96,11 @@ class CompanySettingsForm(BaseBootstrapModelForm):
         super().__init__(*args, **kwargs)
         self.fields["document_color"].widget.attrs["type"] = "color"
         self.fields["document_color"].widget.attrs["class"] = "form-control form-control-color"
+
+
+class AttachmentForm(BaseBootstrapModelForm):
+    class Meta:
+        model = Attachment
+        fields = ["file", "name", "notes"]
+        labels = {"file": "File", "name": "Nome (facoltativo)", "notes": "Note"}
+        help_texts = {"name": "Se vuoto viene usato il nome del file."}

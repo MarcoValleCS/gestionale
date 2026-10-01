@@ -27,12 +27,32 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   rettifiche), evidenza degli articoli **sotto scorta**, rettifica di inventario.
 - **Ordini fornitore** – manuali o generati dagli ordini cliente, invio/conferma,
   **ricezione merce** (anche parziale) con carico automatico a magazzino, **stampa
-  ordine fornitore** da inviare al fornitore.
+  ordine fornitore** da inviare al fornitore. Alla conferma dell'ordine cliente puoi
+  anche **riordinare le scorte** sotto il minimo con un clic.
+- **Cantieri/commesse** – raggruppano preventivi, ordini, ordini fornitore, manutenzioni,
+  seriali e allegati di un lavoro (es. una piscina), con stato, responsabile, date e indirizzo.
+- **Manutenzioni programmate** – canoni e interventi ricorrenti (apertura/chiusura piscina,
+  tagliandi): promemoria in dashboard a 30 giorni, «Eseguita» calcola la prossima scadenza,
+  «Preventivo» crea il preventivo dal modello collegato.
+- **Seriali e garanzie** – registro dei numeri di serie installati (pompe, filtri, robot) con
+  cliente, cantiere, data di installazione e garanzia (stato in garanzia/scaduta).
+- **Allegati** – carica foto, schede tecniche e documenti su articoli e cantieri; i file sono
+  serviti solo agli utenti autenticati.
+- **Varianti articolo** – genera le versioni colore/finitura di un articolo in un clic
+  (ogni variante ha codice, giacenza e prezzi propri).
+- **Kit/composizioni** – articoli che raggruppano componenti (es. mobile + lavabo + specchio):
+  nel preventivo si espandono da soli con i componenti a prezzo zero, così magazzino e ordini
+  fornitore lavorano sui componenti reali.
+- **Sezioni nei documenti** – righe raggruppabili per ambiente o fase («Bagno 1», «Scavo»,
+  «Finiture») con subtotale per sezione in schermo e in stampa.
+- **Sconto abituale cliente** – percentuale proposta automaticamente nelle righe di
+  preventivi e ordini.
 - **Listini fornitori** – prezzo e sconto per articolo, validità temporale e
   **adeguamento percentuale di tutto il listino** (es. +3%) con storico delle variazioni.
 - **Dashboard** – fatturato, margine e marginalità % del periodo (mese, anno, ultimi 12
-  mesi), grafico fatturato/margine per mese, **marginalità per articolo e per fornitore**,
-  valore del magazzino, articoli sotto scorta e ultimi documenti.
+  mesi), **grafico navigabile** (1/3/6/12 mesi, torna al periodo precedente) con dettaglio
+  mese per mese, **marginalità per articolo, fornitore, cliente e cantiere**, valore del
+  magazzino, articoli sotto scorta, manutenzioni in scadenza e ultimi documenti.
 - **Utenti e ruoli** – Amministratore, Vendite, Acquisti, Magazzino, con pagine e azioni
   filtrate per ruolo. Utenti gestibili dall'interfaccia.
 - **Creazione rapida e ricerca a digitazione** – nei documenti clienti, fornitori e articoli
@@ -176,8 +196,9 @@ docker compose logs -f web
 ```
 
 - Con un **dominio** configurato in `.env` (`DOMAIN`, `DJANGO_ALLOWED_HOSTS`,
-  `DJANGO_CSRF_TRUSTED_ORIGINS`): Caddy ottiene il certificato HTTPS in automatico e serve
-  anche i file caricati (logo).
+  `DJANGO_CSRF_TRUSTED_ORIGINS`): Caddy ottiene il certificato HTTPS in automatico.
+- I **file caricati** (logo, allegati) sono serviti da Django **solo agli utenti
+  autenticati**; Caddy non li espone direttamente.
 - Con il **solo IP**: imposta `DOMAIN=<ip-del-vps>` e `DJANGO_ALLOWED_HOSTS=<ip>`; si
   accede via `http://<ip>` (senza certificato).
 - Il primo utente amministratore viene creato automaticamente dalle variabili
@@ -278,6 +299,7 @@ apps/
   inventory/            giacenze e movimenti di magazzino
   sales/                preventivi, ordini cliente, statistiche (fatturato/marginalità)
   purchasing/           ordini fornitore e listini
+  jobs/                 cantieri, manutenzioni programmate, seriali/garanzie
 templates/              interfaccia (Bootstrap 5, in italiano) e documenti stampabili
 static/js/quick_create.js   creazione al volo di contatti e articoli
 static/js/autocomplete.js   ricerca a digitazione
@@ -295,8 +317,9 @@ python manage.py test apps
 
 Coprono il flusso completo (preventivo → ordine → ordine fornitore → ricezione →
 consegna), il calcolo di totali e IVA mista, l'adeguamento dei listini, l'importazione
-CSV/Excel, la creazione rapida, i modelli di preventivo, le statistiche di marginalità,
-le protezioni anti-abuso e i permessi dei ruoli.
+CSV/Excel, la creazione rapida, i modelli di preventivo, cantieri, manutenzioni, seriali,
+allegati, varianti, kit, sezioni, statistiche di marginalità, protezioni anti-abuso e
+permessi dei ruoli.
 
 ## Prossime tappe suggerite
 

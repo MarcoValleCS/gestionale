@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Cantieri{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Nome, codice o città…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="stato">Stato</label>
+        <select class="form-select form-select-sm" id="stato" name="stato">
+          <option value="">Tutti</option>
+          <option value="aperti" {% if status == "aperti" %}selected{% endif %}>Aperti</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="cliente">Cliente</label>
+        <select class="form-select form-select-sm" id="cliente" name="cliente">
+          <option value="">Tutti</option>
+          {% for customer in customers %}
+          <option value="{{ customer.pk }}" {% if customer_id == customer.pk|stringformat:"s" %}selected{% endif %}>{{ customer.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_sales %}
+        <a class="btn btn-primary btn-sm" href="{% url 'jobs:job_create' %}"><i class="bi bi-plus-lg"></i> Nuovo cantiere</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Cantiere</th>
+          <th>Cliente</th>
+          <th>Città</th>
+          <th>Responsabile</th>
+          <th class="text-center">Inizio</th>
+          <th class="text-center">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td class="text-muted number-badge">{{ job.code }}</td>
+          <td><a class="fw-semibold text-decoration-none" href="{% url 'jobs:job_detail' job.pk %}">{{ job.name }}</a></td>
+          <td>{{ job.customer.name }}</td>
+          <td>{{ job.city|default:"—" }}</td>
+          <td>{{ job.manager|default:"—" }}</td>
+          <td class="text-center">{{ job.start_date|date:"d/m/Y"|default:"—" }}</td>
+          <td class="text-center"><span class="badge text-bg-{{ job.status|badge_class }}">{{ job.get_status_display }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          Nessun cantiere trovato. I cantieri raggruppano preventivi, ordini, manutenzioni e seriali di un lavoro (es. una piscina).
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

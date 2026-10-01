@@ -43,6 +43,10 @@
           <label class="form-check-label" for="sotto_scorta">Solo sotto scorta</label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="principali" name="principali" value="1" {% if main_only %}checked{% endif %}>
+          <label class="form-check-label" for="principali">Solo articoli principali (senza varianti)</label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" id="inattivi" name="inattivi" value="1" {% if show_inactive %}checked{% endif %}>
           <label class="form-check-label" for="inattivi">Mostra disattivati</label>
         </div>

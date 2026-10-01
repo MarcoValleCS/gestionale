@@ -1,6 +1,7 @@
 """Modelli di base: unità di misura, IVA, etichette, pagamenti, numerazioni."""
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
@@ -201,3 +202,50 @@ class CompanySettings(models.Model):
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class Attachment(TimeStampedModel):
+    """Allegato su articolo o cantiere (schede tecniche, foto, documenti)."""
+
+    name = models.CharField("Nome", max_length=150, blank=True)
+    file = models.FileField("File", upload_to="attachments/%Y/%m/")
+    notes = models.CharField("Note", max_length=200, blank=True)
+    product = models.ForeignKey(
+        "catalog.Product", on_delete=models.CASCADE, null=True, blank=True, related_name="attachments", verbose_name="Articolo"
+    )
+    job = models.ForeignKey(
+        "jobs.Job", on_delete=models.CASCADE, null=True, blank=True, related_name="attachments", verbose_name="Cantiere"
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="attachments", verbose_name="Caricato da"
+    )
+
+    class Meta:
+        verbose_name = "Allegato"
+        verbose_name_plural = "Allegati"
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(product__isnull=False) | models.Q(job__isnull=False),
+                name="attachment_has_target",
+            )
+        ]
+
+    def __str__(self):
+        return self.name or self.file.name
+
+    def save(self, *args, **kwargs):
+        if not self.name and self.file:
+            self.name = self.file.name.rsplit("/", 1)[-1]
+        return super().save(*args, **kwargs)
+
+    @property
+    def is_image(self):
+        return self.file.name.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
+
+    @property
+    def size_kb(self):
+        try:
+            return round(self.file.size / 1024, 1)
+        except Exception:
+            return None

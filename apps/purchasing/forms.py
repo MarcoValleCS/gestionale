@@ -44,11 +44,21 @@ class PriceListAdjustForm(BootstrapFormMixin, forms.Form):
 class PurchaseOrderForm(PurchaseSupplierFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = PurchaseOrder
-        fields = ["supplier", "date", "expected_date", "payment_term", "notes"]
+        fields = ["supplier", "job", "date", "expected_date", "payment_term", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_supplier_queryset()
+        from apps.jobs.models import Job
+
+        self.fields["job"].queryset = (
+            Job.objects.exclude(status__in=[Job.STATUS_CLOSED, Job.STATUS_CANCELLED])
+            .select_related("customer")
+            .order_by("-created_at")
+        )
+        self.fields["job"].label_from_instance = lambda obj: f"{obj.code} – {obj.name} ({obj.customer.name})"
+        self.fields["job"].required = False
+        self.fields["job"].help_text = "Facoltativo: collega l'ordine al cantiere/commessa."
 
 
 class PurchaseOrderLineForm(LineFormMixin, BaseBootstrapModelForm):
@@ -56,7 +66,7 @@ class PurchaseOrderLineForm(LineFormMixin, BaseBootstrapModelForm):
 
     class Meta:
         model = PurchaseOrderLine
-        fields = ["product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

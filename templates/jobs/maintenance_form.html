@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">{{ page_title }}</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% include "partials/form_fields.html" %}
+          <div class="alert alert-info py-2 small">
+            Con «Crea preventivo» (dalla lista) nascerà un preventivo in bozza con le righe del modello scelto;
+            con «Eseguita» la prossima scadenza viene calcolata automaticamente in base alla frequenza.
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+            <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

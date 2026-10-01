@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .models import Attachment, CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+
+
+@admin.register(Attachment)
+class AttachmentAdmin(admin.ModelAdmin):
+    list_display = ("name", "product", "job", "uploaded_by", "created_at")
+    search_fields = ("name", "product__code", "job__code")
 
 
 @admin.register(VatRate)

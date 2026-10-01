@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Manutenzioni programmate{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Manutenzione o cliente…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="stato">Mostra</label>
+        <select class="form-select form-select-sm" id="stato" name="stato" onchange="this.form.submit()">
+          <option value="attive" {% if status == "attive" %}selected{% endif %}>Attive</option>
+          <option value="scadenza" {% if status == "scadenza" %}selected{% endif %}>In scadenza (30 giorni)</option>
+          <option value="disattive" {% if status == "disattive" %}selected{% endif %}>Disattivate</option>
+          <option value="tutte" {% if status == "tutte" %}selected{% endif %}>Tutte</option>
+        </select>
+      </div>
+      <div class="col-md-5 d-flex gap-2 justify-content-end align-items-center">
+        {% if due_count %}
+        <span class="badge text-bg-warning">{{ due_count }} in scadenza</span>
+        {% endif %}
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
+        <a class="btn btn-primary btn-sm" href="{% url 'jobs:maintenance_create' %}"><i class="bi bi-plus-lg"></i> Nuova manutenzione</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Manutenzione</th>
+          <th>Cliente</th>
+          <th>Cantiere</th>
+          <th>Frequenza</th>
+          <th class="text-center">Prossima esecuzione</th>
+          <th class="text-center">Stato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in plans %}
+        <tr>
+          <td>
+            <a class="fw-semibold text-decoration-none" href="{% url 'jobs:maintenance_update' plan.pk %}">{{ plan.name }}</a>
+            {% if plan.template %}<div class="small text-muted">Modello: {{ plan.template.name }}</div>{% endif %}
+          </td>
+          <td>{{ plan.customer.name }}</td>
+          <td>{% if plan.job %}<a href="{% url 'jobs:job_detail' plan.job.pk %}">{{ plan.job.code }}</a>{% else %}—{% endif %}</td>
+          <td>{{ plan.get_frequency_display }}</td>
+          <td class="text-center {% if plan.is_overdue %}text-danger fw-semibold{% elif plan.is_due %}text-warning fw-semibold{% endif %}">
+            {{ plan.next_date|date:"d/m/Y" }}
+          </td>
+          <td class="text-center">
+            {% if not plan.active %}<span class="badge text-bg-secondary">Disattivata</span>
+            {% elif plan.is_overdue %}<span class="badge text-bg-danger">Scaduta</span>
+            {% elif plan.is_due %}<span class="badge text-bg-warning">In scadenza</span>
+            {% else %}<span class="badge text-bg-success">Attiva</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
+            <form class="d-inline" method="post" action="{% url 'jobs:maintenance_create_quote' plan.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-outline-primary btn-sm" type="submit" title="Crea un preventivo dal modello"><i class="bi bi-file-earmark-plus"></i> Preventivo</button>
+            </form>
+            <form class="d-inline" method="post" action="{% url 'jobs:maintenance_advance' plan.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-outline-success btn-sm" type="submit" title="Segna come eseguita e calcola la prossima scadenza"><i class="bi bi-check-lg"></i> Eseguita</button>
+            </form>
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:maintenance_update' plan.pk %}"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{% url 'jobs:maintenance_delete' plan.pk %}" onsubmit="return confirm('Eliminare la manutenzione «{{ plan.name }}»?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          Nessuna manutenzione. Creane una per ogni cliente con canone o apertura/chiusura piscina: comparirà in dashboard quando è in scadenza.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

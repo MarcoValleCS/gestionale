@@ -92,8 +92,28 @@
         const vat = row.querySelector('[name$="-vat_rate"]');
         if (vat && data.vat_id) vat.value = data.vat_id;
         recalc();
+        if (data.components && data.components.length) {
+          expandKit(row, productSelect, data.components);
+        }
       })
       .catch(function () { /* ignora errori di rete */ });
+  }
+
+  /* Kit/composizione: aggiunge sotto la riga i componenti (a prezzo zero,
+     così il prezzo del kit resta quello della riga principale). */
+  function expandKit(row, productSelect, components) {
+    const marker = String(productSelect.value);
+    if (row.dataset.kitExpanded === marker) return;
+    row.dataset.kitExpanded = marker;
+    components.forEach(function (component) {
+      addRow({
+        product: component.id,
+        productLabel: component.label,
+        description: component.description,
+        qty: component.qty,
+        unitPrice: "0",
+      });
+    });
   }
 
   function bindRow(row) {
@@ -163,8 +183,35 @@
     totalFormsInput.value = index + 1;
     bindRow(row);
     if (values) fillRow(row, values);
+    applyCustomerDiscount(row);
     recalc();
     return row;
+  }
+
+  /* Sconto abituale del cliente proposto nelle righe (solo se la riga è a 0). */
+  const customerDiscountsEl = document.getElementById("customer-discounts");
+  const customerDiscounts = customerDiscountsEl ? JSON.parse(customerDiscountsEl.textContent) : {};
+  const customerDiscountSelect = document.getElementById("id_customer");
+
+  function applyCustomerDiscount(row) {
+    if (!customerDiscountSelect) return;
+    const discount = customerDiscounts[customerDiscountSelect.value];
+    if (!discount) return;
+    const field = row.querySelector('[name$="-discount_pct"]');
+    if (!field) return;
+    const current = parseFloat(String(field.value || "").replace(",", "."));
+    if (String(field.value || "").trim() === "" || isNaN(current) || current === 0) {
+      field.value = discount;
+    }
+  }
+
+  if (customerDiscountSelect) {
+    customerDiscountSelect.addEventListener("change", function () {
+      tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
+        applyCustomerDiscount(row);
+      });
+      recalc();
+    });
   }
 
   const addButton = document.getElementById("add-line");

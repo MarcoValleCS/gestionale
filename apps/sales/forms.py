@@ -19,6 +19,18 @@ class CustomerChoiceFormMixin:
         self.fields["customer"].widget.attrs["class"] = "d-none"
         self.fields["customer"].widget.attrs["data-autocomplete-target"] = "1"
 
+    def apply_job_queryset(self):
+        from apps.jobs.models import Job
+
+        self.fields["job"].queryset = (
+            Job.objects.exclude(status__in=[Job.STATUS_CLOSED, Job.STATUS_CANCELLED])
+            .select_related("customer")
+            .order_by("-created_at")
+        )
+        self.fields["job"].label_from_instance = lambda obj: f"{obj.code} – {obj.name} ({obj.customer.name})"
+        self.fields["job"].required = False
+        self.fields["job"].help_text = "Facoltativo: collega il documento al cantiere/commessa."
+
 
 class PurchaseSupplierFormMixin:
     def apply_supplier_queryset(self):
@@ -63,11 +75,12 @@ class LineFormMixin:
 class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = Quote
-        fields = ["customer", "date", "valid_until", "payment_term", "reference", "terms_text", "notes"]
+        fields = ["customer", "job", "date", "valid_until", "payment_term", "reference", "terms_text", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_customer_queryset()
+        self.apply_job_queryset()
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
             self.fields["valid_until"].initial = timezone.localdate() + timedelta(days=30)
@@ -77,11 +90,12 @@ class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
 class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = SalesOrder
-        fields = ["customer", "date", "expected_date", "payment_term", "reference", "terms_text", "notes"]
+        fields = ["customer", "job", "date", "expected_date", "payment_term", "reference", "terms_text", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_customer_queryset()
+        self.apply_job_queryset()
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
             self.fields["terms_text"].initial = CompanySettings.load().quote_footer
@@ -98,7 +112,7 @@ class QuoteTemplateLineForm(LineFormMixin, BaseBootstrapModelForm):
 
     class Meta:
         model = QuoteTemplateLine
-        fields = ["product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -108,7 +122,7 @@ class QuoteTemplateLineForm(LineFormMixin, BaseBootstrapModelForm):
 class QuoteLineForm(LineFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = QuoteLine
-        fields = ["product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -118,7 +132,7 @@ class QuoteLineForm(LineFormMixin, BaseBootstrapModelForm):
 class SalesOrderLineForm(LineFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = SalesOrderLine
-        fields = ["product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

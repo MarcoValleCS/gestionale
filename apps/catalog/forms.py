@@ -3,7 +3,7 @@ from django import forms
 from apps.contacts.models import Contact
 from apps.core.forms import BaseBootstrapModelForm, BootstrapFormMixin, active_units, active_vat_rates
 
-from .models import Category, Product
+from .models import Category, KitComponent, Product
 
 
 class ProductForm(BaseBootstrapModelForm):
@@ -21,8 +21,10 @@ class ProductForm(BaseBootstrapModelForm):
             "purchase_price",
             "purchase_vat",
             "main_supplier",
+            "supplier_lead_days",
             "is_stock_tracked",
             "min_stock",
+            "is_kit",
             "tags",
             "notes",
             "active",

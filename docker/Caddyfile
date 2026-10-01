@@ -16,10 +16,5 @@
 		max_size 25MB
 	}
 
-	handle_path /media/* {
-		root * /srv/media
-		file_server
-	}
-
 	reverse_proxy web:8000
 }

@@ -4,6 +4,7 @@ Il «fatturato» è il valore degli ordini cliente consegnati (imponibile, IVA e
 Il «costo» di ogni riga usa il costo unitario fissato alla conferma dell'ordine,
 con fallback sul prezzo di acquisto attuale dell'articolo.
 """
+import calendar
 from datetime import date
 from decimal import Decimal
 
@@ -55,7 +56,7 @@ def delivered_lines(period):
         order__status=SalesOrder.STATUS_DELIVERED,
         order__delivered_at__date__gte=start,
         order__delivered_at__date__lte=end,
-    ).select_related("product", "product__main_supplier", "order")
+    ).select_related("product", "product__main_supplier", "order", "order__customer", "order__job")
 
 
 def summary(period):
@@ -112,15 +113,42 @@ def by_supplier(period):
     return _group_lines(period, key_func)
 
 
-def monthly_series(months=12):
-    """Serie fatturato/margine per gli ultimi N mesi (per i grafici)."""
+def by_customer(period):
+    def key_func(line):
+        customer = line.order.customer
+        return f"c{customer.pk}", customer.name
+
+    return _group_lines(period, key_func)
+
+
+def by_job(period):
+    def key_func(line):
+        job = line.order.job if line.order.job_id else None
+        if job:
+            return f"j{job.pk}", f"{job.code} – {job.name}"
+        return "none", "Senza cantiere"
+
+    return _group_lines(period, key_func)
+
+
+def monthly_series(months=12, end_offset=0):
+    """Serie fatturato/margine per gli ultimi N mesi (per il grafico).
+
+    ``end_offset`` sposta la finestra indietro di N mesi (0 = fino al mese corrente).
+    """
     today = timezone.localdate()
-    start_year, start_month = add_months(today.year, today.month, -(months - 1))
+    end_year, end_month = add_months(today.year, today.month, -end_offset)
+    start_year, start_month = add_months(end_year, end_month, -(months - 1))
     start = date(start_year, start_month, 1)
+    if end_offset == 0:
+        end = today
+    else:
+        end = date(end_year, end_month, calendar.monthrange(end_year, end_month)[1])
 
     lines = SalesOrderLine.objects.filter(
         order__status=SalesOrder.STATUS_DELIVERED,
         order__delivered_at__date__gte=start,
+        order__delivered_at__date__lte=end,
     ).select_related("product", "order")
 
     buckets = {}
@@ -131,17 +159,33 @@ def monthly_series(months=12):
         entry["revenue"] += line.line_subtotal
         entry["cost"] += line_cost(line)
 
-    labels, revenue, margin = [], [], []
+    labels, revenue, margin, rows = [], [], [], []
     year, month = start_year, start_month
     for _ in range(months):
-        labels.append(f"{MONTH_ABBR[month - 1]} {str(year)[2:]}")
+        label = f"{MONTH_ABBR[month - 1]} {str(year)[2:]}"
+        labels.append(label)
         entry = buckets.get((year, month))
-        if entry:
-            revenue.append(float(entry["revenue"]))
-            margin.append(float(entry["revenue"] - entry["cost"]))
-        else:
-            revenue.append(0.0)
-            margin.append(0.0)
+        month_revenue = entry["revenue"] if entry else ZERO
+        month_margin = (entry["revenue"] - entry["cost"]) if entry else ZERO
+        revenue.append(float(month_revenue))
+        margin.append(float(month_margin))
+        rows.append(
+            {
+                "label": label,
+                "revenue": round2(month_revenue),
+                "margin": round2(month_margin),
+                "margin_pct": round2(month_margin / month_revenue * 100) if month_revenue else ZERO,
+            }
+        )
         year, month = add_months(year, month, 1)
 
-    return {"labels": labels, "revenue": revenue, "margin": margin}
+    return {
+        "labels": labels,
+        "revenue": revenue,
+        "margin": margin,
+        "rows": rows,
+        "start_label": labels[0] if labels else "",
+        "end_label": labels[-1] if labels else "",
+        "months": months,
+        "end_offset": end_offset,
+    }

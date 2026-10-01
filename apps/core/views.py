@@ -1,16 +1,20 @@
 """Viste dell'app core: dashboard, impostazioni e tabelle di base."""
+from datetime import timedelta
+
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Value
 from django.db.models.functions import Coalesce
 from django.forms import modelformset_factory
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views.generic import CreateView, ListView, UpdateView
 
-from apps.accounts.permissions import ROLE_ADMIN, RoleRequiredMixin, has_role, role_required
+from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, has_role, role_required
 
 from .forms import (
+    AttachmentForm,
     BaseBootstrapModelForm,
     BootstrapFormMixin,
     CompanySettingsForm,
@@ -19,7 +23,7 @@ from .forms import (
     UnitOfMeasureForm,
     VatRateForm,
 )
-from .models import CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .models import Attachment, CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
 
 
 def home(request):
@@ -49,8 +53,25 @@ def home(request):
 
     margin_by_product = analytics.by_product(period)[:10]
     margin_by_supplier = analytics.by_supplier(period)[:10]
+    margin_by_customer = analytics.by_customer(period)[:10]
+    margin_by_job = analytics.by_job(period)[:10]
+
+    # Finestra temporale del grafico: 1 / 3 / 6 / 12 mesi, spostabile indietro
+    try:
+        months = int(request.GET.get("finestra", 12))
+    except (TypeError, ValueError):
+        months = 12
+    if months not in (1, 3, 6, 12):
+        months = 12
+    try:
+        offset = int(request.GET.get("indietro", 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(0, min(offset, 36))
+    series = analytics.monthly_series(months, end_offset=offset)
 
     from apps.inventory.models import StockLevel
+    from apps.jobs.models import Asset, Job, MaintenancePlan
 
     inventory_value = (
         StockLevel.objects.aggregate(
@@ -62,6 +83,13 @@ def home(request):
             )
         )["total"]
         or 0
+    )
+
+    due_limit = timezone.localdate() + timedelta(days=30)
+    maintenance_due_qs = (
+        MaintenancePlan.objects.filter(active=True, next_date__lte=due_limit)
+        .select_related("customer", "job")
+        .order_by("next_date")
     )
 
     context = {
@@ -81,7 +109,18 @@ def home(request):
         "inventory_value": inventory_value,
         "margin_by_product": margin_by_product,
         "margin_by_supplier": margin_by_supplier,
-        "series": analytics.monthly_series(12),
+        "margin_by_customer": margin_by_customer,
+        "margin_by_job": margin_by_job,
+        # Grafico
+        "series": series,
+        "months": months,
+        "offset": offset,
+        "months_choices": (1, 3, 6, 12),
+        # Cantieri e assistenza
+        "jobs_open": Job.objects.filter(status__in=Job.OPEN_STATUSES).count(),
+        "maintenance_due": maintenance_due_qs[:6],
+        "maintenance_due_count": maintenance_due_qs.count(),
+        "assets_count": Asset.objects.count(),
     }
     return render(request, "core/dashboard.html", context)
 
@@ -322,3 +361,49 @@ def sequence_list(request):
         messages.error(request, "Controlla i valori inseriti.")
 
     return render(request, "core/sequence_list.html", {"formset": formset, "page_title": "Numerazioni"})
+
+
+# --------------------------------------------------------------- allegati
+ATTACHMENT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_WAREHOUSE)
+
+
+def _attachment_redirect(request, product_id=None, job_id=None):
+    if product_id:
+        return redirect("catalog:product_detail", pk=product_id)
+    if job_id:
+        return redirect("jobs:job_detail", pk=job_id)
+    return redirect("core:home")
+
+
+@role_required(*ATTACHMENT_ROLES)
+def attachment_upload(request):
+    if request.method != "POST":
+        return redirect("core:home")
+
+    product_id = request.POST.get("product") or None
+    job_id = request.POST.get("job") or None
+    form = AttachmentForm(request.POST, request.FILES)
+    if form.is_valid() and (product_id or job_id):
+        attachment = form.save(commit=False)
+        attachment.product_id = product_id
+        attachment.job_id = job_id
+        attachment.uploaded_by = request.user
+        attachment.save()
+        messages.success(request, f"Allegato «{attachment.name}» caricato.")
+    else:
+        messages.error(request, "Caricamento non riuscito: scegli un file valido.")
+
+    return _attachment_redirect(request, product_id, job_id)
+
+
+@role_required(*ATTACHMENT_ROLES)
+def attachment_delete(request, pk):
+    attachment = get_object_or_404(Attachment, pk=pk)
+    product_id = attachment.product_id
+    job_id = attachment.job_id
+    if request.method == "POST":
+        name = attachment.name
+        attachment.file.delete(save=False)
+        attachment.delete()
+        messages.success(request, f"Allegato «{name}» rimosso.")
+    return _attachment_redirect(request, product_id, job_id)

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Seriali installati{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label mb-1" for="q">Cerca</label>
+        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ search }}" placeholder="Numero di serie, articolo o cliente…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" for="garanzia">Garanzia</label>
+        <select class="form-select form-select-sm" id="garanzia" name="garanzia" onchange="this.form.submit()">
+          <option value="">Tutte</option>
+          <option value="valida" {% if warranty == "valida" %}selected{% endif %}>In garanzia</option>
+          <option value="scaduta" {% if warranty == "scaduta" %}selected{% endif %}>Garanzia scaduta</option>
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+        {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
+        <a class="btn btn-primary btn-sm" href="{% url 'jobs:asset_create' %}"><i class="bi bi-plus-lg"></i> Nuovo seriale</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Articolo</th>
+          <th>Numero di serie</th>
+          <th>Cliente</th>
+          <th>Cantiere</th>
+          <th class="text-center">Installato il</th>
+          <th class="text-center">Garanzia fino al</th>
+          <th class="text-center">Stato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asset in assets %}
+        <tr>
+          <td><a class="text-decoration-none" href="{% url 'catalog:product_detail' asset.product.pk %}">{{ asset.product }}</a></td>
+          <td class="number-badge fw-semibold">{{ asset.serial_number }}</td>
+          <td>{{ asset.customer.name|default:"—" }}</td>
+          <td>{% if asset.job %}<a href="{% url 'jobs:job_detail' asset.job.pk %}">{{ asset.job.code }}</a>{% else %}—{% endif %}</td>
+          <td class="text-center">{{ asset.installed_on|date:"d/m/Y"|default:"—" }}</td>
+          <td class="text-center">{{ asset.warranty_until|date:"d/m/Y"|default:"—" }}</td>
+          <td class="text-center">
+            {% if not asset.installed_on %}<span class="badge text-bg-secondary">—</span>
+            {% elif asset.under_warranty %}<span class="badge text-bg-success">In garanzia</span>
+            {% else %}<span class="badge text-bg-dark">Scaduta</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:asset_update' asset.pk %}"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{% url 'jobs:asset_delete' asset.pk %}" onsubmit="return confirm('Eliminare il seriale {{ asset.serial_number }}?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          Nessun seriale registrato. Usa i seriali per pompe, filtri e robot: saprai sempre cosa è installato e fino a quando è in garanzia.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

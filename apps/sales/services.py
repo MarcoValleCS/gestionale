@@ -1,4 +1,5 @@
 """Logica di business di vendite: conversioni, conferme, consegne."""
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -77,8 +78,11 @@ def convert_quote_to_order(quote, user=None):
         return order
 
 
-def confirm_sales_order(order, user=None):
+def confirm_sales_order(order, user=None, replenish=False):
     """Conferma l'ordine e genera gli ordini fornitore per le carenze di magazzino.
+
+    Con ``replenish=True`` vengono riordinati anche gli articoli sotto scorta
+    minima (per riportarli almeno alla scorta minima).
 
     Restituisce ``{"purchase_orders": [...], "without_supplier": [(product, qty), ...]}``.
     """
@@ -101,20 +105,40 @@ def confirm_sales_order(order, user=None):
         entry = needed.setdefault(product.pk, {"product": product, "qty": Decimal("0")})
         entry["qty"] += remaining
 
-    by_supplier = {}
-    without_supplier = []
+    # Quantità da ordinare: carenze dell'ordine (+ riordino sotto scorta)
+    quantities = {}
     for entry in needed.values():
         product = entry["product"]
-        available = product.total_stock
-        shortage = entry["qty"] - available
-        if shortage <= 0:
-            continue
+        shortage = entry["qty"] - product.total_stock
+        if shortage > 0:
+            quantities[product.pk] = {"product": product, "qty": shortage}
+
+    if replenish:
+        from apps.catalog.models import Product
+
+        low_stock_products = Product.objects.filter(
+            active=True, is_stock_tracked=True, min_stock__gt=0, main_supplier__isnull=False
+        )
+        for product in low_stock_products:
+            topup = product.min_stock - product.total_stock
+            if topup <= 0:
+                continue
+            current = quantities.get(product.pk)
+            if current is None:
+                quantities[product.pk] = {"product": product, "qty": topup}
+            elif topup > current["qty"]:
+                current["qty"] = topup
+
+    by_supplier = {}
+    without_supplier = []
+    for entry in quantities.values():
+        product = entry["product"]
         supplier = product.main_supplier
         if supplier is None:
-            without_supplier.append((product, shortage))
+            without_supplier.append((product, entry["qty"]))
             continue
         group = by_supplier.setdefault(supplier.pk, {"supplier": supplier, "items": []})
-        group["items"].append((product, shortage))
+        group["items"].append((product, entry["qty"]))
 
     from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 
@@ -128,19 +152,22 @@ def confirm_sales_order(order, user=None):
 
         for group in by_supplier.values():
             supplier = group["supplier"]
+            lead_days = max((product.supplier_lead_days or 0) for product, _qty in group["items"])
+            expected_date = timezone.localdate() + timedelta(days=lead_days) if lead_days else None
             po = PurchaseOrder.objects.create(
                 supplier=supplier,
                 source_sales_order=order,
+                expected_date=expected_date,
                 notes=f"Generato automaticamente da ordine cliente {order.number}",
                 created_by=user,
             )
-            for position, (product, shortage) in enumerate(group["items"], start=1):
+            for position, (product, quantity) in enumerate(group["items"], start=1):
                 PurchaseOrderLine.objects.create(
                     po=po,
                     position=position,
                     product=product,
                     description=product.name,
-                    qty=shortage,
+                    qty=quantity,
                     uom=product.uom,
                     unit_price=product.purchase_unit_price(supplier),
                     vat_rate=product.purchase_vat,

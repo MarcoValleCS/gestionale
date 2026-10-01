@@ -64,6 +64,31 @@ class Product(TimeStampedModel):
         related_name="supplied_products",
         verbose_name="Fornitore abituale",
     )
+    supplier_lead_days = models.PositiveSmallIntegerField(
+        "Giorni di consegna fornitore",
+        default=0,
+        help_text="Usato come data prevista negli ordini fornitore generati automaticamente.",
+    )
+
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="variants",
+        verbose_name="Articolo principale",
+    )
+    variant_label = models.CharField(
+        "Variante",
+        max_length=60,
+        blank=True,
+        help_text="Es. colore o finitura (Bianco, Cromo, Nero opaco…).",
+    )
+    is_kit = models.BooleanField(
+        "Kit / composizione",
+        default=False,
+        help_text="Raggruppa più componenti (es. mobile + lavabo + specchio): nel preventivo puoi espanderlo.",
+    )
 
     is_stock_tracked = models.BooleanField("Gestito a magazzino", default=True)
     min_stock = models.DecimalField(
@@ -134,3 +159,20 @@ class Product(TimeStampedModel):
             if price is not None:
                 return price
         return self.purchase_price
+
+
+class KitComponent(models.Model):
+    """Componente di un kit/composizione."""
+
+    kit = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="components", verbose_name="Kit")
+    component = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="used_in_kits", verbose_name="Componente")
+    qty = models.DecimalField("Quantità", max_digits=12, decimal_places=3, default=Decimal("1"))
+
+    class Meta:
+        verbose_name = "Componente kit"
+        verbose_name_plural = "Componenti kit"
+        ordering = ["component__name"]
+        constraints = [models.UniqueConstraint(fields=["kit", "component"], name="unique_component_per_kit")]
+
+    def __str__(self):
+        return f"{self.component} × {self.qty}"

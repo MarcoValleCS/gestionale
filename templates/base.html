@@ -43,6 +43,17 @@
       </a>
       {% endif %}
 
+      <div class="nav-section">Cantieri e assistenza</div>
+      <a class="nav-link {% if 'job_' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'jobs:job_list' %}">
+        <i class="bi bi-cone-striped"></i> Cantieri
+      </a>
+      <a class="nav-link {% if 'maintenance' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'jobs:maintenance_list' %}">
+        <i class="bi bi-calendar-check"></i> Manutenzioni
+      </a>
+      <a class="nav-link {% if 'asset' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'jobs:asset_list' %}">
+        <i class="bi bi-upc-scan"></i> Seriali
+      </a>
+
       <div class="nav-section">Acquisti</div>
       {% if roles.is_admin or roles.is_purchasing or roles.is_warehouse %}
       <a class="nav-link {% if request.resolver_match.url_name == 'po_list' %}active{% endif %}" href="{% url 'purchasing:po_list' %}">

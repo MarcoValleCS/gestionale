@@ -4,6 +4,24 @@ Documento di lavoro: cosa si può fare nel gestionale per il tuo settore, cosa �
 **già pronto** e cosa possiamo aggiungere. Le proposte sono ordinate per priorità
 nella sezione finale: dimmi quali vuoi e le implemento.
 
+> **Aggiornamento (ottobre 2026) – implementato:**
+>
+> - ✅ **Cantieri/commesse** (codice, stato, responsabile, indirizzo, documenti collegati)
+> - ✅ **Sezioni nei preventivi/ordini** per ambiente o fase, con subtotali in schermo e stampa
+> - ✅ **Manutenzioni programmate** con scadenze in dashboard, «Eseguita» e «Preventivo dal modello»
+> - ✅ **Seriali e garanzie** (numero di serie, installazione, garanzia valida/scaduta)
+> - ✅ **Allegati** su articoli e cantieri (protetti da login)
+> - ✅ **Varianti articolo** generate da colore/finitura
+> - ✅ **Kit/composizioni** con espansione automatica dei componenti nei documenti
+> - ✅ **Sconto abituale cliente** proposto nelle righe
+> - ✅ **Giorni di consegna fornitore** usati come data prevista negli ordini fornitore
+> - ✅ **Riordino scorte** sotto il minimo alla conferma dell'ordine («e riordina scorte»)
+> - ✅ **Statistiche estese**: finestra 1/3/6/12 mesi con navigazione nel tempo, dettaglio
+>   per mese, fatturato per **cliente**, **articolo**, **fornitore** e **cantiere**
+>
+> Restano da fare: listini di vendita per articolo/cliente, DDT per cantiere,
+> fatturazione elettronica, promemoria email delle manutenzioni.
+
 ---
 
 ## 1. Arredo bagno

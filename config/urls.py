@@ -1,8 +1,15 @@
 """URL principali del progetto."""
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth.decorators import login_required
 from django.urls import include, path
+from django.views.static import serve as media_serve
+
+
+def protected_media(request, path):
+    """Serve i file caricati leggendo MEDIA_ROOT a runtime (non all'avvio)."""
+    return media_serve(request, path, document_root=settings.MEDIA_ROOT)
+
 
 admin.site.site_header = "Gestionale – Amministrazione"
 admin.site.site_title = "Gestionale"
@@ -16,8 +23,11 @@ urlpatterns = [
     path("magazzino/", include("apps.inventory.urls")),
     path("vendite/", include("apps.sales.urls")),
     path("acquisti/", include("apps.purchasing.urls")),
+    path("", include("apps.jobs.urls")),
     path("", include("apps.core.urls")),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# File caricati (logo, allegati) serviti SOLO agli utenti autenticati
+urlpatterns += [
+    path("media/<path:path>", login_required(protected_media), name="protected_media"),
+]

@@ -23,7 +23,7 @@ from .forms import (
     SalesOrderForm,
     SalesOrderLineForm,
 )
-from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine
+from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine, group_lines_by_section
 
 QuoteLineFormSet = modelformset_factory(QuoteLine, form=QuoteLineForm, extra=1, can_delete=True)
 SalesOrderLineFormSet = modelformset_factory(SalesOrderLine, form=SalesOrderLineForm, extra=1, can_delete=True)
@@ -61,6 +61,7 @@ def build_print_context(
     signature_label="",
 ):
     """Contesto per il documento stampabile (templates/print/document.html)."""
+    lines = document.lines.select_related("product", "uom", "vat_rate")
     return {
         "document": document,
         "document_title": title,
@@ -68,7 +69,8 @@ def build_print_context(
         "counterparty_label": counterparty_label,
         "meta_rows": meta_rows,
         "back_url": back_url,
-        "lines": document.lines.select_related("product", "uom", "vat_rate"),
+        "lines": lines,
+        "line_groups": group_lines_by_section(lines),
         "vat_rows": document.vat_breakdown(),
         "notes": notes,
         "show_signature": show_signature,
@@ -82,6 +84,10 @@ def with_vat_rates(context):
     context["vat_rates_json"] = {str(v.pk): str(v.rate) for v in VatRate.objects.filter(is_active=True)}
     context["quick_uoms"] = active_units()
     context["quick_vats"] = active_vat_rates()
+    context["customer_discounts_json"] = {
+        str(contact.pk): str(contact.sale_discount_pct)
+        for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
+    }
     return context
 
 
@@ -145,6 +151,7 @@ class QuoteDetailView(RoleRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Preventivo {self.object.number}"
         context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
+        context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
         context["generated_order"] = self.object.generated_order
         return context
@@ -233,6 +240,7 @@ class QuotePrintView(RoleRequiredMixin, DetailView):
                     ("Valido fino al", fdate(doc.valid_until)),
                     ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
                     ("Vostro riferimento", doc.reference),
+                    ("Cantiere", str(doc.job) if doc.job_id else ""),
                 ],
                 back_url=reverse("sales:quote_detail", args=[doc.pk]),
                 notes=doc.terms_text,
@@ -359,6 +367,7 @@ class SalesOrderDetailView(RoleRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Ordine {self.object.number}"
         context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
+        context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
         context["purchase_orders"] = self.object.purchase_orders.select_related("supplier").order_by("pk")
         return context
@@ -453,6 +462,7 @@ class SalesOrderPrintView(RoleRequiredMixin, DetailView):
                     ("Consegna prevista", fdate(doc.expected_date)),
                     ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
                     ("Vostro riferimento", doc.reference),
+                    ("Cantiere", str(doc.job) if doc.job_id else ""),
                 ],
                 back_url=reverse("sales:order_detail", args=[doc.pk]),
                 notes=doc.terms_text,
@@ -466,13 +476,15 @@ class SalesOrderPrintView(RoleRequiredMixin, DetailView):
 @role_required(*ORDER_EDIT_ROLES)
 def order_confirm(request, pk):
     order = get_object_or_404(SalesOrder, pk=pk)
+    replenish = request.method == "POST" and request.POST.get("replenish") == "1"
     try:
-        result = services.confirm_sales_order(order, user=request.user)
+        result = services.confirm_sales_order(order, user=request.user, replenish=replenish)
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
         return redirect("sales:order_detail", pk=order.pk)
 
-    messages.success(request, f"Ordine {order.number} confermato.")
+    extra = " Sono stati riordinati anche gli articoli sotto scorta minima." if replenish else ""
+    messages.success(request, f"Ordine {order.number} confermato.{extra}")
     purchase_orders = result["purchase_orders"]
     if purchase_orders:
         numbers = ", ".join(po.number for po in purchase_orders)

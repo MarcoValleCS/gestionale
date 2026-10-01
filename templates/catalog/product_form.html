@@ -28,6 +28,7 @@
             {% include "partials/field.html" with field=form.purchase_price col=3 %}
             {% include "partials/field.html" with field=form.purchase_vat col=3 %}
             {% include "partials/field.html" with field=form.main_supplier col=6 %}
+            {% include "partials/field.html" with field=form.supplier_lead_days col=6 %}
           </div>
         </div>
       </div>
@@ -39,6 +40,7 @@
           <div class="row">
             {% include "partials/field.html" with field=form.is_stock_tracked col=12 %}
             {% include "partials/field.html" with field=form.min_stock col=12 %}
+            {% include "partials/field.html" with field=form.is_kit col=12 %}
           </div>
         </div>
       </div>

@@ -1,21 +1,22 @@
 from decimal import Decimal
+import re
 
 from django.contrib import messages
 from django.db.models import DecimalField, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, RoleRequiredMixin, role_required
 from apps.contacts.models import Contact
 from apps.core.models import Tag
-from apps.core.utils import format_money
+from apps.core.utils import format_money, to_decimal
 
 from . import importer
 from .forms import CategoryForm, ProductForm, ProductImportForm, ProductQuickForm
-from .models import Category, Product
+from .models import Category, KitComponent, Product
 
 STOCK_SUM = Coalesce(
     Sum("stock_levels__quantity"),
@@ -53,6 +54,8 @@ class ProductListView(ListView):
             queryset = queryset.filter(main_supplier_id=supplier_id)
         if self.request.GET.get("sotto_scorta") == "1":
             queryset = queryset.filter(is_stock_tracked=True, min_stock__gt=0, stock_total__lt=F("min_stock"))
+        if self.request.GET.get("principali") == "1":
+            queryset = queryset.filter(parent__isnull=True)
         if self.request.GET.get("inattivi") != "1":
             queryset = queryset.filter(active=True)
         return queryset.distinct()
@@ -68,6 +71,7 @@ class ProductListView(ListView):
         context["selected_tag"] = self.request.GET.get("tag", "")
         context["supplier_id"] = self.request.GET.get("fornitore", "")
         context["low_stock_only"] = self.request.GET.get("sotto_scorta") == "1"
+        context["main_only"] = self.request.GET.get("principali") == "1"
         context["show_inactive"] = self.request.GET.get("inattivi") == "1"
         return context
 
@@ -86,6 +90,10 @@ class ProductDetailView(DetailView):
         context["price_list_items"] = (
             product.price_list_items.select_related("pricelist", "pricelist__supplier").order_by("pricelist__supplier__name")
         )
+        context["variants"] = product.variants.order_by("name")
+        context["components"] = product.components.select_related("component").order_by("component__name")
+        context["attachments"] = product.attachments.select_related("uploaded_by")[:20]
+        context["component_choices"] = Product.objects.filter(active=True).exclude(pk=product.pk).order_by("name")
         return context
 
 
@@ -141,6 +149,18 @@ def product_defaults(request, pk):
         vat = product.sale_vat
         price = product.sale_price
 
+    components = []
+    if product.is_kit:
+        for item in product.components.select_related("component").order_by("component__name"):
+            components.append(
+                {
+                    "id": item.component_id,
+                    "label": f"{item.component.code} – {item.component.name}",
+                    "qty": f"{item.qty:f}".rstrip("0").rstrip(".") or "1",
+                    "description": f"{item.component.name} (componente {product.code})",
+                }
+            )
+
     return JsonResponse(
         {
             "code": product.code,
@@ -151,9 +171,84 @@ def product_defaults(request, pk):
             "vat_id": vat.pk if vat else "",
             "vat_label": str(vat) if vat else "",
             "price": str(price or Decimal("0")),
-            "supplier_id": supplier.pk if supplier else "",
+            "supplier_id": supplier.id if supplier else "",
+            "is_kit": product.is_kit,
+            "components": components,
         }
     )
+
+
+@role_required(*EDIT_ROLES)
+def product_variants_create(request, pk):
+    """Genera le varianti (colore/finitura) di un articolo, tanti SKU quante sono le varianti."""
+    product = get_object_or_404(Product, pk=pk)
+    if request.method != "POST":
+        return redirect("catalog:product_detail", pk=product.pk)
+
+    values = [value.strip() for value in re.split(r"[,;\n]+", request.POST.get("values", "")) if value.strip()]
+    if not values:
+        messages.warning(request, "Indica almeno una variante (es. Bianco, Nero).")
+        return redirect("catalog:product_detail", pk=product.pk)
+
+    created = 0
+    for value in values:
+        label = value[:60]
+        exists = product.variants.filter(variant_label__iexact=label).exists()
+        if exists:
+            continue
+        Product.objects.create(
+            name=f"{product.name} – {label}",
+            description=product.description,
+            category=product.category,
+            uom=product.uom,
+            sale_price=product.sale_price,
+            sale_vat=product.sale_vat,
+            purchase_price=product.purchase_price,
+            purchase_vat=product.purchase_vat,
+            main_supplier=product.main_supplier,
+            supplier_lead_days=product.supplier_lead_days,
+            is_stock_tracked=product.is_stock_tracked,
+            min_stock=product.min_stock,
+            parent=product,
+            variant_label=label,
+        )
+        created += 1
+
+    if created:
+        messages.success(request, f"Create {created} varianti di «{product.name}». Ogni variante è un articolo a sé: impostane giacenza e prezzi.")
+    else:
+        messages.info(request, "Nessuna nuova variante creata (esistevano già).")
+    return redirect("catalog:product_detail", pk=product.pk)
+
+
+@role_required(*EDIT_ROLES)
+def product_component_add(request, pk):
+    """Aggiunge (o aggiorna) un componente del kit."""
+    kit = get_object_or_404(Product, pk=pk)
+    if request.method == "POST":
+        component = Product.objects.filter(pk=request.POST.get("component")).first()
+        qty = to_decimal(request.POST.get("qty"), Decimal("1"))
+        if component is None:
+            messages.error(request, "Scegli un componente valido.")
+        elif component.pk == kit.pk:
+            messages.error(request, "Un kit non può contenere se stesso.")
+        else:
+            item, created = KitComponent.objects.get_or_create(kit=kit, component=component, defaults={"qty": qty})
+            if not created and item.qty != qty:
+                item.qty = qty
+                item.save(update_fields=["qty"])
+            messages.success(request, f"Componente «{component.name}» {'aggiunto al' if created else 'aggiornato nel'} kit.")
+    return redirect("catalog:product_detail", pk=kit.pk)
+
+
+@role_required(*EDIT_ROLES)
+def product_component_remove(request, pk):
+    kit = get_object_or_404(Product, pk=pk)
+    if request.method == "POST":
+        removed, _ = KitComponent.objects.filter(kit=kit, component_id=request.POST.get("component")).delete()
+        if removed:
+            messages.success(request, "Componente rimosso dal kit.")
+    return redirect("catalog:product_detail", pk=kit.pk)
 
 
 @role_required(*EDIT_ROLES)

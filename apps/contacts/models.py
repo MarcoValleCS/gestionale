@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -34,6 +36,13 @@ class Contact(TimeStampedModel):
         null=True,
         blank=True,
         verbose_name="Condizione di pagamento",
+    )
+    sale_discount_pct = models.DecimalField(
+        "Sconto vendite abituale %",
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Proposto automaticamente nelle righe dei preventivi e degli ordini.",
     )
     tags = models.ManyToManyField(Tag, blank=True, related_name="contacts", verbose_name="Etichette")
     notes = models.TextField("Note", blank=True)

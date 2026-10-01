@@ -11,6 +11,7 @@ from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUS
 from apps.contacts.models import Contact
 from apps.core.models import VatRate
 from apps.sales.views import build_print_context, fdate, save_document_lines
+from apps.sales.models import group_lines_by_section
 
 from . import services
 from .forms import (
@@ -255,6 +256,7 @@ class PurchaseOrderDetailView(RoleRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Ordine fornitore {self.object.number}"
         context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
+        context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
         return context
 
@@ -348,6 +350,7 @@ class PurchaseOrderPrintView(RoleRequiredMixin, DetailView):
                     ("Consegna prevista", fdate(doc.expected_date)),
                     ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
                     ("Nostro riferimento", doc.source_sales_order.number if doc.source_sales_order else doc.number),
+                    ("Cantiere", str(doc.job) if doc.job_id else ""),
                 ],
                 back_url=reverse("purchasing:po_detail", args=[doc.pk]),
                 notes=doc.notes,

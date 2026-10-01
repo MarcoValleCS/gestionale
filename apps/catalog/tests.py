@@ -219,6 +219,67 @@ class QuickCreateTest(TestCase):
         self.assertContains(response, "data-autocomplete=")
         self.assertContains(response, "autocomplete-wrap")
         self.assertContains(response, 'name="tax_code"')
+        self.assertContains(response, 'name="job"')
+        self.assertContains(response, 'name="lines-0-section"')
+        self.assertContains(response, "customer-discounts")
+
+    def test_crea_varianti(self):
+        product = Product.objects.create(
+            name="Mobile bagno 80",
+            uom=self.uom,
+            sale_price=Decimal("450.00"),
+            sale_vat=self.vat,
+            purchase_price=Decimal("300.00"),
+            purchase_vat=self.vat,
+        )
+        response = self.client.post(
+            reverse("catalog:product_variants_create", args=[product.pk]),
+            {"values": "Bianco, Nero opaco"},
+        )
+        self.assertEqual(response.status_code, 302)
+        variants = Product.objects.filter(parent=product).order_by("variant_label")
+        self.assertEqual(variants.count(), 2)
+        self.assertEqual(variants[0].variant_label, "Bianco")
+        self.assertEqual(variants[0].sale_price, product.sale_price)
+        self.assertTrue(variants[0].code.startswith("ART"))
+
+        # ri-chiamare con le stesse varianti non ne crea altre
+        self.client.post(reverse("catalog:product_variants_create", args=[product.pk]), {"values": "Bianco"})
+        self.assertEqual(Product.objects.filter(parent=product).count(), 2)
+
+    def test_kit_componenti_e_dati_predefiniti(self):
+        kit = Product.objects.create(
+            name="Composizione bagno",
+            uom=self.uom,
+            sale_price=Decimal("600.00"),
+            sale_vat=self.vat,
+            purchase_price=Decimal("400.00"),
+            purchase_vat=self.vat,
+            is_kit=True,
+        )
+        component = Product.objects.create(
+            name="Lavabo da appoggio",
+            uom=self.uom,
+            sale_price=Decimal("120.00"),
+            sale_vat=self.vat,
+            purchase_price=Decimal("75.00"),
+            purchase_vat=self.vat,
+        )
+        response = self.client.post(
+            reverse("catalog:product_component_add", args=[kit.pk]),
+            {"component": component.pk, "qty": "2"},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        data = self.client.get(reverse("catalog:product_defaults", args=[kit.pk])).json()
+        self.assertTrue(data["is_kit"])
+        self.assertEqual(len(data["components"]), 1)
+        self.assertEqual(data["components"][0]["id"], component.pk)
+        self.assertEqual(data["components"][0]["qty"], "2")
+
+        self.client.post(reverse("catalog:product_component_remove", args=[kit.pk]), {"component": component.pk})
+        data = self.client.get(reverse("catalog:product_defaults", args=[kit.pk])).json()
+        self.assertEqual(data["components"], [])
 
     def test_ricerca_articoli(self):
         product = Product.objects.create(

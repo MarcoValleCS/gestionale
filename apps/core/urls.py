@@ -21,4 +21,7 @@ urlpatterns = [
     path("impostazioni/pagamenti/nuova/", views.PaymentTermCreateView.as_view(), name="paymentterm_create"),
     path("impostazioni/pagamenti/<int:pk>/", views.PaymentTermUpdateView.as_view(), name="paymentterm_update"),
     path("impostazioni/numerazioni/", views.sequence_list, name="sequence_list"),
+    # Allegati
+    path("allegati/carica/", views.attachment_upload, name="attachment_upload"),
+    path("allegati/<int:pk>/elimina/", views.attachment_delete, name="attachment_delete"),
 ]

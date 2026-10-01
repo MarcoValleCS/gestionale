@@ -6,6 +6,7 @@
 <form method="post" novalidate id="document-form">
   {% csrf_token %}
   {{ line_formset.management_form }}
+  {{ customer_discounts_json|json_script:"customer-discounts" }}
   <div class="row g-3">
     <div class="col-lg-8">
       <div class="card mb-3">
@@ -13,10 +14,11 @@
         <div class="card-body">
           <div class="row">
             {% include "partials/field_quick.html" with field=form.customer col=6 kind="customer" title="Crea nuovo cliente" %}
+            {% include "partials/field.html" with field=form.job col=6 %}
             {% include "partials/field.html" with field=form.date col=3 %}
             {% include "partials/field.html" with field=form.valid_until col=3 %}
-            {% include "partials/field.html" with field=form.payment_term col=4 %}
-            {% include "partials/field.html" with field=form.reference col=8 %}
+            {% include "partials/field.html" with field=form.reference col=6 %}
+            {% include "partials/field.html" with field=form.payment_term col=6 %}
           </div>
         </div>
       </div>
@@ -58,15 +60,16 @@
           <table class="table table-sm doc-lines mb-0" id="lines-table">
             <thead>
               <tr>
-                <th style="width:17%">Articolo</th>
+                <th style="width:15%">Articolo</th>
                 <th>Descrizione</th>
-                <th style="width:7%">Q.tà</th>
-                <th style="width:9%">U.d.M.</th>
-                <th style="width:10%">Prezzo</th>
-                <th style="width:7%">Sc. %</th>
-                <th style="width:11%">IVA</th>
-                <th style="width:9%" class="text-end">Totale</th>
-                <th style="width:44px"></th>
+                <th style="width:10%">Sezione</th>
+                <th style="width:6%">Q.tà</th>
+                <th style="width:8%">U.d.M.</th>
+                <th style="width:9%">Prezzo</th>
+                <th style="width:6%">Sc. %</th>
+                <th style="width:9%">IVA</th>
+                <th style="width:8%" class="text-end">Totale</th>
+                <th style="width:40px"></th>
               </tr>
             </thead>
             <tbody id="lines-body">

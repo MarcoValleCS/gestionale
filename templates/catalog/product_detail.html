@@ -45,9 +45,100 @@
           <dt class="col-6 text-muted">Gestito a magazzino</dt>
           <dd class="col-6">{% if product.is_stock_tracked %}Sì{% else %}No{% endif %}</dd>
           <dt class="col-6 text-muted">Scorta minima</dt><dd class="col-6">{{ product.min_stock|qty }}</dd>
+          <dt class="col-6 text-muted">Giorni consegna fornitore</dt><dd class="col-6">{{ product.supplier_lead_days }}</dd>
+          <dt class="col-6 text-muted">Kit/composizione</dt>
+          <dd class="col-6">{% if product.is_kit %}Sì ({{ components|length }} componenti){% else %}No{% endif %}</dd>
+          {% if product.parent %}
+          <dt class="col-6 text-muted">Variante di</dt>
+          <dd class="col-6"><a href="{% url 'catalog:product_detail' product.parent.pk %}">{{ product.parent.name }}</a>{% if product.variant_label %} · {{ product.variant_label }}{% endif %}</dd>
+          {% endif %}
         </dl>
       </div>
     </div>
+
+    {% if not product.parent %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-palette me-1"></i> Varianti</div>
+      <div class="card-body">
+        {% if variants %}
+        <ul class="list-group list-group-flush mb-3">
+          {% for variant in variants %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <a href="{% url 'catalog:product_detail' variant.pk %}">{{ variant.name }}</a>
+            <span class="text-muted small number-badge">{{ variant.code }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted small">Nessuna variante: crea le versioni colore/finitura di questo articolo.</p>
+        {% endif %}
+        {% if roles.is_admin or roles.is_sales or roles.is_purchasing %}
+        <form method="post" action="{% url 'catalog:product_variants_create' product.pk %}" class="row g-2 align-items-end no-print">
+          {% csrf_token %}
+          <div class="col-8">
+            <label class="form-label" for="variant-values">Nuove varianti</label>
+            <input class="form-control form-control-sm" type="text" id="variant-values" name="values" placeholder="Bianco, Nero, Cromo">
+            <div class="form-text">Separate da virgola: per ognuna nasce un articolo con giacenza propria.</div>
+          </div>
+          <div class="col-4">
+            <button class="btn btn-outline-primary btn-sm w-100" type="submit"><i class="bi bi-plus-lg"></i> Crea</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if product.is_kit %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-boxes me-1"></i> Componenti del kit</div>
+      <div class="card-body">
+        <ul class="list-group list-group-flush mb-3">
+          {% for item in components %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <span>
+              <a href="{% url 'catalog:product_detail' item.component.pk %}">{{ item.component }}</a>
+              <span class="text-muted small">× {{ item.qty|qty }}</span>
+            </span>
+            {% if roles.is_admin or roles.is_sales or roles.is_purchasing %}
+            <form class="d-inline" method="post" action="{% url 'catalog:product_component_remove' product.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="component" value="{{ item.component.pk }}">
+              <button class="btn btn-outline-danger btn-sm" type="submit" title="Rimuovi componente"><i class="bi bi-x-lg"></i></button>
+            </form>
+            {% endif %}
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted px-0">Nessun componente</li>
+          {% endfor %}
+        </ul>
+        {% if roles.is_admin or roles.is_sales or roles.is_purchasing %}
+        <form method="post" action="{% url 'catalog:product_component_add' product.pk %}" class="row g-2 align-items-end no-print">
+          {% csrf_token %}
+          <div class="col-7">
+            <label class="form-label" for="component-select">Aggiungi componente</label>
+            <select class="form-select form-select-sm" id="component-select" name="component">
+              {% for choice in component_choices %}
+              <option value="{{ choice.pk }}">{{ choice.code }} – {{ choice.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="form-label" for="component-qty">Qtà</label>
+            <input class="form-control form-control-sm" type="number" step="any" min="0" id="component-qty" name="qty" value="1">
+          </div>
+          <div class="col-2">
+            <button class="btn btn-outline-primary btn-sm w-100" type="submit"><i class="bi bi-plus-lg"></i></button>
+          </div>
+        </form>
+        {% endif %}
+        <p class="text-muted small mt-3 mb-0">
+          Nei preventivi, quando scegli questo kit, i componenti vengono aggiunti automaticamente come righe a prezzo zero
+          (il prezzo resta quello del kit), così magazzino e ordini fornitore lavorano sui componenti reali.
+        </p>
+      </div>
+    </div>
+    {% endif %}
     {% if product.description %}
     <div class="card mb-3">
       <div class="card-header">Descrizione</div>
@@ -60,6 +151,7 @@
       <div class="card-body small" style="white-space: pre-line">{{ product.notes }}</div>
     </div>
     {% endif %}
+    {% include "core/_attachments.html" %}
   </div>
 
   <div class="col-lg-8">

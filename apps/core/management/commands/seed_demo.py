@@ -162,6 +162,49 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS("Creati due modelli di preventivo di esempio (bagno e piscina)."))
 
+        # Cantiere, seriale e manutenzione di esempio
+        from datetime import timedelta
+
+        from apps.jobs.models import Asset, Job, MaintenancePlan
+
+        if not Job.objects.exists():
+            job = Job.objects.create(
+                name="Piscina privata – Via Verdi",
+                customer=customer,
+                status=Job.STATUS_IN_PROGRESS,
+                address="Via Verdi 12",
+                zip_code="20100",
+                city="Milano",
+                province="MI",
+                start_date=timezone.localdate(),
+                notes="Cantiere di esempio: piscina interrata 8x4.",
+            )
+            # collega solo i documenti di esempio (per non toccare i tuoi)
+            SalesOrder.objects.filter(notes__icontains="esempio", job__isnull=True).update(job=job)
+            Quote.objects.filter(reference__icontains="demo", job__isnull=True).update(job=job)
+
+            Asset.objects.create(
+                product=bullone,
+                serial_number="POMPA-DEMO-001",
+                job=job,
+                customer=customer,
+                installed_on=timezone.localdate(),
+                warranty_months=24,
+                notes="Seriale di esempio (pompa di ricircolo).",
+            )
+
+            piscina_template = QuoteTemplate.objects.filter(name__startswith="Piscina").first()
+            MaintenancePlan.objects.create(
+                name="Manutenzione stagionale piscina",
+                customer=customer,
+                job=job,
+                template=piscina_template,
+                frequency=MaintenancePlan.FREQUENCY_ANNUAL,
+                next_date=timezone.localdate() + timedelta(days=20),
+                notes="Apertura e controlli stagionali.",
+            )
+            self.stdout.write(self.style.SUCCESS("Creati cantiere, seriale e manutenzione di esempio (visibili in dashboard)."))
+
         if not Quote.objects.exists():
             quote = Quote.objects.create(
                 customer=customer,

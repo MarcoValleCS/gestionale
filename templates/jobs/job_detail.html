@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ job }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">{{ job.name }} <span class="text-muted fs-6 number-badge">{{ job.code }}</span></h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ job.status|badge_class }}">{{ job.get_status_display }}</span>
+      <a class="text-decoration-none" href="{% url 'contacts:detail' job.customer.pk %}">{{ job.customer.name }}</a>
+      {% if job.city %}<span class="text-muted small"><i class="bi bi-geo-alt"></i> {{ job.city }}{% if job.province %} ({{ job.province }}){% endif %}</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    {% if roles.is_admin or roles.is_sales %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:job_update' job.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'sales:quote_create' %}"><i class="bi bi-file-earmark-plus"></i> Nuovo preventivo</a>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'jobs:maintenance_create' %}?cliente={{ job.customer.pk }}&cantiere={{ job.pk }}"><i class="bi bi-calendar-plus"></i> Manutenzione</a>
+    {% endif %}
+    {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'jobs:asset_create' %}"><i class="bi bi-upc-scan"></i> Registra seriale</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Cliente e luogo</div>
+      <div class="card-body small">
+        <div class="fw-semibold">{{ job.customer.name }}</div>
+        {% if job.customer.vat_number %}<div class="text-muted">P.IVA {{ job.customer.vat_number }}</div>{% endif %}
+        {% if job.address %}<div class="mt-2"><i class="bi bi-geo-alt"></i> {{ job.address }}</div>{% endif %}
+        {% if job.zip_code or job.city %}<div>{{ job.zip_code }} {{ job.city }}{% if job.province %} ({{ job.province }}){% endif %}</div>{% endif %}
+        <a class="small" href="{% url 'contacts:detail' job.customer.pk %}">Scheda cliente</a>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6 text-muted">Responsabile</dt><dd class="col-6">{{ job.manager|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Inizio lavori</dt><dd class="col-6">{{ job.start_date|date:"d/m/Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Fine prevista</dt><dd class="col-6">{{ job.end_date|date:"d/m/Y"|default:"—" }}</dd>
+          <dt class="col-6 text-muted">Creato il</dt><dd class="col-6">{{ job.created_at|date:"d/m/Y" }}</dd>
+        </dl>
+      </div>
+    </div>
+    {% if job.notes %}
+    <div class="card mb-3">
+      <div class="card-header">Note</div>
+      <div class="card-body small" style="white-space: pre-line">{{ job.notes }}</div>
+    </div>
+    {% endif %}
+    {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
+      {% include "core/_attachments.html" %}
+    {% endif %}
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header p-0 border-0">
+        <ul class="nav nav-tabs card-header-tabs m-0 px-2 pt-2" role="tablist">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-quotes" type="button">Preventivi <span class="badge text-bg-light border">{{ quotes|length }}</span></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-orders" type="button">Ordini <span class="badge text-bg-light border">{{ orders|length }}</span></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-pos" type="button">Ordini fornitore <span class="badge text-bg-light border">{{ purchase_orders|length }}</span></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-plans" type="button">Manutenzioni <span class="badge text-bg-light border">{{ plans|length }}</span></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-assets" type="button">Seriali <span class="badge text-bg-light border">{{ assets|length }}</span></button></li>
+        </ul>
+      </div>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-quotes">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Numero</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+              <tbody>
+                {% for quote in quotes %}
+                <tr>
+                  <td><a href="{% url 'sales:quote_detail' quote.pk %}">{{ quote.number }}</a></td>
+                  <td>{{ quote.date|date:"d/m/Y" }}</td>
+                  <td class="text-end">{{ quote.grand_total|money }} €</td>
+                  <td class="text-center"><span class="badge text-bg-{{ quote.status|badge_class }}">{{ quote.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nessun preventivo collegato</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-orders">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Numero</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+              <tbody>
+                {% for order in orders %}
+                <tr>
+                  <td><a href="{% url 'sales:order_detail' order.pk %}">{{ order.number }}</a></td>
+                  <td>{{ order.date|date:"d/m/Y" }}</td>
+                  <td class="text-end">{{ order.grand_total|money }} €</td>
+                  <td class="text-center"><span class="badge text-bg-{{ order.status|badge_class }}">{{ order.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nessun ordine cliente collegato</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-pos">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Numero</th><th>Fornitore</th><th>Data</th><th class="text-end">Totale</th><th class="text-center">Stato</th></tr></thead>
+              <tbody>
+                {% for po in purchase_orders %}
+                <tr>
+                  <td><a href="{% url 'purchasing:po_detail' po.pk %}">{{ po.number }}</a></td>
+                  <td>{{ po.supplier.name }}</td>
+                  <td>{{ po.date|date:"d/m/Y" }}</td>
+                  <td class="text-end">{{ po.grand_total|money }} €</td>
+                  <td class="text-center"><span class="badge text-bg-{{ po.status|badge_class }}">{{ po.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-3">Nessun ordine fornitore collegato</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-plans">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Manutenzione</th><th>Frequenza</th><th class="text-center">Prossima</th><th></th></tr></thead>
+              <tbody>
+                {% for plan in plans %}
+                <tr>
+                  <td>{{ plan.name }}</td>
+                  <td>{{ plan.get_frequency_display }}</td>
+                  <td class="text-center {% if plan.is_overdue %}text-danger fw-semibold{% endif %}">{{ plan.next_date|date:"d/m/Y" }}</td>
+                  <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:maintenance_update' plan.pk %}"><i class="bi bi-pencil"></i></a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nessuna manutenzione programmata</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-assets">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead><tr><th>Articolo</th><th>Seriale</th><th class="text-center">Installato</th><th class="text-center">Garanzia fino</th><th></th></tr></thead>
+              <tbody>
+                {% for asset in assets %}
+                <tr>
+                  <td>{{ asset.product }}</td>
+                  <td class="number-badge">{{ asset.serial_number }}</td>
+                  <td class="text-center">{{ asset.installed_on|date:"d/m/Y"|default:"—" }}</td>
+                  <td class="text-center">{{ asset.warranty_until|date:"d/m/Y"|default:"—" }}</td>
+                  <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:asset_update' asset.pk %}"><i class="bi bi-pencil"></i></a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-3">Nessun seriale registrato</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -113,6 +113,9 @@ class PurchaseOrder(TotalsDocument, TimeStampedModel):
     date = models.DateField("Data", default=timezone.localdate)
     expected_date = models.DateField("Consegna prevista", null=True, blank=True)
     supplier = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="purchase_orders", verbose_name="Fornitore")
+    job = models.ForeignKey(
+        "jobs.Job", on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_orders", verbose_name="Cantiere"
+    )
     payment_term = models.ForeignKey(
         PaymentTerm, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Condizione di pagamento"
     )

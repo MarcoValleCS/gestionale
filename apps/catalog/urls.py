@@ -15,6 +15,9 @@ urlpatterns = [
     path("<int:pk>/", views.ProductDetailView.as_view(), name="product_detail"),
     path("<int:pk>/modifica/", views.ProductUpdateView.as_view(), name="product_update"),
     path("<int:pk>/default/", views.product_defaults, name="product_defaults"),
+    path("<int:pk>/varianti/", views.product_variants_create, name="product_variants_create"),
+    path("<int:pk>/componenti/aggiungi/", views.product_component_add, name="product_component_add"),
+    path("<int:pk>/componenti/rimuovi/", views.product_component_remove, name="product_component_remove"),
     path("crea-rapido/", views.product_quick_create, name="quick_create"),
     path("cerca/", views.product_search, name="search"),
 ]

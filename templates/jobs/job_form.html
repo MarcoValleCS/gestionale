@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">Dati cantiere</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.name col=8 %}
+            {% include "partials/field.html" with field=form.status col=4 %}
+            {% include "partials/field.html" with field=form.customer col=6 %}
+            {% include "partials/field.html" with field=form.manager col=6 %}
+            {% include "partials/field.html" with field=form.start_date col=3 %}
+            {% include "partials/field.html" with field=form.end_date col=3 %}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Indirizzo del cantiere</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.address col=8 %}
+            {% include "partials/field.html" with field=form.zip_code col=4 %}
+            {% include "partials/field.html" with field=form.city col=6 %}
+            {% include "partials/field.html" with field=form.province col=3 %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">Note</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.notes col=12 %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva cantiere</button>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -26,6 +26,12 @@ class DocumentLine(TimeStampedModel):
     """Riga di documento (preventivo o ordine)."""
 
     position = models.PositiveIntegerField("Posizione", default=0)
+    section = models.CharField(
+        "Sezione",
+        max_length=80,
+        blank=True,
+        help_text="Es. ambiente o fase (Bagno 1, Scavo, Finiture…). Righe consecutive con la stessa sezione vengono raggruppate.",
+    )
     product = models.ForeignKey(
         Product, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", verbose_name="Articolo"
     )
@@ -65,6 +71,21 @@ class DocumentLine(TimeStampedModel):
         if self.product_id and self.description:
             return f"{self.product.code} – {self.description}" if self.product.code not in self.description else self.description
         return self.description or (str(self.product) if self.product_id else "—")
+
+
+def group_lines_by_section(lines):
+    """Raggruppa righe consecutive con la stessa sezione, con subtotale per gruppo."""
+    groups = []
+    for number, line in enumerate(lines, start=1):
+        line.row_number = number
+        section = line.section or ""
+        if not groups or groups[-1]["section"] != section:
+            groups.append({"section": section, "lines": [], "subtotal": ZERO})
+        groups[-1]["lines"].append(line)
+        groups[-1]["subtotal"] += line.line_subtotal
+    for group in groups:
+        group["subtotal"] = round2(group["subtotal"])
+    return groups
 
 
 class TotalsDocument(models.Model):
@@ -124,6 +145,9 @@ class Quote(TotalsDocument, TimeStampedModel):
     date = models.DateField("Data", default=timezone.localdate)
     valid_until = models.DateField("Valido fino al", null=True, blank=True)
     customer = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="quotes", verbose_name="Cliente")
+    job = models.ForeignKey(
+        "jobs.Job", on_delete=models.SET_NULL, null=True, blank=True, related_name="quotes", verbose_name="Cantiere"
+    )
     payment_term = models.ForeignKey(
         PaymentTerm, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Condizione di pagamento"
     )
@@ -185,6 +209,9 @@ class SalesOrder(TotalsDocument, TimeStampedModel):
     date = models.DateField("Data", default=timezone.localdate)
     expected_date = models.DateField("Consegna prevista", null=True, blank=True)
     customer = models.ForeignKey(Contact, on_delete=models.PROTECT, related_name="sales_orders", verbose_name="Cliente")
+    job = models.ForeignKey(
+        "jobs.Job", on_delete=models.SET_NULL, null=True, blank=True, related_name="sales_orders", verbose_name="Cantiere"
+    )
     payment_term = models.ForeignKey(
         PaymentTerm, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Condizione di pagamento"
     )

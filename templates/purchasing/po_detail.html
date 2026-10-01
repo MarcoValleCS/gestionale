@@ -69,9 +69,15 @@
             </tr>
           </thead>
           <tbody>
-            {% for line in lines %}
+            {% for group in line_groups %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="9" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
+            </tr>
+            {% endif %}
+            {% for line in group.lines %}
             <tr>
-              <td class="text-muted">{{ forloop.counter }}</td>
+              <td class="text-muted">{{ line.row_number }}</td>
               <td>
                 {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
                 {{ line.description|default:"—" }}
@@ -86,6 +92,13 @@
               <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
               <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
             </tr>
+            {% endfor %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="8" class="text-end small text-muted">Totale {{ group.section }}</td>
+              <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>
+            </tr>
+            {% endif %}
             {% empty %}
             <tr><td colspan="9" class="text-center text-muted py-3">Nessuna riga</td></tr>
             {% endfor %}

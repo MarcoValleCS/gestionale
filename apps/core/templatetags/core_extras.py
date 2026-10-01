@@ -19,6 +19,12 @@ BADGE_CLASSES = {
     "received": "success",
     "received_partial": "warning",
     "cancelled": "dark",
+    # Cantieri
+    "survey": "info",
+    "quote": "secondary",
+    "in_progress": "warning",
+    "testing": "info",
+    "closed": "success",
 }
 
 

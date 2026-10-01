@@ -1,0 +1,48 @@
+{% load core_extras %}
+<div class="card">
+  <div class="card-header"><i class="bi bi-paperclip me-1"></i> Allegati</div>
+  <div class="card-body py-3">
+    {% if roles.is_admin or roles.is_sales or roles.is_purchasing or roles.is_warehouse %}
+    <form method="post" action="{% url 'core:attachment_upload' %}" enctype="multipart/form-data" class="row g-2 align-items-end no-print">
+      {% csrf_token %}
+      {% if product %}<input type="hidden" name="product" value="{{ product.pk }}">{% endif %}
+      {% if job %}<input type="hidden" name="job" value="{{ job.pk }}">{% endif %}
+      <div class="col-md-5">
+        <label class="form-label" for="attachment-file">File</label>
+        <input class="form-control form-control-sm" type="file" id="attachment-file" name="file" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="attachment-name">Nome (facoltativo)</label>
+        <input class="form-control form-control-sm" type="text" id="attachment-name" name="name">
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-primary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Carica</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  <ul class="list-group list-group-flush">
+    {% for attachment in attachments %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div class="text-truncate">
+        <i class="bi {% if attachment.is_image %}bi-file-earmark-image{% else %}bi-file-earmark-text{% endif %} me-1"></i>
+        <a href="{{ attachment.file.url }}" target="_blank">{{ attachment.name }}</a>
+        {% if attachment.notes %}<div class="small text-muted">{{ attachment.notes }}</div>{% endif %}
+      </div>
+      <div class="text-end text-nowrap">
+        <span class="text-muted small me-2">
+          {% if attachment.size_kb %}{{ attachment.size_kb }} KB · {% endif %}{{ attachment.created_at|date:"d/m/Y" }}
+        </span>
+        {% if roles.is_admin or roles.is_sales or roles.is_purchasing or roles.is_warehouse %}
+        <form class="d-inline" method="post" action="{% url 'core:attachment_delete' attachment.pk %}" onsubmit="return confirm('Rimuovere l\'allegato?');">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% empty %}
+    <li class="list-group-item text-muted text-center py-3">Nessun allegato</li>
+    {% endfor %}
+  </ul>
+</div>

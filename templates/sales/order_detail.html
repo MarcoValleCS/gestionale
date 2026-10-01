@@ -18,8 +18,12 @@
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:order_print' order.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
     {% if order.is_editable %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:order_update' order.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
-    <form method="post" action="{% url 'sales:order_confirm' order.pk %}">{% csrf_token %}
+    <form method="post" action="{% url 'sales:order_confirm' order.pk %}" class="d-flex gap-2">{% csrf_token %}
       <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg"></i> Conferma ordine</button>
+      <button class="btn btn-outline-primary btn-sm" type="submit" name="replenish" value="1"
+              title="Oltre alle carenze dell'ordine, riordina anche gli articoli sotto scorta minima">
+        <i class="bi bi-arrow-repeat"></i> e riordina scorte
+      </button>
     </form>
     <form method="post" action="{% url 'sales:order_delete' order.pk %}" onsubmit="return confirm('Eliminare definitivamente l\'ordine {{ order.number }}?');">{% csrf_token %}
       <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Elimina</button>
@@ -67,9 +71,15 @@
             </tr>
           </thead>
           <tbody>
-            {% for line in lines %}
+            {% for group in line_groups %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="9" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
+            </tr>
+            {% endif %}
+            {% for line in group.lines %}
             <tr>
-              <td class="text-muted">{{ forloop.counter }}</td>
+              <td class="text-muted">{{ line.row_number }}</td>
               <td>
                 {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
                 {{ line.description|default:"—" }}
@@ -84,6 +94,13 @@
               <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
               <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
             </tr>
+            {% endfor %}
+            {% if group.section %}
+            <tr class="table-light">
+              <td colspan="8" class="text-end small text-muted">Totale {{ group.section }}</td>
+              <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>
+            </tr>
+            {% endif %}
             {% empty %}
             <tr><td colspan="9" class="text-center text-muted py-3">Nessuna riga</td></tr>
             {% endfor %}
