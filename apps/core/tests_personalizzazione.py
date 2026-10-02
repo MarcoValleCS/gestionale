@@ -87,13 +87,57 @@ class CompanySettingsAspettoTest(TestCase):
         azienda.save()
         self.assertEqual(azienda.theme_color_hex, "#2563eb")
 
-    def test_logo_del_gestionale_ricade_su_quello_aziendale(self):
+    def test_logo_del_gestionale_e_quello_caricato(self):
         azienda = CompanySettings.load()
         self.assertEqual(azienda.app_logo_url, "")
         azienda.logo = "company/logo.png"
-        self.assertEqual(azienda.app_logo_url, "/media/company/logo.png")
+        # il logo aziendale serve ai documenti, non al menu
+        self.assertEqual(azienda.app_logo_url, "")
         azienda.app_logo = "company/app.png"
         self.assertEqual(azienda.app_logo_url, "/media/company/app.png")
+
+
+class LogoPredefinitoTest(TestCase):
+    """Senza un logo caricato si usa il logo Aquaforma predefinito."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser("logo", "logo@example.com", "password123!")
+        self.client.force_login(self.user)
+        self.azienda = CompanySettings.load()
+        self.azienda.app_logo = ""
+        self.azienda.save()
+
+    def test_menu_usa_il_simbolo_predefinito(self):
+        response = self.client.get(reverse("core:home"))
+        html = response.content.decode()
+        self.assertIn("brand/aquaforma-simbolo.png", html)
+        # la dimensione è fissata anche senza foglio di stile
+        self.assertIn('width="34" height="34"', html)
+
+    def test_pagina_di_accesso_usa_il_logo_completo(self):
+        self.client.logout()
+        response = self.client.get(reverse("accounts:login"))
+        html = response.content.decode()
+        self.assertIn("brand/aquaforma-logo.png", html)
+        self.assertIn("max-height:118px", html)
+
+    def test_caricando_un_logo_prende_il_suo(self):
+        azienda = CompanySettings.load()
+        azienda.app_logo = "company/mio.png"
+        azienda.save()
+        html = self.client.get(reverse("core:home")).content.decode()
+        self.assertIn("/media/company/mio.png", html)
+        self.assertNotIn("brand/aquaforma-simbolo.png", html)
+
+    def test_i_file_del_logo_esistono(self):
+        import os
+
+        from django.conf import settings
+
+        for nome in ("aquaforma-simbolo.png", "aquaforma-logo.png", "aquaforma-simbolo-scuro.png", "aquaforma-logo-scuro.png"):
+            percorso = os.path.join(settings.BASE_DIR, "static", "brand", nome)
+            with self.subTest(nome=nome):
+                self.assertTrue(os.path.exists(percorso), percorso)
 
 
 class TemaNeiTemplateTest(TestCase):

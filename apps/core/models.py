@@ -330,14 +330,11 @@ class CompanySettings(models.Model):
 
     @property
     def app_logo_url(self):
-        """Logo del gestionale: se non impostato si usa quello aziendale."""
-        for campo in (self.app_logo, self.logo):
-            try:
-                if campo:
-                    return campo.url
-            except ValueError:
-                continue
-        return ""
+        """Logo del gestionale caricato dall'utente (vuoto se non impostato)."""
+        try:
+            return self.app_logo.url if self.app_logo else ""
+        except ValueError:
+            return ""
 
 
 class Attachment(TimeStampedModel):

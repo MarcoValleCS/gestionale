@@ -39,16 +39,17 @@
             <div class="col-md-8">{% include "partials/field.html" with field=form.theme_background %}</div>
             <div class="col-md-6">{% include "partials/field.html" with field=form.app_logo %}</div>
             <div class="col-md-6">
-              <label class="form-label">Logo attuale nel menu</label>
+              <label class="form-label">Logo usato nel menu</label>
               <div class="d-flex align-items-center gap-2 border rounded p-2" style="background: {{ company.sidebar_colors.top }};">
-                {% if company.app_logo_url %}
-                <img src="{{ company.app_logo_url }}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.08);padding:3px;">
-                {% else %}
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:{{ company.theme_color_hex }};color:#fff;">
-                  <i class="bi bi-box-seam"></i>
-                </span>
-                {% endif %}
+                <img src="{{ tema.logo_menu }}" alt="" style="width:34px;height:34px;object-fit:contain;">
                 <span class="text-white fw-bold text-truncate">{{ company.name|default:"Gestionale" }}</span>
+              </div>
+              <div class="form-text">
+                {% if company.app_logo_url %}
+                Stai usando il logo caricato qui sopra.
+                {% else %}
+                Stai usando il logo Aquaforma predefinito: carica un file qui sopra per sostituirlo.
+                {% endif %}
               </div>
             </div>
           </div>

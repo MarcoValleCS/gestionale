@@ -14,11 +14,23 @@ def company(request):
 
 def tema(request):
     """Colori e sfondo scelti dall'utente, pronti per il foglio di stile."""
+    from django.templatetags.static import static
+
+    symbol = static("brand/aquaforma-simbolo.png")
+    lockup = static("brand/aquaforma-logo.png")
     try:
         azienda = CompanySettings.load()
     except Exception:  # tabelle non ancora migrate
-        return {"tema": {}}
+        return {
+            "tema": {
+                "logo": "",
+                "logo_menu": symbol,
+                "logo_login": lockup,
+                "logo_predefinito": symbol,
+            }
+        }
     laterale = azienda.sidebar_colors
+    logo_personalizzato = azienda.app_logo_url
     return {
         "tema": {
             "colore": azienda.theme_color_hex,
@@ -30,7 +42,10 @@ def tema(request):
             "laterale_basso": laterale["bottom"],
             "laterale_luce": laterale["glow"],
             "laterale_attivo": laterale["active"],
-            "logo": azienda.app_logo_url,
+            "logo": logo_personalizzato,
+            "logo_menu": logo_personalizzato or symbol,
+            "logo_login": logo_personalizzato or lockup,
+            "logo_predefinito": symbol,
             "stile_documenti": azienda.document_style,
         }
     }
