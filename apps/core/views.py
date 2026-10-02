@@ -51,12 +51,9 @@ def home(request):
         .order_by("name")
     )
 
-    # Un solo passaggio sulle righe consegnate: evita cinque query pesanti
-    stats = analytics.breakdowns(period, limit=10)
-    margin_by_product = stats["by_product"]
-    margin_by_supplier = stats["by_supplier"]
-    margin_by_customer = stats["by_customer"]
-    margin_by_job = stats["by_job"]
+    # Riepilogo del periodo: i dettagli per articolo/cliente/fornitore stanno
+    # nella pagina «Statistiche», così la dashboard resta leggera.
+    stats = analytics.summary(period)
 
     # Finestra temporale del grafico: 1 / 3 / 6 / 12 mesi, spostabile indietro
     try:
@@ -73,7 +70,7 @@ def home(request):
     series = analytics.monthly_series(months, end_offset=offset)
 
     from apps.inventory.models import StockLevel
-    from apps.jobs.models import Asset, Job, MaintenancePlan
+    from apps.jobs.models import Job, MaintenancePlan
     from apps.billing.models import DeliveryNote, PurchaseInvoice, SalesInvoice
 
     inventory_value = (
@@ -115,12 +112,8 @@ def home(request):
         # Statistiche
         "period": period,
         "period_choices": analytics.PERIOD_CHOICES,
-        "stats": stats["summary"],
+        "stats": stats,
         "inventory_value": inventory_value,
-        "margin_by_product": margin_by_product,
-        "margin_by_supplier": margin_by_supplier,
-        "margin_by_customer": margin_by_customer,
-        "margin_by_job": margin_by_job,
         # Grafico
         "series": series,
         "months": months,
@@ -130,7 +123,6 @@ def home(request):
         "jobs_open": Job.objects.filter(status__in=Job.OPEN_STATUSES).count(),
         "maintenance_due": maintenance_due_qs[:6],
         "maintenance_due_count": maintenance_due_qs.count(),
-        "assets_count": Asset.objects.count(),
         # Fatturazione
         "invoices_to_collect": invoices_to_collect,
         "invoices_to_pay": invoices_to_pay,

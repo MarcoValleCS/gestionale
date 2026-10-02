@@ -30,6 +30,9 @@
     <a class="btn btn-outline-success btn-sm text-nowrap" href="{% url 'sales:export_sales_excel' %}?periodo={{ period }}">
       <i class="bi bi-file-earmark-excel"></i> Esporta Excel
     </a>
+    <a class="btn btn-outline-primary btn-sm text-nowrap" href="{% url 'sales:statistics' %}">
+      <i class="bi bi-graph-up-arrow"></i> Statistiche complete
+    </a>
   </form>
 </div>
 
@@ -39,9 +42,6 @@
   </a>
   <a class="btn btn-sm btn-outline-secondary" href="{% url 'jobs:maintenance_list' %}?stato=scadenza">
     <i class="bi bi-calendar-check"></i> Manutenzioni in scadenza <span class="badge text-bg-warning ms-1">{{ maintenance_due_count }}</span>
-  </a>
-  <a class="btn btn-sm btn-outline-secondary" href="{% url 'jobs:asset_list' %}">
-    <i class="bi bi-upc-scan"></i> Seriali installati <span class="badge text-bg-light border ms-1">{{ assets_count }}</span>
   </a>
   {% if roles.is_admin or roles.is_sales %}
   <a class="btn btn-sm btn-outline-secondary" href="{% url 'billing:salesinvoice_list' %}?stato=aperte">
@@ -289,136 +289,6 @@
         {% endfor %}
       </tbody>
     </table>
-  </div>
-</div>
-
-<div class="row g-3 mb-3">
-  <div class="col-lg-7">
-    <div class="card h-100">
-      <div class="card-header"><i class="bi bi-award me-1"></i> Marginalità per articolo</div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
-            <tr>
-              <th>Articolo</th>
-              <th class="text-end">Fatturato</th>
-              <th class="text-end">Costo</th>
-              <th class="text-end">Margine</th>
-              <th class="text-end">Marg. %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in margin_by_product %}
-            <tr>
-              <td>{{ row.label }}</td>
-              <td class="text-end">{{ row.revenue|money }} €</td>
-              <td class="text-end text-muted">{{ row.cost|money }} €</td>
-              <td class="text-end fw-semibold {% if row.margin >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.margin|money }} €</td>
-              <td class="text-end">{{ row.margin_pct|qty }}%</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="text-center text-muted py-4">
-              Nessuna vendita consegnata nel periodo.<br>
-              <span class="small">Le statistiche si popolano quando gli ordini vengono consegnati.</span>
-            </td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-5">
-    <div class="card h-100">
-      <div class="card-header"><i class="bi bi-truck me-1"></i> Marginalità per fornitore</div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
-            <tr>
-              <th>Fornitore</th>
-              <th class="text-end">Fatturato</th>
-              <th class="text-end">Margine</th>
-              <th class="text-end">Marg. %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in margin_by_supplier %}
-            <tr>
-              <td>{{ row.label }}</td>
-              <td class="text-end">{{ row.revenue|money }} €</td>
-              <td class="text-end fw-semibold {% if row.margin >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.margin|money }} €</td>
-              <td class="text-end">{{ row.margin_pct|qty }}%</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-center text-muted py-4">Nessun dato nel periodo</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="row g-3 mb-3">
-  <div class="col-lg-7">
-    <div class="card h-100">
-      <div class="card-header"><i class="bi bi-people me-1"></i> Fatturato per cliente</div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th class="text-end">Fatturato</th>
-              <th class="text-end">Margine</th>
-              <th class="text-end">Marg. %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in margin_by_customer %}
-            <tr>
-              <td>{{ row.label }}</td>
-              <td class="text-end">{{ row.revenue|money }} €</td>
-              <td class="text-end fw-semibold {% if row.margin >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.margin|money }} €</td>
-              <td class="text-end">{{ row.margin_pct|qty }}%</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-center text-muted py-4">Nessun dato nel periodo</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-5">
-    <div class="card h-100">
-      <div class="card-header"><i class="bi bi-cone-striped me-1"></i> Fatturato per cantiere</div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
-            <tr>
-              <th>Cantiere</th>
-              <th class="text-end">Fatturato</th>
-              <th class="text-end">Margine</th>
-              <th class="text-end">Marg. %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in margin_by_job %}
-            <tr>
-              <td>{{ row.label }}</td>
-              <td class="text-end">{{ row.revenue|money }} €</td>
-              <td class="text-end fw-semibold {% if row.margin >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.margin|money }} €</td>
-              <td class="text-end">{{ row.margin_pct|qty }}%</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-center text-muted py-4">
-              Nessun dato nel periodo.<br>
-              <span class="small">Collega gli ordini a un cantiere per vederli qui.</span>
-            </td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 </div>
 

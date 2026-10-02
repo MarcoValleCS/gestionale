@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Foto cantieri e bolle{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
+  <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+    <select class="form-select form-select-sm w-auto" name="tipo" aria-label="Tipo">
+      <option value="">Tutte le foto</option>
+      <option value="site" {% if tipo == "site" %}selected{% endif %}>Foto cantiere</option>
+      <option value="receipt" {% if tipo == "receipt" %}selected{% endif %}>Bolle e acquisti</option>
+    </select>
+    <select class="form-select form-select-sm w-auto" name="collaboratore" aria-label="Collaboratore">
+      <option value="">Tutti i collaboratori</option>
+      {% for collaboratore in collaborators %}
+      <option value="{{ collaboratore.pk }}" {% if collaboratore_id == collaboratore.pk|stringformat:"s" %}selected{% endif %}>{{ collaboratore.name }}</option>
+      {% endfor %}
+    </select>
+    <select class="form-select form-select-sm w-auto" name="cantiere" aria-label="Cantiere">
+      <option value="">Tutti i cantieri</option>
+      {% for cantiere in jobs %}
+      <option value="{{ cantiere.pk }}" {% if cantiere_id == cantiere.pk|stringformat:"s" %}selected{% endif %}>{{ cantiere.code }} – {{ cantiere.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-outline-primary btn-sm" type="submit">Filtra</button>
+    {% if tipo or collaboratore_id or cantiere_id %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:photo_list' %}">Azzera</a>
+    {% endif %}
+  </form>
+  <span class="text-muted small">{{ photos|length }} foto</span>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-images me-1"></i> Foto dei cantieri</div>
+  <div class="card-body">
+    <div class="row g-2">
+      {% for foto in photos_site %}
+      <div class="col-6 col-md-4 col-xl-3">
+        <div class="border rounded overflow-hidden h-100 d-flex flex-column">
+          {% if foto.is_image %}
+          <a href="{{ foto.file.url }}" target="_blank">
+            <img src="{{ foto.file.url }}" alt="{{ foto.name }}" class="w-100" style="height:150px;object-fit:cover;">
+          </a>
+          {% else %}
+          <a href="{{ foto.file.url }}" target="_blank" class="d-flex align-items-center justify-content-center bg-light text-decoration-none" style="height:150px;">
+            <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
+          </a>
+          {% endif %}
+          <div class="p-2 small flex-grow-1">
+            <div class="fw-semibold text-truncate">{{ foto.name }}</div>
+            <div class="text-muted">{{ foto.created_at|date:"d/m/Y H:i" }}</div>
+            <div class="text-muted text-truncate">
+              <i class="bi bi-person"></i> {{ foto.collaborator.name|default:foto.uploaded_by|default:"—" }}
+            </div>
+            {% if foto.job %}
+            <div class="text-truncate"><a href="{% url 'jobs:job_detail' foto.job.pk %}">{{ foto.job.code }} – {{ foto.job.name }}</a></div>
+            {% endif %}
+            {% if foto.notes %}<div class="text-muted">{{ foto.notes }}</div>{% endif %}
+          </div>
+          <form method="post" action="{% url 'jobs:photo_delete' foto.pk %}" class="p-2 pt-0"
+                onsubmit="return confirm('Eliminare questa foto?');">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-12 text-center text-muted py-4">
+        Nessuna foto del cantiere. I collaboratori le caricano da «Le mie ore» → «Foto del cantiere».
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-receipt me-1"></i> Bolle e documenti di acquisto</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>File</th>
+          <th>Collaboratore</th>
+          <th>Cantiere</th>
+          <th>Nota</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for foto in photos_receipt %}
+        <tr>
+          <td class="text-nowrap">{{ foto.created_at|date:"d/m/Y H:i" }}</td>
+          <td>
+            <i class="bi {% if foto.is_image %}bi-file-earmark-image{% else %}bi-file-earmark-pdf{% endif %} me-1"></i>
+            <a href="{{ foto.file.url }}" target="_blank">{{ foto.name }}</a>
+            {% if foto.size_kb %}<span class="text-muted small">· {{ foto.size_kb }} KB</span>{% endif %}
+          </td>
+          <td>{{ foto.collaborator.name|default:"—" }}</td>
+          <td>
+            {% if foto.job %}<a href="{% url 'jobs:job_detail' foto.job.pk %}">{{ foto.job.code }} – {{ foto.job.name }}</a>{% else %}—{% endif %}
+          </td>
+          <td class="small text-muted">{{ foto.notes|default:"—" }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'jobs:photo_delete' foto.pk %}" class="d-inline"
+                  onsubmit="return confirm('Eliminare questo documento?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">Nessuna bolla caricata</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

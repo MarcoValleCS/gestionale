@@ -1,4 +1,4 @@
-"""Test di cantieri, manutenzioni programmate e seriali."""
+"""Test di cantieri e manutenzioni programmate."""
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -12,7 +12,7 @@ from apps.contacts.models import Contact
 from apps.core.models import UnitOfMeasure, VatRate
 from apps.sales.models import Quote, QuoteTemplate, QuoteTemplateLine
 
-from .models import Asset, Job, MaintenancePlan
+from .models import Job, MaintenancePlan
 
 User = get_user_model()
 
@@ -133,40 +133,11 @@ class MaintenanceTest(JobsTestBase):
         self.assertContains(response, "Manutenzioni in scadenza")
 
 
-class AssetTest(JobsTestBase):
-    def test_seriale_con_garanzia(self):
-        job = Job.objects.create(name="Piscina seriali", customer=self.customer)
-        self.login()
-        response = self.client.post(
-            reverse("jobs:asset_create"),
-            {
-                "product": self.product.pk,
-                "serial_number": "POMPA-2026-001",
-                "job": job.pk,
-                "customer": "",
-                "installed_on": "2026-05-10",
-                "warranty_months": "24",
-                "notes": "",
-            },
-        )
-        self.assertEqual(response.status_code, 302)
-        asset = Asset.objects.get()
-        self.assertEqual(asset.customer, self.customer)  # preso dal cantiere
-        self.assertEqual(asset.warranty_until, date(2028, 5, 10))
-        self.assertTrue(asset.under_warranty)
-
-    def test_seriale_unico_per_articolo(self):
-        Asset.objects.create(product=self.product, serial_number="X1")
-        with self.assertRaises(Exception):
-            Asset.objects.create(product=self.product, serial_number="X1")
-
-
 class JobsPagesSmokeTest(JobsTestBase):
     def test_pagine(self):
         self.login()
         job = Job.objects.create(name="Cantiere smoke", customer=self.customer)
         plan = MaintenancePlan.objects.create(name="Manutenzione smoke", customer=self.customer)
-        asset = Asset.objects.create(product=self.product, serial_number="SMOKE-1", job=job)
 
         urls = [
             reverse("jobs:job_list"),
@@ -176,9 +147,6 @@ class JobsPagesSmokeTest(JobsTestBase):
             reverse("jobs:maintenance_list"),
             reverse("jobs:maintenance_create"),
             reverse("jobs:maintenance_update", args=[plan.pk]),
-            reverse("jobs:asset_list"),
-            reverse("jobs:asset_create"),
-            reverse("jobs:asset_update", args=[asset.pk]),
         ]
         for url in urls:
             with self.subTest(url=url):
@@ -190,8 +158,6 @@ class JobsPagesSmokeTest(JobsTestBase):
         urls = [
             reverse("jobs:job_list") + "?stato=aperti",
             reverse("jobs:maintenance_list") + "?stato=scadenza",
-            reverse("jobs:asset_list") + "?garanzia=valida",
-            reverse("jobs:asset_list") + "?q=SMOKE",
         ]
         for url in urls:
             with self.subTest(url=url):

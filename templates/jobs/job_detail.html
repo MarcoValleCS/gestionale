@@ -18,9 +18,6 @@
     <a class="btn btn-outline-primary btn-sm" href="{% url 'sales:quote_create' %}"><i class="bi bi-file-earmark-plus"></i> Nuovo preventivo</a>
     <a class="btn btn-outline-primary btn-sm" href="{% url 'jobs:maintenance_create' %}?cliente={{ job.customer.pk }}&cantiere={{ job.pk }}"><i class="bi bi-calendar-plus"></i> Manutenzione</a>
     {% endif %}
-    {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
-    <a class="btn btn-outline-primary btn-sm" href="{% url 'jobs:asset_create' %}"><i class="bi bi-upc-scan"></i> Registra seriale</a>
-    {% endif %}
   </div>
 </div>
 
@@ -66,7 +63,6 @@
           <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-orders" type="button">Ordini <span class="badge text-bg-light border">{{ orders|length }}</span></button></li>
           <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-pos" type="button">Ordini fornitore <span class="badge text-bg-light border">{{ purchase_orders|length }}</span></button></li>
           <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-plans" type="button">Manutenzioni <span class="badge text-bg-light border">{{ plans|length }}</span></button></li>
-          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-assets" type="button">Seriali <span class="badge text-bg-light border">{{ assets|length }}</span></button></li>
         </ul>
       </div>
       <div class="tab-content">
@@ -142,26 +138,6 @@
                 </tr>
                 {% empty %}
                 <tr><td colspan="4" class="text-center text-muted py-3">Nessuna manutenzione programmata</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="tab-pane fade" id="tab-assets">
-          <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
-              <thead><tr><th>Articolo</th><th>Seriale</th><th class="text-center">Installato</th><th class="text-center">Garanzia fino</th><th></th></tr></thead>
-              <tbody>
-                {% for asset in assets %}
-                <tr>
-                  <td>{{ asset.product }}</td>
-                  <td class="number-badge">{{ asset.serial_number }}</td>
-                  <td class="text-center">{{ asset.installed_on|date:"d/m/Y"|default:"—" }}</td>
-                  <td class="text-center">{{ asset.warranty_until|date:"d/m/Y"|default:"—" }}</td>
-                  <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:asset_update' asset.pk %}"><i class="bi bi-pencil"></i></a></td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center text-muted py-3">Nessun seriale registrato</td></tr>
                 {% endfor %}
               </tbody>
             </table>

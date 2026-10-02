@@ -163,10 +163,10 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS("Creati due modelli di preventivo di esempio (bagno e piscina)."))
 
-        # Cantiere, seriale e manutenzione di esempio
+        # Cantiere e manutenzione di esempio
         from datetime import timedelta
 
-        from apps.jobs.models import Asset, Job, MaintenancePlan
+        from apps.jobs.models import Job, MaintenancePlan
 
         if not Job.objects.exists():
             job = Job.objects.create(
@@ -183,16 +183,6 @@ class Command(BaseCommand):
             # collega solo i documenti di esempio (per non toccare i tuoi)
             SalesOrder.objects.filter(notes__icontains="esempio", job__isnull=True).update(job=job)
             Quote.objects.filter(reference__icontains="demo", job__isnull=True).update(job=job)
-
-            Asset.objects.create(
-                product=bullone,
-                serial_number="POMPA-DEMO-001",
-                job=job,
-                customer=customer,
-                installed_on=timezone.localdate(),
-                warranty_months=24,
-                notes="Seriale di esempio (pompa di ricircolo).",
-            )
 
             piscina_template = QuoteTemplate.objects.filter(name__startswith="Piscina").first()
             MaintenancePlan.objects.create(

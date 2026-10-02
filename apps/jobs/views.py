@@ -1,4 +1,4 @@
-"""Viste di cantieri, manutenzioni programmate e seriali."""
+"""Viste di cantieri e manutenzioni programmate."""
 from datetime import timedelta
 
 from django.contrib import messages
@@ -8,11 +8,11 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from apps.accounts.permissions import ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
+from apps.accounts.permissions import ROLE_ADMIN, ROLE_HR, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
 from apps.core.concurrency import ConflictAwareUpdateView
 
-from .forms import AssetForm, JobForm, MaintenancePlanForm
-from .models import Asset, Job, MaintenancePlan
+from .forms import JobForm, MaintenancePlanForm
+from .models import Job, MaintenancePlan
 
 JOB_EDIT_ROLES = (ROLE_ADMIN, ROLE_SALES)
 SERVICE_EDIT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
@@ -70,7 +70,6 @@ class JobDetailView(DetailView):
         context["orders"] = job.sales_orders.select_related("customer").order_by("-date", "-pk")[:30]
         context["purchase_orders"] = job.purchase_orders.select_related("supplier").order_by("-date", "-pk")[:30]
         context["plans"] = job.maintenance_plans.order_by("next_date")[:20]
-        context["assets"] = job.assets.select_related("product").order_by("-created_at")[:30]
         context["attachments"] = job.attachments.select_related("uploaded_by")[:20]
         return context
 
@@ -113,6 +112,63 @@ class JobUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Cantiere aggiornato.")
         return super().form_valid(form)
+
+
+# ------------------------------------------------------------------- foto
+PHOTO_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_HR)
+
+
+@role_required(*PHOTO_ROLES)
+def photo_list(request):
+    """Foto dei cantieri e bolle caricate dai collaboratori."""
+    from apps.core.models import Attachment
+    from apps.hr.models import Collaborator
+
+    foto = Attachment.objects.filter(kind__in=[Attachment.KIND_SITE, Attachment.KIND_RECEIPT]).select_related(
+        "job", "collaborator", "uploaded_by", "job__customer"
+    )
+
+    tipo = request.GET.get("tipo", "")
+    if tipo in {Attachment.KIND_SITE, Attachment.KIND_RECEIPT}:
+        foto = foto.filter(kind=tipo)
+
+    collaboratore_id = request.GET.get("collaboratore", "")
+    if collaboratore_id.isdigit():
+        foto = foto.filter(collaborator_id=int(collaboratore_id))
+
+    cantiere_id = request.GET.get("cantiere", "")
+    if cantiere_id.isdigit():
+        foto = foto.filter(job_id=int(cantiere_id))
+
+    foto = list(foto)
+    return render(
+        request,
+        "jobs/photo_list.html",
+        {
+            "page_title": "Foto cantieri e bolle",
+            "photos": foto,
+            "photos_site": [f for f in foto if f.kind == Attachment.KIND_SITE],
+            "photos_receipt": [f for f in foto if f.kind == Attachment.KIND_RECEIPT],
+            "tipo": tipo,
+            "collaboratore_id": collaboratore_id,
+            "cantiere_id": cantiere_id,
+            "collaborators": Collaborator.objects.order_by("name"),
+            "jobs": Job.objects.exclude(status__in=[Job.STATUS_CLOSED, Job.STATUS_CANCELLED]).order_by("name"),
+        },
+    )
+
+
+@role_required(*PHOTO_ROLES)
+def photo_delete(request, pk):
+    from apps.core.models import Attachment
+
+    foto = get_object_or_404(Attachment, pk=pk)
+    if request.method == "POST":
+        descrizione = foto.name
+        foto.file.delete(save=False)
+        foto.delete()
+        messages.success(request, f"Foto «{descrizione}» eliminata.")
+    return redirect("jobs:photo_list")
 
 
 # ----------------------------------------------------- manutenzioni
@@ -251,86 +307,3 @@ def maintenance_delete(request, pk):
         messages.success(request, f"Manutenzione «{name}» eliminata.")
     return redirect("jobs:maintenance_list")
 
-
-# ----------------------------------------------------------------- seriali
-class AssetListView(ListView):
-    model = Asset
-    template_name = "jobs/asset_list.html"
-    context_object_name = "assets"
-    paginate_by = 50
-
-    def get_queryset(self):
-        queryset = Asset.objects.select_related("product", "customer", "job").order_by("-created_at")
-        search = self.request.GET.get("q", "").strip()
-        if search:
-            queryset = queryset.filter(
-                Q(serial_number__icontains=search)
-                | Q(product__name__icontains=search)
-                | Q(product__code__icontains=search)
-                | Q(customer__name__icontains=search)
-            )
-        warranty = self.request.GET.get("garanzia", "")
-        if warranty == "valida":
-            queryset = queryset.filter(installed_on__isnull=False)
-            queryset = [asset for asset in queryset if asset.under_warranty]
-        elif warranty == "scaduta":
-            queryset = queryset.filter(installed_on__isnull=False)
-            queryset = [asset for asset in queryset if not asset.under_warranty]
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["page_title"] = "Seriali installati"
-        context["search"] = self.request.GET.get("q", "")
-        context["warranty"] = self.request.GET.get("garanzia", "")
-        return context
-
-
-class AssetCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = SERVICE_EDIT_ROLES
-    model = Asset
-    form_class = AssetForm
-    template_name = "jobs/asset_form.html"
-
-    def get_success_url(self):
-        return reverse_lazy("jobs:asset_list")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["page_title"] = "Nuovo seriale installato"
-        context["cancel_url"] = reverse("jobs:asset_list")
-        return context
-
-    def form_valid(self, form):
-        messages.success(self.request, "Seriale registrato.")
-        return super().form_valid(form)
-
-
-class AssetUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
-    allowed_roles = SERVICE_EDIT_ROLES
-    model = Asset
-    form_class = AssetForm
-    template_name = "jobs/asset_form.html"
-
-    def get_success_url(self):
-        return reverse_lazy("jobs:asset_list")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["page_title"] = f"Modifica seriale: {self.object}"
-        context["cancel_url"] = reverse("jobs:asset_list")
-        return context
-
-    def form_valid(self, form):
-        messages.success(self.request, "Seriale aggiornato.")
-        return super().form_valid(form)
-
-
-@role_required(*SERVICE_EDIT_ROLES)
-def asset_delete(request, pk):
-    asset = get_object_or_404(Asset, pk=pk)
-    if request.method == "POST":
-        label = str(asset)
-        asset.delete()
-        messages.success(request, f"Seriale «{label}» eliminato.")
-    return redirect("jobs:asset_list")
