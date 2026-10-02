@@ -133,6 +133,41 @@
     .signature { width: 100%; border-collapse: collapse; margin-top: 12mm; }
     .signature td { width: 50%; padding-top: 16mm; border-top: 0; font-size: 10.5px; color: #4b5563; }
     .signature .line { border-bottom: 1px solid #9ca3af; height: 12mm; }
+    /* ------------------------------------------------------ stili documento */
+    /* Moderno: colore pieno su titolo e intestazioni di tabella */
+    .stile-moderno .accent-bar { height: 12px; }
+    .stile-moderno .doc-title { background: var(--doc-color); border-color: var(--doc-color); color: #fff; }
+    .stile-moderno .party-box { background: #fff; border-left-width: 5px; box-shadow: 0 2px 10px rgba(16, 24, 40, 0.06); }
+    .stile-moderno table.lines thead th { background: var(--doc-color); color: #fff; border-bottom: 0; }
+    .stile-moderno table.lines tbody tr:nth-child(even) td { background: #f7f9ff; }
+    .stile-moderno table.lines tr.section-row td { background: #eef2fb; }
+    .stile-moderno .totals tr.grand td { font-size: 15px; }
+
+    /* Sobrio: nero su bianco, senza riquadri né colori pieni */
+    .stile-sobrio .accent-bar { height: 3px; }
+    .stile-sobrio .doc-title { border: 0; padding: 0; font-size: 18px; letter-spacing: 0; }
+    .stile-sobrio .party-box { border: 0; border-bottom: 1px solid #e5e7eb; border-radius: 0; background: transparent; padding: 0 0 3mm; }
+    .stile-sobrio table.lines thead th { background: transparent; color: #111827; border-bottom: 1.5px solid #111827; letter-spacing: 0.02em; }
+    .stile-sobrio table.lines tbody tr:nth-child(even) td { background: transparent; }
+    .stile-sobrio table.lines tr.section-row td { background: transparent; color: #111827; text-decoration: underline; }
+    .stile-sobrio table.lines tr.section-total td { background: transparent; }
+    .stile-sobrio .totals tr.grand td { background: transparent; color: #111827; padding: 2.5mm 0; border-top: 1.5px solid #111827; border-radius: 0; }
+    .stile-sobrio .totals tr.grand td.label { border-radius: 0; }
+    .stile-sobrio .totals tr.grand td.value { border-radius: 0; }
+
+    /* Elegante: carattere con grazie, toni caldi e spazi ampi */
+    .stile-elegante { font-family: Georgia, "Times New Roman", serif; }
+    .stile-elegante .company-name,
+    .stile-elegante .doc-title,
+    .stile-elegante .doc-number,
+    .stile-elegante .party-name { font-family: Georgia, "Times New Roman", serif; letter-spacing: 0.01em; }
+    .stile-elegante .header { border-bottom: 1px solid #ddd6c8; padding-bottom: 4mm; }
+    .stile-elegante .accent-bar { height: 4px; }
+    .stile-elegante .doc-title { border-width: 1px; letter-spacing: 0.2em; padding: 3mm 7mm; }
+    .stile-elegante .party-box { background: #fbfaf7; border-left-color: var(--doc-color); }
+    .stile-elegante table.lines thead th { background: #f7f5f0; letter-spacing: 0.08em; }
+    .stile-elegante table.lines tbody tr:nth-child(even) td { background: #fdfcfa; }
+    .stile-elegante table.lines tr.section-row td { background: #f4f1ea; }
     /* --------------------------------------------------------- footer */
     .sheet-footer {
       position: absolute;
@@ -163,7 +198,7 @@
     <button class="primary" onclick="window.print()">Stampa / Salva PDF</button>
   </div>
 
-  <div class="sheet">
+  <div class="sheet stile-{{ company.document_style|default:'classico' }}">
     <div class="accent-bar"></div>
 
     <header class="header">
