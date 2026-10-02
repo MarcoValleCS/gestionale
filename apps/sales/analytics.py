@@ -127,13 +127,14 @@ def _finalize(rows, limit=None):
     return result[:limit] if limit else result
 
 
-def _accumulate(rows, key, label, revenue, cost, commission=ZERO):
+def _accumulate(rows, key, label, revenue, cost, commission=ZERO, quantity=ZERO):
     entry = rows.get(key)
     if entry is None:
-        entry = rows[key] = {"label": label, "revenue": ZERO, "cost": ZERO, "commission": ZERO}
+        entry = rows[key] = {"label": label, "revenue": ZERO, "cost": ZERO, "commission": ZERO, "quantity": ZERO}
     entry["revenue"] += revenue
     entry["cost"] += cost
     entry["commission"] += commission
+    entry["quantity"] += quantity
 
 
 def breakdowns(period, limit=10):
@@ -172,25 +173,25 @@ def breakdowns(period, limit=10):
         order_ids.add(line.order_id)
 
         if line.product_id:
-            _accumulate(product_rows, f"p{line.product_id}", line.product.name, line_revenue, row_cost, row_commission)
+            _accumulate(product_rows, f"p{line.product_id}", line.product.name, line_revenue, row_cost, row_commission, line.qty)
             supplier = line.product.main_supplier
         else:
-            _accumulate(product_rows, "none", line.description or "Voci libere", line_revenue, row_cost, row_commission)
+            _accumulate(product_rows, "none", line.description or "Voci libere", line_revenue, row_cost, row_commission, line.qty)
             supplier = None
 
         if supplier:
-            _accumulate(supplier_rows, f"s{supplier.pk}", supplier.name, line_revenue, row_cost, row_commission)
+            _accumulate(supplier_rows, f"s{supplier.pk}", supplier.name, line_revenue, row_cost, row_commission, line.qty)
         else:
-            _accumulate(supplier_rows, "none", "Senza fornitore", line_revenue, row_cost, row_commission)
+            _accumulate(supplier_rows, "none", "Senza fornitore", line_revenue, row_cost, row_commission, line.qty)
 
         customer = order.customer
-        _accumulate(customer_rows, f"c{customer.pk}", customer.name, line_revenue, row_cost, row_commission)
+        _accumulate(customer_rows, f"c{customer.pk}", customer.name, line_revenue, row_cost, row_commission, line.qty)
 
         job = order.job if order.job_id else None
         if job:
-            _accumulate(job_rows, f"j{job.pk}", f"{job.code} – {job.name}", line_revenue, row_cost, row_commission)
+            _accumulate(job_rows, f"j{job.pk}", f"{job.code} – {job.name}", line_revenue, row_cost, row_commission, line.qty)
         else:
-            _accumulate(job_rows, "none", "Senza cantiere", line_revenue, row_cost, row_commission)
+            _accumulate(job_rows, "none", "Senza cantiere", line_revenue, row_cost, row_commission, line.qty)
 
     margin = revenue - cost - commission_total
     return {
@@ -248,6 +249,138 @@ def by_job(period):
     return _group_lines(period, key_func)
 
 
+# ------------------------------------------------------------- provvigioni
+STATO_CONSEGNATI = (SalesOrder.STATUS_DELIVERED,)
+STATO_CONFERMATI = (SalesOrder.STATUS_CONFIRMED,)
+STATO_TUTTI = (SalesOrder.STATUS_CONFIRMED, SalesOrder.STATUS_DELIVERED)
+
+
+def month_label(year, month):
+    return f"{MONTH_ABBR[month - 1]} {year}"
+
+
+def commission_report(year=None, month=None, statuses=STATO_TUTTI):
+    """Provvigioni da riconoscere nel mese, raggruppate per beneficiario.
+
+    Un ordine entra nel mese in cui la provvigione matura: il mese della
+    consegna per gli ordini consegnati, il mese dell'ordine per gli altri
+    (che sono ancora in lavorazione).
+    """
+    from django.db.models import Q
+
+    today = timezone.localdate()
+    year = int(year or today.year)
+    month = int(month or today.month)
+    start = date(year, month, 1)
+    end = date(year, month, calendar.monthrange(year, month)[1])
+
+    ordini = (
+        SalesOrder.objects.filter(
+            status__in=statuses,
+            commission_contact__isnull=False,
+            commission_pct__gt=0,
+        )
+        .filter(
+            Q(delivered_at__isnull=False, delivered_at__date__gte=start, delivered_at__date__lte=end)
+            | Q(delivered_at__isnull=True, date__gte=start, date__lte=end)
+        )
+        .select_related("commission_contact", "customer")
+        .order_by("date", "number")
+    )
+
+    righe = {}
+    for ordine in ordini:
+        voce = righe.setdefault(
+            ordine.commission_contact_id,
+            {
+                "contact": ordine.commission_contact,
+                "orders": [],
+                "revenue": ZERO,
+                "commission": ZERO,
+                "paid": ZERO,
+                "pending": ZERO,
+            },
+        )
+        importo = ordine.commission_amount
+        consegnato = ordine.delivered_at is not None
+        voce["orders"].append(
+            {
+                "order": ordine,
+                "revenue": ordine.subtotal,
+                "commission": importo,
+                "delivered": consegnato,
+                "when": timezone.localtime(ordine.delivered_at).date() if consegnato else ordine.date,
+            }
+        )
+        voce["revenue"] += ordine.subtotal
+        voce["commission"] += importo
+        if consegnato:
+            voce["paid"] += importo
+        else:
+            voce["pending"] += importo
+
+    result = list(righe.values())
+    for voce in result:
+        voce["revenue"] = round2(voce["revenue"])
+        voce["commission"] = round2(voce["commission"])
+        voce["paid"] = round2(voce["paid"])
+        voce["pending"] = round2(voce["pending"])
+        voce["orders"].sort(key=lambda riga: riga["when"])
+    result.sort(key=lambda voce: voce["commission"], reverse=True)
+
+    return {
+        "year": year,
+        "month": month,
+        "label": month_label(year, month),
+        "rows": result,
+        "total_revenue": round2(sum(voce["revenue"] for voce in result)),
+        "total_commission": round2(sum(voce["commission"] for voce in result)),
+        "total_paid": round2(sum(voce["paid"] for voce in result)),
+        "total_pending": round2(sum(voce["pending"] for voce in result)),
+        "orders_count": sum(len(voce["orders"]) for voce in result),
+    }
+
+
+def commission_year(year=None, statuses=STATO_TUTTI):
+    """Totale provvigioni dell'anno per beneficiario (riepilogo)."""
+    today = timezone.localdate()
+    year = int(year or today.year)
+    start = date(year, 1, 1)
+    end = date(year, 12, 31)
+
+    from django.db.models import Q
+
+    ordini = (
+        SalesOrder.objects.filter(
+            status__in=statuses,
+            commission_contact__isnull=False,
+            commission_pct__gt=0,
+        )
+        .filter(
+            Q(delivered_at__isnull=False, delivered_at__date__gte=start, delivered_at__date__lte=end)
+            | Q(delivered_at__isnull=True, date__gte=start, date__lte=end)
+        )
+        .select_related("commission_contact")
+    )
+
+    riepilogo = {}
+    for ordine in ordini:
+        voce = riepilogo.setdefault(
+            ordine.commission_contact_id,
+            {"contact": ordine.commission_contact, "orders": 0, "revenue": ZERO, "commission": ZERO},
+        )
+        voce["orders"] += 1
+        voce["revenue"] += ordine.subtotal
+        voce["commission"] += ordine.commission_amount
+
+    righe = list(riepilogo.values())
+    for voce in righe:
+        voce["revenue"] = round2(voce["revenue"])
+        voce["commission"] = round2(voce["commission"])
+    righe.sort(key=lambda voce: voce["commission"], reverse=True)
+    return righe
+
+
 def monthly_series(months=12, end_offset=0):
     """Serie fatturato/margine per gli ultimi N mesi (per il grafico).
 
@@ -300,6 +433,7 @@ def monthly_series(months=12, end_offset=0):
             {
                 "label": label,
                 "revenue": round2(month_revenue),
+                "cost": round2(entry["cost"]) if entry else ZERO,
                 "margin": round2(month_margin),
                 "commission": round2(entry["commission"]) if entry else ZERO,
                 "margin_pct": round2(month_margin / month_revenue * 100) if month_revenue else ZERO,

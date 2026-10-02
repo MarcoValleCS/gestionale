@@ -36,10 +36,101 @@ ORDER_VIEW_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, ROLE_PURCHASING)
 ORDER_EDIT_ROLES = (ROLE_ADMIN, ROLE_SALES)
 ORDER_DELIVER_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
 
+MESI_ITALIANI = [
+    "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+    "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+]
+
 
 # ------------------------------------------------------------------ helper
 def fdate(value):
     return value.strftime("%d/%m/%Y") if value else ""
+
+
+def statistics(request):
+    """Statistiche complete: fatturato, margine e classifiche del periodo."""
+    period = request.GET.get("periodo", analytics.PERIOD_YEAR)
+    if period not in {value for value, _label in analytics.PERIOD_CHOICES}:
+        period = analytics.PERIOD_YEAR
+
+    try:
+        months = int(request.GET.get("finestra", 12))
+    except (TypeError, ValueError):
+        months = 12
+    if months not in (1, 3, 6, 12):
+        months = 12
+    try:
+        offset = int(request.GET.get("indietro", 0))
+    except (TypeError, ValueError):
+        offset = 0
+    offset = max(0, min(offset, 36))
+
+    stats = analytics.breakdowns(period, limit=None)
+    return render(
+        request,
+        "sales/statistics.html",
+        {
+            "page_title": "Statistiche",
+            "period": period,
+            "period_choices": analytics.PERIOD_CHOICES,
+            "stats": stats["summary"],
+            "margin_by_product": stats["by_product"],
+            "margin_by_supplier": stats["by_supplier"],
+            "margin_by_customer": stats["by_customer"],
+            "margin_by_job": stats["by_job"],
+            "series": analytics.monthly_series(months, end_offset=offset),
+            "months": months,
+            "offset": offset,
+            "months_choices": (1, 3, 6, 12),
+        },
+    )
+
+
+@role_required(*QUOTE_ROLES)
+def commission_report(request):
+    """Resoconto mensile delle provvigioni da riconoscere e a chi."""
+    oggi = timezone.localdate()
+    try:
+        year = int(request.GET.get("anno", oggi.year))
+    except (TypeError, ValueError):
+        year = oggi.year
+    try:
+        month = int(request.GET.get("mese", oggi.month))
+    except (TypeError, ValueError):
+        month = oggi.month
+    if not 1 <= month <= 12:
+        month = oggi.month
+    if not 2000 <= year <= 2100:
+        year = oggi.year
+
+    stati = request.GET.get("stato", "tutti")
+    stati_disponibili = {
+        "tutti": ("Tutti gli ordini", analytics.STATO_TUTTI),
+        "consegnati": ("Solo consegnati", analytics.STATO_CONSEGNATI),
+        "confermati": ("Solo in lavorazione", analytics.STATO_CONFERMATI),
+    }
+    if stati not in stati_disponibili:
+        stati = "tutti"
+
+    precedente = analytics.add_months(year, month, -1)
+    successivo = analytics.add_months(year, month, 1)
+
+    return render(
+        request,
+        "sales/commission_report.html",
+        {
+            "page_title": "Provvigioni",
+            "report": analytics.commission_report(year, month, stati_disponibili[stati][1]),
+            "riepilogo_anno": analytics.commission_year(year, stati_disponibili[stati][1]),
+            "stato": stati,
+            "stati_disponibili": [(chiave, etichetta) for chiave, (etichetta, _s) in stati_disponibili.items()],
+            "anno_corrente": year,
+            "anni": list(range(oggi.year - 3, oggi.year + 2)),
+            "mesi": [(numero, nome) for numero, nome in enumerate(MESI_ITALIANI, start=1)],
+            "precedente": {"anno": precedente[0], "mese": precedente[1]},
+            "successivo": {"anno": successivo[0], "mese": successivo[1]},
+        },
+    )
 
 
 def plain_number(value):

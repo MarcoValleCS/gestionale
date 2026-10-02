@@ -273,8 +273,19 @@ class AnalyticsTest(FlowTestBase):
             with self.subTest(period=period):
                 response = self.client.get(reverse("core:home") + f"?periodo={period}")
                 self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Fatturato")
+                self.assertContains(response, "Statistiche complete")
+
+    def test_pagina_statistiche_con_dettagli(self):
+        self._delivered_order()
+        self.login()
+        for period in ("anno", "mese", "12m"):
+            with self.subTest(period=period):
+                response = self.client.get(reverse("sales:statistics") + f"?periodo={period}")
+                self.assertEqual(response.status_code, 200)
                 self.assertContains(response, "Marginalità per articolo")
                 self.assertContains(response, "Fatturato per cliente")
+                self.assertContains(response, "Fatturato per cantiere")
 
     def test_fatturato_per_cliente_e_per_cantiere(self):
         job = Job.objects.create(name="Piscina Rossi", customer=self.customer)

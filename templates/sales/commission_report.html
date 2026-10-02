@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Provvigioni{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary" href="{% querystring anno=precedente.anno mese=precedente.mese %}" title="Mese precedente">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <a class="btn btn-outline-secondary" href="{% querystring anno=successivo.anno mese=successivo.mese %}" title="Mese successivo">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <select class="form-select form-select-sm w-auto" name="mese" aria-label="Mese">
+        {% for numero, nome in mesi %}
+        <option value="{{ numero }}" {% if report.month == numero %}selected{% endif %}>{{ nome }}</option>
+        {% endfor %}
+      </select>
+      <select class="form-select form-select-sm w-auto" name="anno" aria-label="Anno">
+        {% for valore in anni %}
+        <option value="{{ valore }}" {% if report.year == valore %}selected{% endif %}>{{ valore }}</option>
+        {% endfor %}
+      </select>
+      <select class="form-select form-select-sm w-auto" name="stato" aria-label="Ordini">
+        {% for chiave, etichetta in stati_disponibili %}
+        <option value="{{ chiave }}" {% if stato == chiave %}selected{% endif %}>{{ etichetta }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-primary btn-sm" type="submit">Mostra</button>
+    </form>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:statistics' %}">
+    <i class="bi bi-graph-up-arrow"></i> Statistiche
+  </a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Provvigioni di {{ report.label }}</div>
+        <div class="fs-3 fw-bold number-badge">{{ report.total_commission|money }} €</div>
+        <div class="small text-muted">{{ report.orders_count }} ordini con provvigione</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Imponibile di riferimento</div>
+        <div class="fs-3 fw-bold number-badge">{{ report.total_revenue|money }} €</div>
+        <div class="small text-muted">vendite su cui è calcolata</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Da liquidare</div>
+        <div class="fs-3 fw-bold number-badge">{{ report.total_pending|money }} €</div>
+        <div class="small text-muted">ordini non ancora consegnati</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Maturate</div>
+        <div class="fs-3 fw-bold number-badge">{{ report.total_paid|money }} €</div>
+        <div class="small text-muted">su ordini consegnati</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-person-badge me-1"></i> A chi va riconosciuta</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Beneficiario</th>
+          <th class="text-end">Ordini</th>
+          <th class="text-end">Imponibile</th>
+          <th class="text-end">Provvigione</th>
+          <th class="text-end">Maturate</th>
+          <th class="text-end">Da liquidare</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report.rows %}
+        <tr>
+          <td>
+            <a href="{% url 'contacts:detail' row.contact.pk %}" class="fw-semibold">{{ row.contact.name }}</a>
+          </td>
+          <td class="text-end">{{ row.orders|length }}</td>
+          <td class="text-end">{{ row.revenue|money }} €</td>
+          <td class="text-end fw-semibold">{{ row.commission|money }} €</td>
+          <td class="text-end text-muted">{{ row.paid|money }} €</td>
+          <td class="text-end text-muted">{{ row.pending|money }} €</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">
+          Nessuna provvigione in {{ report.label }}.<br>
+          <span class="small">Le provvigioni si impostano sul preventivo o sull'ordine, indicando beneficiario e percentuale.</span>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if report.rows %}
+      <tfoot class="table-group-divider">
+        <tr>
+          <th>Totale</th>
+          <th class="text-end">{{ report.orders_count }}</th>
+          <th class="text-end">{{ report.total_revenue|money }} €</th>
+          <th class="text-end">{{ report.total_commission|money }} €</th>
+          <th class="text-end">{{ report.total_paid|money }} €</th>
+          <th class="text-end">{{ report.total_pending|money }} €</th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-list-ul me-1"></i> Dettaglio ordini di {{ report.label }}</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Ordine</th>
+          <th>Cliente</th>
+          <th>Beneficiario</th>
+          <th class="text-end">%</th>
+          <th class="text-end">Imponibile</th>
+          <th class="text-end">Provvigione</th>
+          <th class="text-center">Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report.rows %}
+        {% for voce in row.orders %}
+        <tr>
+          <td>{{ voce.when|date:"d/m/Y" }}</td>
+          <td><a href="{% url 'sales:order_detail' voce.order.pk %}">{{ voce.order.number }}</a></td>
+          <td>{{ voce.order.customer.name }}</td>
+          <td>{{ row.contact.name }}</td>
+          <td class="text-end">{{ voce.order.commission_pct|qty }}%</td>
+          <td class="text-end">{{ voce.revenue|money }} €</td>
+          <td class="text-end fw-semibold">{{ voce.commission|money }} €</td>
+          <td class="text-center">
+            {% if voce.delivered %}
+            <span class="badge text-bg-success">Consegnato</span>
+            {% else %}
+            <span class="badge text-bg-warning">In lavorazione</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-3">Nessun ordine nel mese</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-calendar3 me-1"></i> Riepilogo {{ anno_corrente }}</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th>Beneficiario</th>
+          <th class="text-end">Ordini</th>
+          <th class="text-end">Imponibile</th>
+          <th class="text-end">Provvigioni dell'anno</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for voce in riepilogo_anno %}
+        <tr>
+          <td>{{ voce.contact.name }}</td>
+          <td class="text-end">{{ voce.orders }}</td>
+          <td class="text-end">{{ voce.revenue|money }} €</td>
+          <td class="text-end fw-semibold">{{ voce.commission|money }} €</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted py-3">Nessuna provvigione registrata nel {{ anno_corrente }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
