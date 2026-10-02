@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Ricerca{% endblock %}
+
+{% block content %}
+<form method="get" class="mb-4">
+  <div class="input-group">
+    <input type="search" class="form-control form-control-lg" name="q" value="{{ testo }}" autofocus
+           placeholder="Cerca articoli, contatti, documenti, cantieri…">
+    <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> Cerca</button>
+  </div>
+  <div class="form-text">Scrivi almeno due lettere: cerca per nome, codice, codice a barre, P.IVA, città, numero documento.</div>
+</form>
+
+{% if testo and not risultati %}
+<div class="alert alert-light border text-center py-4">
+  Nessun risultato per «{{ testo }}».
+</div>
+{% endif %}
+
+{% if risultati.contatti %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-people me-1"></i> Contatti</div>
+  <div class="list-group list-group-flush">
+    {% for contatto in risultati.contatti %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+       href="{% url 'contacts:detail' contatto.pk %}">
+      <div>
+        <div class="fw-semibold">{{ contatto.name }}</div>
+        <div class="small text-muted">
+          {{ contatto.code }}
+          {% if contatto.city %} · {{ contatto.city }}{% endif %}
+          {% if contatto.vat_number %} · P.IVA {{ contatto.vat_number }}{% endif %}
+        </div>
+      </div>
+      <div class="text-end small text-muted">
+        {% if contatto.is_customer %}<span class="badge text-bg-light border">Cliente</span>{% endif %}
+        {% if contatto.is_supplier %}<span class="badge text-bg-light border">Fornitore</span>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.articoli %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-box me-1"></i> Articoli</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead><tr><th>Codice</th><th>Descrizione</th><th class="text-end">Prezzo</th><th class="text-end">Giacenza</th></tr></thead>
+      <tbody>
+        {% for articolo in risultati.articoli %}
+        <tr>
+          <td><a href="{% url 'catalog:product_detail' articolo.pk %}">{{ articolo.code }}</a></td>
+          <td>{{ articolo.name }}</td>
+          <td class="text-end">{{ articolo.sale_price|money }} €</td>
+          <td class="text-end {% if articolo.is_low_stock %}text-danger{% endif %}">
+            {{ articolo.total_stock|qty }} {{ articolo.uom.code }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.preventivi %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-file-earmark-text me-1"></i> Preventivi</div>
+  <div class="list-group list-group-flush">
+    {% for documento in risultati.preventivi %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'sales:quote_detail' documento.pk %}">
+      <span><span class="fw-semibold">{{ documento.number }}</span> · {{ documento.customer.name }}</span>
+      <span class="text-muted small">{{ documento.date|date:"d/m/Y" }} · {{ documento.grand_total|money }} €</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.ordini %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-cart-check me-1"></i> Ordini cliente</div>
+  <div class="list-group list-group-flush">
+    {% for documento in risultati.ordini %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'sales:order_detail' documento.pk %}">
+      <span><span class="fw-semibold">{{ documento.number }}</span> · {{ documento.customer.name }}</span>
+      <span class="text-muted small">{{ documento.date|date:"d/m/Y" }} · {{ documento.grand_total|money }} €</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.ordini_fornitore %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-truck me-1"></i> Ordini fornitore</div>
+  <div class="list-group list-group-flush">
+    {% for documento in risultati.ordini_fornitore %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'purchasing:po_detail' documento.pk %}">
+      <span><span class="fw-semibold">{{ documento.number }}</span> · {{ documento.supplier.name }}</span>
+      <span class="text-muted small">{{ documento.date|date:"d/m/Y" }} · {{ documento.grand_total|money }} €</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.fatture %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-receipt me-1"></i> Fatture emesse</div>
+  <div class="list-group list-group-flush">
+    {% for documento in risultati.fatture %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'billing:salesinvoice_detail' documento.pk %}">
+      <span><span class="fw-semibold">{{ documento.number }}</span> · {{ documento.customer.name }}</span>
+      <span class="text-muted small">{{ documento.date|date:"d/m/Y" }} · {{ documento.grand_total|money }} €</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.fatture_ricevute %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-receipt-cutoff me-1"></i> Fatture ricevute</div>
+  <div class="list-group list-group-flush">
+    {% for documento in risultati.fatture_ricevute %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'billing:purchaseinvoice_detail' documento.pk %}">
+      <span><span class="fw-semibold">{{ documento.number }}</span> · {{ documento.supplier.name }}</span>
+      <span class="text-muted small">{{ documento.date|date:"d/m/Y" }} · {{ documento.grand_total|money }} €</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.ddt %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-truck me-1"></i> DDT</div>
+  <div class="list-group list-group-flush">
+    {% for documento in risultati.ddt %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'billing:deliverynote_detail' documento.pk %}">
+      <span><span class="fw-semibold">{{ documento.number }}</span> · {{ documento.customer.name }}</span>
+      <span class="text-muted small">{{ documento.date|date:"d/m/Y" }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.cantieri %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-cone-striped me-1"></i> Cantieri</div>
+  <div class="list-group list-group-flush">
+    {% for cantiere in risultati.cantieri %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'jobs:job_detail' cantiere.pk %}">
+      <span><span class="fw-semibold">{{ cantiere.code }}</span> · {{ cantiere.name }}</span>
+      <span class="text-muted small">{{ cantiere.customer.name }}{% if cantiere.city %} · {{ cantiere.city }}{% endif %}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

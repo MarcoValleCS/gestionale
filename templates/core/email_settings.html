@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Email{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-envelope-check me-1"></i> Stato dell'invio email</div>
+      <div class="card-body">
+        {% if configurato %}
+        <div class="alert alert-success py-2 mb-3">
+          <i class="bi bi-check-circle me-1"></i> L'invio è configurato: preventivi, fatture e solleciti possono partire.
+        </div>
+        {% else %}
+        <div class="alert alert-warning py-2 mb-3">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <strong>L'invio non è configurato.</strong>
+          Finché le variabili <code>EMAIL_*</code> nel file <code>.env</code> restano vuote non partono
+          preventivi, fatture, solleciti né la trasmissione allo SDI.
+        </div>
+        {% endif %}
+
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4 text-muted">Sistema di invio</dt><dd class="col-sm-8">{{ backend }}</dd>
+          <dt class="col-sm-4 text-muted">Server SMTP</dt><dd class="col-sm-8">{{ host }}</dd>
+          <dt class="col-sm-4 text-muted">Porta</dt><dd class="col-sm-8">{{ port }}{% if tls %} · TLS attivo{% endif %}</dd>
+          <dt class="col-sm-4 text-muted">Utente</dt><dd class="col-sm-8">{{ utente }}</dd>
+          <dt class="col-sm-4 text-muted">Mittente</dt><dd class="col-sm-8">{{ mittente }}</dd>
+          <dt class="col-sm-4 text-muted">PEC per lo SDI</dt><dd class="col-sm-8">{{ pec_sdi }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-send me-1"></i> Prova di invio</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Manda una email di prova per verificare che la configurazione funzioni davvero.
+        </p>
+        <form method="post" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <div class="col-md-8">
+            <label class="form-label" for="email-test">Destinatario</label>
+            <input class="form-control" type="email" id="email-test" name="to" value="{{ destinatario }}"
+                   placeholder="indirizzo@esempio.it" required>
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send"></i> Invia prova</button>
+          </div>
+        </form>
+
+        {% if esito %}
+        <div class="alert alert-{% if esito.0 == 'ok' %}success{% else %}danger{% endif %} py-2 mt-3 mb-0">
+          {{ esito.1 }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-gear me-1"></i> Come si configura</div>
+      <div class="card-body small">
+        <p>Nel file <code>.env</code> del server (accanto a <code>docker-compose.yml</code>) vanno compilate:</p>
+        <pre class="bg-light border rounded p-2 small mb-3">EMAIL_HOST=smtp.tuoprovider.it
+EMAIL_PORT=587
+EMAIL_HOST_USER=info@aquaforma.space
+EMAIL_HOST_PASSWORD=la-password
+EMAIL_USE_TLS=true
+DEFAULT_FROM_EMAIL=Aquaforma &lt;info@aquaforma.space&gt;</pre>
+        <p class="mb-2">Per la <strong>fatturazione elettronica</strong> serve la stessa configurazione, ma con le
+        credenziali della casella <strong>PEC</strong>: l'XML viene trasmesso allo SDI via PEC.</p>
+        <p class="mb-0 text-muted">
+          Dopo la modifica: <code>docker compose up -d</code> per riavviare con le nuove variabili.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

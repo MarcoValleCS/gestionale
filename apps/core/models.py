@@ -406,3 +406,37 @@ class Attachment(TimeStampedModel):
             return round(self.file.size / 1024, 1)
         except Exception:
             return None
+
+
+class ActivityLog(models.Model):
+    """Riga del registro modifiche: chi ha fatto cosa e quando."""
+
+    ACTION_CHOICES = [
+        ("creato", "Creato"),
+        ("modificato", "Modificato"),
+        ("cancellato", "Cancellato"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activity_logs",
+        verbose_name="Utente",
+    )
+    action = models.CharField("Azione", max_length=20, choices=ACTION_CHOICES)
+    model_name = models.CharField("Tipo", max_length=60)
+    object_id = models.CharField("Identificativo", max_length=40, blank=True)
+    object_label = models.CharField("Oggetto", max_length=120, blank=True)
+    details = models.CharField("Dettagli", max_length=300, blank=True)
+    created_at = models.DateTimeField("Quando", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Attività"
+        verbose_name_plural = "Registro attività"
+        ordering = ["-created_at", "-pk"]
+        indexes = [models.Index(fields=["-created_at"], name="activity_date_idx")]
+
+    def __str__(self):
+        return f"{self.get_action_display()} {self.model_name} {self.object_label}".strip()

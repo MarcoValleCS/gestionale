@@ -196,27 +196,30 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------ main
     def handle(self, *args, **options):
+        from apps.core.activity import registro_sospeso
+
         self.rif = self._riferimenti()
-        if options["reset"]:
-            self._svuota()
-        with transaction.atomic():
-            self._azienda()
-            self._utenti()
-            self._contatti()
-            self._articoli()
-            self._listini()
-            self._cantieri()
-            self._preventivi()
-            self._ordini_cliente()
-            self._ordini_fornitore()
-            self._ddt()
-            self._provvigioni_del_mese()
-            self._fatture()
-            self._manutenzioni()
-            self._personale()
-            self._collaboratori()
-            if not options["senza_foto"]:
-                self._foto()
+        with registro_sospeso():
+            if options["reset"]:
+                self._svuota()
+            with transaction.atomic():
+                self._azienda()
+                self._utenti()
+                self._contatti()
+                self._articoli()
+                self._listini()
+                self._cantieri()
+                self._preventivi()
+                self._ordini_cliente()
+                self._ordini_fornitore()
+                self._ddt()
+                self._provvigioni_del_mese()
+                self._fatture()
+                self._manutenzioni()
+                self._personale()
+                self._collaboratori()
+                if not options["senza_foto"]:
+                    self._foto()
         self._riepilogo()
 
     # ----------------------------------------------------------- riferimenti

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Registro attività{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+    <select class="form-select form-select-sm w-auto" name="utente" aria-label="Utente">
+      <option value="">Tutti gli utenti</option>
+      {% for id_utente, nome in utenti %}
+      <option value="{{ id_utente }}" {% if utente_id == id_utente|stringformat:"s" %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
+    <select class="form-select form-select-sm w-auto" name="tipo" aria-label="Tipo">
+      <option value="">Tutti i tipi</option>
+      {% for nome in tipi %}
+      <option value="{{ nome }}" {% if tipo == nome %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
+    <select class="form-select form-select-sm w-auto" name="azione" aria-label="Azione">
+      <option value="">Tutte le azioni</option>
+      <option value="creato" {% if azione == "creato" %}selected{% endif %}>Creato</option>
+      <option value="modificato" {% if azione == "modificato" %}selected{% endif %}>Modificato</option>
+      <option value="cancellato" {% if azione == "cancellato" %}selected{% endif %}>Cancellato</option>
+    </select>
+    <button class="btn btn-outline-primary btn-sm" type="submit">Filtra</button>
+    {% if utente_id or tipo or azione %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:activity_log' %}">Azzera</a>
+    {% endif %}
+  </form>
+  <span class="text-muted small">{{ totale }} movimenti</span>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th style="width:150px">Quando</th>
+          <th style="width:140px">Utente</th>
+          <th style="width:110px">Azione</th>
+          <th style="width:140px">Tipo</th>
+          <th>Oggetto</th>
+          <th>Dettagli</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for voce in voci %}
+        <tr>
+          <td class="text-nowrap">{{ voce.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ voce.user.username|default:"—" }}</td>
+          <td>
+            <span class="badge {% if voce.action == 'creato' %}text-bg-success{% elif voce.action == 'cancellato' %}text-bg-danger{% else %}text-bg-info{% endif %}">
+              {{ voce.get_action_display }}
+            </span>
+          </td>
+          <td>{{ voce.model_name }}</td>
+          <td class="text-truncate" style="max-width:280px">{{ voce.object_label }}</td>
+          <td class="small text-muted">{{ voce.details }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">
+          Il registro è vuoto: le modifiche compariranno qui d'ora in avanti.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if totale > 300 %}
+<p class="text-muted small mt-2">Mostrati gli ultimi 300 movimenti su {{ totale }}. Usa i filtri per restringere.</p>
+{% endif %}
+{% endblock %}

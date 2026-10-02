@@ -6,8 +6,11 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("cerca/", views.global_search, name="search"),
     path("impostazioni/", views.settings_home, name="settings"),
     path("impostazioni/azienda/", views.CompanyUpdateView.as_view(), name="company_update"),
+    path("impostazioni/email/", views.email_settings, name="email_settings"),
+    path("impostazioni/attivita/", views.activity_log, name="activity_log"),
     path("impostazioni/iva/", views.VatRateListView.as_view(), name="vat_list"),
     path("impostazioni/iva/nuova/", views.VatRateCreateView.as_view(), name="vat_create"),
     path("impostazioni/iva/<int:pk>/", views.VatRateUpdateView.as_view(), name="vat_update"),

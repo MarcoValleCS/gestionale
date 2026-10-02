@@ -154,6 +154,167 @@ def settings_home(request):
     return render(request, "core/settings.html", {"page_title": "Impostazioni"})
 
 
+@role_required(ROLE_ADMIN)
+def email_settings(request):
+    """Stato della configurazione email e invio di una email di prova."""
+    from django.conf import settings as dj_settings
+
+    from .mailing import email_configured
+
+    esito = None
+    if request.method == "POST":
+        destinatario = (request.POST.get("to") or request.user.email or "").strip()
+        if not destinatario:
+            esito = ("errore", "Indica un indirizzo email di destinazione (o aggiungilo al tuo utente).")
+        elif not email_configured():
+            esito = ("errore", "L'invio non è configurato: compila le variabili EMAIL_* nel file .env e riavvia.")
+        else:
+            from django.core.mail import send_mail
+
+            try:
+                send_mail(
+                    subject="Prova di invio dal gestionale",
+                    message=(
+                        "Questa è una email di prova inviata dal gestionale.\n\n"
+                        "Se la ricevi, l'invio di preventivi e fatture funziona."
+                    ),
+                    from_email=dj_settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[destinatario],
+                    fail_silently=False,
+                )
+            except Exception as exc:
+                esito = ("errore", f"Invio non riuscito: {exc}")
+            else:
+                esito = ("ok", f"Email di prova inviata a {destinatario}.")
+
+    configurato = email_configured()
+    backend = dj_settings.EMAIL_BACKEND.rsplit(".", 1)[-1]
+    return render(
+        request,
+        "core/email_settings.html",
+        {
+            "page_title": "Email",
+            "configurato": configurato,
+            "esito": esito,
+            "backend": backend,
+            "host": dj_settings.EMAIL_HOST or "—",
+            "port": dj_settings.EMAIL_PORT,
+            "utente": dj_settings.EMAIL_HOST_USER or "—",
+            "mittente": dj_settings.DEFAULT_FROM_EMAIL,
+            "tls": getattr(dj_settings, "EMAIL_USE_TLS", False),
+            "pec_sdi": getattr(dj_settings, "SDI_PEC_ADDRESS", "—"),
+            "destinatario": request.user.email,
+        },
+    )
+
+
+@role_required(ROLE_ADMIN)
+def activity_log(request):
+    """Registro delle modifiche: chi ha toccato cosa."""
+    from .models import ActivityLog
+
+    voci = ActivityLog.objects.select_related("user")
+    utente_id = request.GET.get("utente", "")
+    if utente_id.isdigit():
+        voci = voci.filter(user_id=int(utente_id))
+    tipo = request.GET.get("tipo", "")
+    if tipo:
+        voci = voci.filter(model_name__iexact=tipo)
+    azione = request.GET.get("azione", "")
+    if azione:
+        voci = voci.filter(action=azione)
+
+    totale = voci.count()
+    voci = voci[:300]
+    utenti = (
+        ActivityLog.objects.exclude(user__isnull=True)
+        .values_list("user_id", "user__username")
+        .distinct()
+        .order_by("user__username")
+    )
+    tipi = ActivityLog.objects.values_list("model_name", flat=True).distinct().order_by("model_name")
+    return render(
+        request,
+        "core/activity.html",
+        {
+            "page_title": "Registro attività",
+            "voci": voci,
+            "totale": totale,
+            "utenti": utenti,
+            "tipi": tipi,
+            "azione": azione,
+            "tipo": tipo,
+            "utente_id": utente_id,
+        },
+    )
+
+
+def global_search(request):
+    """Ricerca unica: articoli, contatti, documenti e cantieri."""
+    from django.db.models import Q
+
+    from apps.billing.models import DeliveryNote, PurchaseInvoice, SalesInvoice
+    from apps.catalog.models import Product
+    from apps.contacts.models import Contact
+    from apps.jobs.models import Job
+    from apps.purchasing.models import PurchaseOrder
+    from apps.sales.models import Quote, SalesOrder
+
+    testo = (request.GET.get("q") or "").strip()
+    risultati = {}
+    if len(testo) >= 2:
+        risultati["contatti"] = Contact.objects.filter(
+            Q(name__icontains=testo) | Q(code__icontains=testo) | Q(vat_number__icontains=testo)
+            | Q(city__icontains=testo) | Q(email__icontains=testo)
+        ).order_by("name")[:15]
+
+        risultati["articoli"] = Product.objects.filter(
+            Q(name__icontains=testo) | Q(code__icontains=testo) | Q(barcode__icontains=testo)
+        ).select_related("uom").order_by("name")[:15]
+
+        documenti = {}
+        if has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_SALES):
+            documenti["preventivi"] = Quote.objects.filter(
+                Q(number__icontains=testo) | Q(customer__name__icontains=testo) | Q(reference__icontains=testo)
+            )
+            documenti["fatture"] = SalesInvoice.objects.filter(
+                Q(number__icontains=testo) | Q(customer__name__icontains=testo)
+            )
+        if has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_SALES) or has_role(request.user, ROLE_WAREHOUSE) or has_role(request.user, ROLE_PURCHASING):
+            documenti["ordini"] = SalesOrder.objects.filter(
+                Q(number__icontains=testo) | Q(customer__name__icontains=testo) | Q(reference__icontains=testo)
+            )
+        if has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_PURCHASING) or has_role(request.user, ROLE_WAREHOUSE):
+            documenti["ordini_fornitore"] = PurchaseOrder.objects.filter(
+                Q(number__icontains=testo) | Q(supplier__name__icontains=testo)
+            )
+        if has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_PURCHASING):
+            documenti["fatture_ricevute"] = PurchaseInvoice.objects.filter(
+                Q(number__icontains=testo) | Q(supplier__name__icontains=testo)
+                | Q(supplier_reference__icontains=testo)
+            )
+        documenti["ddt"] = DeliveryNote.objects.filter(
+            Q(number__icontains=testo) | Q(customer__name__icontains=testo)
+        )
+        documenti["cantieri"] = Job.objects.filter(
+            Q(name__icontains=testo) | Q(code__icontains=testo) | Q(city__icontains=testo)
+            | Q(customer__name__icontains=testo)
+        )
+        for chiave, queryset in documenti.items():
+            # ogni modello ha relazioni diverse: si carica solo quello che esiste
+            campi_modello = {campo.name for campo in queryset.model._meta.get_fields()}
+            da_caricare = [campo for campo in ("customer", "supplier") if campo in campi_modello]
+            trovati = list(queryset.select_related(*da_caricare)[:10])
+            if trovati:
+                risultati[chiave] = trovati
+
+    return render(
+        request,
+        "core/search.html",
+        {"page_title": f"Ricerca: {testo}" if testo else "Ricerca", "testo": testo, "risultati": risultati},
+    )
+
+
 class AdminRequiredMixin(RoleRequiredMixin):
     allowed_roles = (ROLE_ADMIN,)
 
