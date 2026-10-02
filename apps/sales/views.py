@@ -14,6 +14,7 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
 from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
+from apps.catalog.models import Product
 from apps.core.models import VatRate
 
 from . import analytics, emailing, services
@@ -84,6 +85,106 @@ def statistics(request):
             "months_choices": (1, 3, 6, 12),
         },
     )
+
+
+@role_required(*QUOTE_ROLES)
+def follow_up(request):
+    """Preventivi da sollecitare e tasso di conversione."""
+    from datetime import timedelta
+
+    oggi = timezone.localdate()
+    try:
+        giorni = int(request.GET.get("giorni", 7))
+    except (TypeError, ValueError):
+        giorni = 7
+    giorni = max(1, min(giorni, 365))
+
+    aperti = list(
+        Quote.objects.filter(status__in=[Quote.STATUS_DRAFT, Quote.STATUS_SENT])
+        .select_related("customer", "created_by")
+        .order_by("date")
+    )
+    da_sollecitare = []
+    for preventivo in aperti:
+        attesa = (oggi - preventivo.date).days
+        scadenza = preventivo.valid_until
+        giorni_a_scadenza = (scadenza - oggi).days if scadenza else None
+        preventivo.attesa = attesa
+        preventivo.giorni_a_scadenza = giorni_a_scadenza
+        preventivo.scaduto = giorni_a_scadenza is not None and giorni_a_scadenza < 0
+        preventivo.email_cliente = bool(preventivo.customer.email)
+        if attesa >= giorni:
+            da_sollecitare.append(preventivo)
+
+    # conversione: quanti preventivi diventano ordini
+    inviati = Quote.objects.filter(status__in=[Quote.STATUS_SENT, Quote.STATUS_ACCEPTED, Quote.STATUS_CONVERTED]).count()
+    convertiti = Quote.objects.filter(status=Quote.STATUS_CONVERTED).count()
+    rifiutati = Quote.objects.filter(status=Quote.STATUS_REJECTED).count()
+    conclusi = convertiti + rifiutati
+    conversione = round(convertiti / conclusi * 100, 1) if conclusi else 0
+
+    # tempo medio di chiusura dei preventivi convertiti
+    chiusure = []
+    for preventivo in Quote.objects.filter(status=Quote.STATUS_CONVERTED).prefetch_related("generated_orders")[:200]:
+        for ordine in preventivo.generated_orders.all():
+            delta = (ordine.date - preventivo.date).days
+            if delta >= 0:
+                chiusure.append(delta)
+    tempo_medio = round(sum(chiusure) / len(chiusure), 1) if chiusure else None
+
+    valore_fermo = sum((p.grand_total or 0) for p in da_sollecitare)
+
+    return render(
+        request,
+        "sales/follow_up.html",
+        {
+            "page_title": "Preventivi da seguire",
+            "da_sollecitare": da_sollecitare,
+            "giorni": giorni,
+            "inviati": inviati,
+            "convertiti": convertiti,
+            "rifiutati": rifiutati,
+            "conversione": conversione,
+            "tempo_medio": tempo_medio,
+            "valore_fermo": valore_fermo,
+            "email_configurata": emailing.email_configured(),
+        },
+    )
+
+
+@role_required(*QUOTE_ROLES)
+def quote_reminder(request, pk):
+    """Invia un sollecito per un preventivo senza risposta."""
+    preventivo = get_object_or_404(Quote.objects.select_related("customer"), pk=pk)
+    if request.method != "POST":
+        return redirect("sales:follow_up")
+    if not preventivo.customer.email:
+        messages.error(request, f"Il cliente {preventivo.customer.name} non ha un indirizzo email.")
+        return redirect("sales:follow_up")
+    if not emailing.email_configured():
+        messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        return redirect("sales:follow_up")
+
+    giorni = (timezone.localdate() - preventivo.date).days
+    oggetto = f"Preventivo {preventivo.number} – siamo a disposizione"
+    corpo = (
+        f"Gentile {preventivo.customer.name},\n\n"
+        f"torniamo sul preventivo {preventivo.number} del {preventivo.date:%d/%m/%Y} "
+        f"({preventivo.grand_total:.2f} € IVA inclusa), inviato {giorni} giorni fa.\n\n"
+        "Restiamo a disposizione per chiarimenti, modifiche o per fissare un appuntamento.\n"
+        "Se il preventivo non è più di interesse, ce lo faccia sapere: ci aiuta a non disturbarla.\n\n"
+        "Cordiali saluti"
+    )
+    try:
+        emailing.send_quote_email(preventivo, to_email=preventivo.customer.email, subject=oggetto, message=corpo)
+    except Exception as exc:
+        messages.error(request, f"Sollecito non inviato: {exc}")
+    else:
+        if preventivo.status == Quote.STATUS_DRAFT:
+            preventivo.status = Quote.STATUS_SENT
+            preventivo.save(update_fields=["status"])
+        messages.success(request, f"Sollecito inviato a {preventivo.customer.email} per {preventivo.number}.")
+    return redirect("sales:follow_up")
 
 
 @role_required(*QUOTE_ROLES)
@@ -194,6 +295,11 @@ def with_vat_rates(context):
         str(contact.pk): str(contact.sale_discount_pct)
         for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
     }
+    # costo di acquisto per articolo: serve a mostrare il margine mentre si scrive
+    context["product_costs_json"] = {
+        str(pk): str(costo)
+        for pk, costo in Product.objects.filter(purchase_price__gt=0).values_list("pk", "purchase_price")
+    }
     return context
 
 
@@ -208,6 +314,9 @@ def save_document_lines(document, formset, fk_field):
         if line.position != position:
             line.position = position
             line.save(update_fields=["position"])
+    services.espandi_kit(document, fk_field)
+    if hasattr(document, "recalculate"):
+        document.recalculate()
 
 
 # --------------------------------------------------------------- preventivi

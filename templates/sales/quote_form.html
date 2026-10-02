@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static core_extras %}
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
@@ -67,6 +67,29 @@
             </div>
           </dl>
           <div id="vat-breakdown" class="mt-2"></div>
+          <div class="border-top mt-3 pt-2">
+            <div class="text-muted small text-uppercase mb-1">Margine del preventivo</div>
+            <dl class="doc-totals mb-0">
+              <div class="d-flex justify-content-between"><dt>Costo merce</dt><dd id="totals-cost">0,00 €</dd></div>
+              <div class="d-flex justify-content-between">
+                <dt>Margine</dt>
+                <dd id="totals-margin">0,00 €</dd>
+              </div>
+              <div class="d-flex justify-content-between">
+                <dt>Marginalità</dt>
+                <dd id="totals-margin-pct">—</dd>
+              </div>
+            </dl>
+            {% if object.commission_pct %}
+            <div class="d-flex justify-content-between small text-muted mt-1">
+              <span>Provvigione {{ object.commission_pct|qty }}%</span>
+              <span id="totals-commission">0,00 €</span>
+            </div>
+            {% endif %}
+            <p class="text-muted small mb-0 mt-2">
+              Il margine usa il costo di acquisto in anagrafica: è un'indicazione, non un dato contabile.
+            </p>
+          </div>
           <p class="text-muted small mt-3 mb-0">
             I totali definitivi vengono ricalcolati dal server al salvataggio.
           </p>
@@ -101,6 +124,7 @@
             <th class="col-sconto">Sc. %</th>
             <th class="col-iva">IVA</th>
             <th class="col-totale text-end">Totale</th>
+            <th class="col-margine text-end">Margine</th>
             <th class="col-azioni"></th>
           </tr>
         </thead>

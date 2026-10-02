@@ -1,4 +1,4 @@
-<tr class="line-row">
+<tr class="line-row" data-cost="{{ lineform.instance.unit_cost|default_if_none:'' }}">
   <td class="d-none">{{ lineform.id }}</td>
   <td>
     <div class="autocomplete-wrap">
@@ -22,6 +22,10 @@
   <td>{{ lineform.discount_pct }}</td>
   <td>{{ lineform.vat_rate }}</td>
   <td class="text-end line-total text-nowrap">—</td>
+  <td class="text-end line-margin text-nowrap">
+    <span class="line-margin-value">—</span>
+    <div class="small line-margin-pct text-muted"></div>
+  </td>
   <td class="text-center text-nowrap">
     <button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Rimuovi riga">
       <i class="bi bi-trash"></i>

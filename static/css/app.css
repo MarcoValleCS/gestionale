@@ -401,6 +401,7 @@ a:hover {
 .doc-lines .col-sconto { min-width: 90px; }
 .doc-lines .col-iva { min-width: 100px; }
 .doc-lines .col-totale { min-width: 120px; }
+.doc-lines .col-margine { min-width: 110px; }
 .doc-lines .col-azioni { min-width: 56px; }
 .doc-lines td input,
 .doc-lines td select {

@@ -113,6 +113,9 @@ class Product(TimeStampedModel):
         return f"{self.code} – {self.name}" if self.code else self.name
 
     def save(self, *args, **kwargs):
+        # un kit non è un pezzo fisico: a magazzino ci vanno i suoi componenti
+        if self.is_kit:
+            self.is_stock_tracked = False
         if not self.code:
             super().save(*args, **kwargs)
             self.code = f"ART{self.pk:05d}"

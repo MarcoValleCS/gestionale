@@ -42,6 +42,54 @@ def duplicate_quote(quote, user=None):
         return new
 
 
+def espandi_kit(documento, fk_field="quote"):
+    """Aggiunge le righe dei componenti per i kit rimasti chiusi.
+
+    Il modulo del preventivo espande già i kit in JavaScript; questa è la rete
+    di sicurezza per i documenti creati per altre strade (importazione, servizi,
+    conversioni): se una riga è un kit e i suoi componenti non compaiono nel
+    documento, vengono aggiunti a prezzo zero. Così la consegna scarica i pezzi
+    giusti invece di provare a scaricare il kit, che non esiste a magazzino.
+    """
+    righe = list(documento.lines.select_related("product"))
+    if not righe:
+        return []
+    presenti = {(riga.product_id, riga.description) for riga in righe if riga.product_id}
+    posizione = max((riga.position for riga in righe), default=0)
+    modello_riga = documento.lines.model
+    nuove = []
+    for riga in righe:
+        prodotto = riga.product
+        if prodotto is None or not prodotto.is_kit:
+            continue
+        for componente in prodotto.components.select_related("component"):
+            descrizione = f"{componente.component.name} (componente {prodotto.code})"[:300]
+            if (componente.component_id, descrizione) in presenti:
+                continue
+            posizione += 1
+            nuove.append(
+                modello_riga(
+                    **{
+                        fk_field: documento,
+                        "position": posizione,
+                        "section": riga.section,
+                        "product": componente.component,
+                        "description": descrizione,
+                        "qty": (riga.qty or 0) * (componente.qty or 0),
+                        "uom": componente.component.uom,
+                        "unit_price": 0,
+                        "discount_pct": 0,
+                        "vat_rate": riga.vat_rate,
+                    }
+                )
+            )
+    for riga_nuova in nuove:
+        riga_nuova.save()
+    if nuove and hasattr(documento, "recalculate"):
+        documento.recalculate()
+    return nuove
+
+
 def convert_quote_to_order(quote, user=None):
     """Trasforma un preventivo in ordine cliente."""
     if quote.status == Quote.STATUS_CONVERTED:

@@ -1,4 +1,5 @@
 {{ vat_rates_json|json_script:"vat-rates-data" }}
+{{ product_costs_json|json_script:"product-costs" }}
 <script>
 (function () {
   const prefix = "lines";
@@ -9,6 +10,24 @@
 
   const vatRates = JSON.parse(document.getElementById("vat-rates-data").textContent);
   const currency = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  /* Costo di acquisto per articolo: serve a mostrare il margine in diretta.
+     Il costo della riga (se già fissato, es. su un ordine consegnato) vince
+     su quello dell'anagrafica. */
+  const costsEl = document.getElementById("product-costs");
+  const productCosts = costsEl ? JSON.parse(costsEl.textContent) : {};
+
+  function rowCost(row) {
+    const fisso = row.dataset.cost;
+    if (fisso !== undefined && fisso !== null && String(fisso).trim() !== "") {
+      const valore = parseNumber(fisso);
+      if (!isNaN(valore)) return valore;
+    }
+    const productSelect = row.querySelector('[name$="-product"]');
+    const chiave = productSelect ? String(productSelect.value || "") : "";
+    if (chiave && productCosts[chiave] !== undefined) return parseNumber(productCosts[chiave]);
+    return 0;
+  }
 
   function parseNumber(value) {
     if (!value) return 0;
@@ -22,6 +41,7 @@
 
   function recalc() {
     let subtotal = 0;
+    let costoTotale = 0;
     const vatMap = {};
     tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
       if (isDeleted(row)) return;
@@ -39,6 +59,26 @@
       subtotal += lineSubtotal;
       const cell = row.querySelector(".line-total");
       if (cell) cell.textContent = currency.format(lineSubtotal + lineVat) + " €";
+
+      // margine della riga: prezzo netto meno costo di acquisto
+      const cost = rowCost(row);
+      const lineCost = cost * qty;
+      costoTotale += lineCost;
+      const margine = lineSubtotal - lineCost;
+      const marginCell = row.querySelector(".line-margin-value");
+      const marginPctCell = row.querySelector(".line-margin-pct");
+      const mostraMargine = cost > 0 || margine !== 0;
+      if (marginCell) {
+        marginCell.textContent = mostraMargine ? currency.format(margine) + " €" : "—";
+        marginCell.classList.toggle("text-danger", margine < 0);
+        marginCell.classList.toggle("text-success", margine > 0);
+      }
+      if (marginPctCell) {
+        marginPctCell.textContent = lineSubtotal > 0 && cost > 0
+          ? (margine / lineSubtotal * 100).toFixed(1).replace(".", ",") + " %"
+          : "";
+      }
+
       if (vatPk) {
         vatMap[vatPk] = vatMap[vatPk] || { rate: rate, base: 0, vat: 0 };
         vatMap[vatPk].base += lineSubtotal;
@@ -54,6 +94,29 @@
     if (subtotalEl) subtotalEl.textContent = currency.format(subtotal) + " €";
     if (vatEl) vatEl.textContent = currency.format(vatTotal) + " €";
     if (grandEl) grandEl.textContent = currency.format(subtotal + vatTotal) + " €";
+
+    // riepilogo margine del documento
+    const costEl = document.getElementById("totals-cost");
+    const marginEl = document.getElementById("totals-margin");
+    const marginPctEl = document.getElementById("totals-margin-pct");
+    const margineTotale = subtotal - costoTotale;
+    if (costEl) costEl.textContent = currency.format(costoTotale) + " €";
+    if (marginEl) {
+      marginEl.textContent = currency.format(margineTotale) + " €";
+      marginEl.classList.toggle("text-danger", margineTotale < 0);
+      marginEl.classList.toggle("text-success", margineTotale > 0);
+    }
+    if (marginPctEl) {
+      marginPctEl.textContent = subtotal > 0 && costoTotale > 0
+        ? (margineTotale / subtotal * 100).toFixed(1).replace(".", ",") + " %"
+        : "—";
+    }
+    const commissionEl = document.getElementById("totals-commission");
+    const commissionField = document.getElementById("id_commission_pct");
+    if (commissionEl && commissionField) {
+      const pct = parseNumber(commissionField.value);
+      commissionEl.textContent = currency.format(subtotal * pct / 100) + " €";
+    }
 
     const breakdown = document.getElementById("vat-breakdown");
     if (breakdown) {
@@ -73,6 +136,8 @@
   function fillFromProduct(row) {
     const productSelect = row.querySelector('[name$="-product"]');
     if (!productSelect) return;
+    // cambiando articolo il costo torna quello dell'anagrafica
+    delete row.dataset.cost;
     const baseUrl = productSelect.dataset.defaultsUrl;
     if (!baseUrl || !productSelect.value) return;
     const url = baseUrl.replace("/0/", "/" + productSelect.value + "/");

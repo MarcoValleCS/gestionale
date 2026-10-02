@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Preventivi da seguire{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Valore in attesa</div>
+        <div class="fs-3 fw-bold number-badge">{{ valore_fermo|money }} €</div>
+        <div class="small text-muted">preventivi fermi da almeno {{ giorni }} giorni</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Tasso di conversione</div>
+        <div class="fs-3 fw-bold number-badge">{{ conversione|qty }}%</div>
+        <div class="small text-muted">{{ convertiti }} vinti su {{ convertiti|add:rifiutati }} decisi</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Tempo medio di chiusura</div>
+        <div class="fs-3 fw-bold number-badge">
+          {% if tempo_medio is not None %}{{ tempo_medio|qty }} gg{% else %}—{% endif %}
+        </div>
+        <div class="small text-muted">dalla data del preventivo all'ordine</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Preventivi inviati</div>
+        <div class="fs-3 fw-bold number-badge">{{ inviati }}</div>
+        <div class="small text-muted">{{ da_sollecitare|length }} da sollecitare</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not email_configurata %}
+<div class="alert alert-warning py-2 small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  L'invio email non è configurato: i solleciti non partiranno finché non imposti le variabili <code>EMAIL_*</code>.
+  <a href="{% url 'core:email_settings' %}">Vedi le impostazioni email</a>.
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-hourglass-split me-1"></i> Preventivi in attesa di risposta</span>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0 small text-muted text-nowrap" for="giorni">Fermi da almeno</label>
+      <select class="form-select form-select-sm w-auto" id="giorni" name="giorni" onchange="this.form.submit()">
+        {% for valore in "3,7,14,30"|slice:":0" %}{% endfor %}
+        <option value="3" {% if giorni == 3 %}selected{% endif %}>3 giorni</option>
+        <option value="7" {% if giorni == 7 %}selected{% endif %}>7 giorni</option>
+        <option value="14" {% if giorni == 14 %}selected{% endif %}>14 giorni</option>
+        <option value="30" {% if giorni == 30 %}selected{% endif %}>30 giorni</option>
+      </select>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Preventivo</th>
+          <th>Cliente</th>
+          <th class="text-center">Data</th>
+          <th class="text-center">In attesa da</th>
+          <th class="text-center">Validità</th>
+          <th class="text-end">Valore</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for preventivo in da_sollecitare %}
+        <tr>
+          <td><a href="{% url 'sales:quote_detail' preventivo.pk %}">{{ preventivo.number }}</a></td>
+          <td>
+            {{ preventivo.customer.name }}
+            {% if not preventivo.email_cliente %}
+            <span class="badge text-bg-light border text-muted" title="Il cliente non ha email">senza email</span>
+            {% endif %}
+          </td>
+          <td class="text-center text-nowrap">{{ preventivo.date|date:"d/m/Y" }}</td>
+          <td class="text-center">
+            <span class="badge {% if preventivo.attesa >= 30 %}text-bg-danger{% elif preventivo.attesa >= 14 %}text-bg-warning{% else %}text-bg-light border{% endif %}">
+              {{ preventivo.attesa }} giorni
+            </span>
+          </td>
+          <td class="text-center text-nowrap">
+            {% if preventivo.scaduto %}
+            <span class="text-danger small">scaduto</span>
+            {% elif preventivo.giorni_a_scadenza is not None %}
+            <span class="text-muted small">fra {{ preventivo.giorni_a_scadenza }} gg</span>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end fw-semibold">{{ preventivo.grand_total|money }} €</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_detail' preventivo.pk %}" title="Apri">
+              <i class="bi bi-eye"></i>
+            </a>
+            {% if preventivo.email_cliente %}
+            <form method="post" action="{% url 'sales:quote_reminder' preventivo.pk %}" class="d-inline"
+                  onsubmit="return confirm('Inviare il sollecito a {{ preventivo.customer.name }}?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-warning btn-sm" type="submit" title="Invia sollecito">
+                <i class="bi bi-envelope-exclamation"></i> Sollecita
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          Nessun preventivo fermo da {{ giorni }} giorni. Ottimo segno!
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
