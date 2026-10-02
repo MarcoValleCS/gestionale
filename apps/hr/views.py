@@ -13,13 +13,16 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_HR, RoleRequiredMixin, role_required
 from apps.core.concurrency import ConflictAwareUpdateView
+from apps.core.models import Attachment
 
 from .forms import (
     BulkTimeEntryForm,
     CollaboratorForm,
+    CollaboratorPhotoForm,
     CollaboratorTimeEntryForm,
     EmployeeForm,
     LeaveRequestForm,
+    StandardHoursForm,
     TimeEntryForm,
     active_employees,
 )
@@ -350,6 +353,69 @@ def timeentry_bulk(request):
     )
 
 
+@role_required(*HR_EDIT_ROLES)
+def timeentry_standard(request):
+    """Registra le ore standard di un periodo (es. 8 ore al giorno per un mese)."""
+    if request.method == "POST":
+        form = StandardHoursForm(request.POST)
+        if form.is_valid():
+            dipendente = form.cleaned_data["employee"]
+            ore = form.cleaned_data["hours"]
+            tipo = form.cleaned_data["kind"]
+            cantiere = form.cleaned_data["job"]
+            descrizione = form.cleaned_data["description"]
+            sovrascrivi = form.cleaned_data["overwrite"]
+            giorni = form.giorni()
+
+            creati = aggiornati = saltati = 0
+            for giorno in giorni:
+                esistente = TimeEntry.objects.filter(employee=dipendente, date=giorno, kind=tipo).first()
+                if esistente is not None:
+                    if not sovrascrivi:
+                        saltati += 1
+                        continue
+                    esistente.hours = ore
+                    esistente.job = cantiere
+                    esistente.description = descrizione
+                    esistente.save(update_fields=["hours", "job", "description", "updated_at"])
+                    aggiornati += 1
+                else:
+                    TimeEntry.objects.create(
+                        employee=dipendente,
+                        date=giorno,
+                        hours=ore,
+                        kind=tipo,
+                        job=cantiere,
+                        description=descrizione,
+                        created_by=request.user,
+                    )
+                    creati += 1
+
+            riepilogo = f"{creati} giornate registrate"
+            if aggiornati:
+                riepilogo += f", {aggiornati} aggiornate"
+            if saltati:
+                riepilogo += f", {saltati} già presenti e lasciate com'erano"
+            messages.success(request, f"{dipendente.full_name}: {riepilogo}.")
+            if giorni:
+                return redirect(f"{reverse('hr:timesheet')}?anno={giorni[0].year}&mese={giorni[0].month}")
+            return redirect("hr:timeentry_list")
+    else:
+        oggi = timezone.localdate()
+        form = StandardHoursForm(
+            initial={
+                "start_date": oggi.replace(day=1),
+                "end_date": oggi,
+            }
+        )
+
+    return render(
+        request,
+        "hr/timeentry_standard.html",
+        {"form": form, "page_title": "Ore standard"},
+    )
+
+
 # ---------------------------------------------------------------- ferie
 class LeaveListView(ListView):
     model = LeaveRequest
@@ -626,6 +692,62 @@ def collaborator_entry_delete(request, pk):
         entry.delete()
         messages.success(request, "Registrazione eliminata.")
     return redirect("hr:collaborator_area")
+
+
+def collaborator_photo_delete(request, pk):
+    """Il collaboratore cancella una propria foto."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return redirect("hr:collaborator_area")
+    foto = get_object_or_404(Attachment, pk=pk, collaborator=collaboratore)
+    if request.method == "POST":
+        descrizione = foto.name
+        foto.file.delete(save=False)
+        foto.delete()
+        messages.success(request, f"Foto «{descrizione}» eliminata.")
+    return redirect("hr:collaborator_photos")
+
+
+def collaborator_photos(request):
+    """Foto del cantiere e bolle caricate dal collaboratore."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return redirect("hr:collaborator_area")
+
+    if request.method == "POST":
+        form = CollaboratorPhotoForm(request.POST, request.FILES, collaborator=collaboratore)
+        if form.is_valid():
+            foto = Attachment(
+                file=form.cleaned_data["file"],
+                kind=form.cleaned_data["kind"],
+                job=form.cleaned_data["job"],
+                notes=form.cleaned_data["notes"],
+                collaborator=collaboratore,
+                uploaded_by=request.user,
+            )
+            foto.save()
+            dimensione = foto.size_kb
+            messages.success(
+                request,
+                f"Caricata «{foto.name}»" + (f" ({dimensione} KB)." if dimensione else "."),
+            )
+            return redirect("hr:collaborator_photos")
+    else:
+        form = CollaboratorPhotoForm(collaborator=collaboratore)
+
+    foto = list(collaboratore.photos.select_related("job", "uploaded_by"))
+    return render(
+        request,
+        "hr/collaborator_photos.html",
+        {
+            "page_title": "Foto del cantiere",
+            "collaborator": collaboratore,
+            "form": form,
+            "photos": foto,
+            "photos_site": [f for f in foto if f.kind == Attachment.KIND_SITE],
+            "photos_receipt": [f for f in foto if f.kind == Attachment.KIND_RECEIPT],
+        },
+    )
 
 
 # ---- gestione dall'ufficio ----

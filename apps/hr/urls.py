@@ -15,6 +15,7 @@ urlpatterns = [
     path("ore/", views.TimeEntryListView.as_view(), name="timeentry_list"),
     path("ore/nuova/", views.TimeEntryCreateView.as_view(), name="timeentry_create"),
     path("ore/rapida/", views.timeentry_bulk, name="timeentry_bulk"),
+    path("ore/standard/", views.timeentry_standard, name="timeentry_standard"),
     path("ore/<int:pk>/modifica/", views.TimeEntryUpdateView.as_view(), name="timeentry_update"),
     path("ore/<int:pk>/elimina/", views.timeentry_delete, name="timeentry_delete"),
     # Ferie e permessi
@@ -37,4 +38,6 @@ urlpatterns = [
     path("mio-lavoro/nuova/", views.collaborator_entry_create, name="collaborator_entry_create"),
     path("mio-lavoro/<int:pk>/modifica/", views.collaborator_entry_update, name="collaborator_entry_update"),
     path("mio-lavoro/<int:pk>/elimina/", views.collaborator_entry_delete, name="collaborator_entry_delete"),
+    path("mio-lavoro/foto/", views.collaborator_photos, name="collaborator_photos"),
+    path("mio-lavoro/foto/<int:pk>/elimina/", views.collaborator_photo_delete, name="collaborator_photo_delete"),
 ]

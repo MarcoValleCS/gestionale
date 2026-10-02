@@ -170,6 +170,112 @@ class TimesheetFilterForm(forms.Form):
             field.widget.attrs["class"] = "form-select form-select-sm"
 
 
+class StandardHoursForm(forms.Form):
+    """Ore standard: riempie un periodo con le stesse ore ogni giorno lavorativo.
+
+    Serve a chi lavora sempre lo stesso orario: invece di registrare 20 giornate
+    una per una, si sceglie il periodo e le ore giornaliere.
+    """
+
+    employee = forms.ModelChoiceField(label="Dipendente", queryset=Employee.objects.none())
+    start_date = forms.DateField(label="Dal", initial=timezone.localdate, widget=forms.DateInput(attrs={"type": "date"}))
+    end_date = forms.DateField(label="Al", initial=timezone.localdate, widget=forms.DateInput(attrs={"type": "date"}))
+    hours = forms.DecimalField(
+        label="Ore al giorno",
+        initial=Decimal("8"),
+        min_value=MIN_HOURS,
+        max_value=Decimal("24"),
+        widget=forms.NumberInput(attrs={"step": "0.25"}),
+        help_text="Di norma 8 ore. Vengono create solo le giornate dal lunedì al venerdì.",
+    )
+    kind = forms.ChoiceField(label="Tipo", choices=TimeEntry.KIND_CHOICES, initial=TimeEntry.KIND_ORDINARY)
+    job = forms.ModelChoiceField(label="Cantiere", queryset=Job.objects.none(), required=False)
+    description = forms.CharField(label="Descrizione attività", max_length=200, required=False)
+    include_saturday = forms.BooleanField(label="Includi il sabato", required=False)
+    overwrite = forms.BooleanField(
+        label="Sovrascrivi le giornate già registrate",
+        required=False,
+        help_text="Se lasci vuoto, i giorni che hanno già una registrazione vengono saltati.",
+    )
+
+    def __init__(self, *args, employees=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["employee"].queryset = employees if employees is not None else active_employees()
+        self.fields["employee"].label_from_instance = lambda obj: f"{obj.full_name} ({obj.code})"
+        self.fields["job"].queryset = open_jobs()
+        self.fields["job"].label_from_instance = lambda obj: f"{obj.code} – {obj.name} ({obj.customer.name})"
+        self.fields["employee"].widget.attrs["class"] = "form-select"
+        self.fields["kind"].widget.attrs["class"] = "form-select"
+        self.fields["job"].widget.attrs["class"] = "form-select"
+        for nome in ("start_date", "end_date"):
+            self.fields[nome].widget.attrs["class"] = "form-control"
+        for nome in ("hours", "description"):
+            self.fields[nome].widget.attrs["class"] = "form-control"
+        self.fields["include_saturday"].widget.attrs["class"] = "form-check-input"
+        self.fields["overwrite"].widget.attrs["class"] = "form-check-input"
+
+    def clean(self):
+        cleaned = super().clean()
+        inizio = cleaned.get("start_date")
+        fine = cleaned.get("end_date")
+        if inizio and fine and fine < inizio:
+            self.add_error("end_date", "La data di fine non può precedere quella di inizio.")
+        elif inizio and fine and (fine - inizio).days > 366:
+            self.add_error("end_date", "Il periodo non può superare un anno.")
+        return cleaned
+
+    def giorni(self):
+        """Le date lavorative del periodo scelto (esclusa la domenica)."""
+        inizio = self.cleaned_data["start_date"]
+        fine = self.cleaned_data["end_date"]
+        sabato = self.cleaned_data.get("include_saturday")
+        giorni = []
+        giorno = inizio
+        while giorno <= fine:
+            if giorno.weekday() < 5 or (sabato and giorno.weekday() == 5):
+                giorni.append(giorno)
+            giorno += timedelta(days=1)
+        return giorni
+
+
+class CollaboratorPhotoForm(forms.Form):
+    """Foto caricata da un collaboratore: cantiere o bolla di acquisto."""
+
+    kind = forms.ChoiceField(
+        label="Cosa stai caricando",
+        choices=[
+            ("site", "Foto del cantiere (inizio o fine giornata)"),
+            ("receipt", "Bolla o documento di acquisto"),
+        ],
+        initial="site",
+        widget=forms.RadioSelect,
+    )
+    file = forms.FileField(
+        label="Foto",
+        widget=forms.ClearableFileInput(attrs={"accept": "image/*,application/pdf", "capture": "environment"}),
+    )
+    job = forms.ModelChoiceField(label="Cantiere", queryset=Job.objects.none(), required=False)
+    notes = forms.CharField(label="Nota (facoltativa)", max_length=200, required=False)
+
+    def __init__(self, *args, collaborator=None, **kwargs):
+        self.collaborator = collaborator
+        super().__init__(*args, **kwargs)
+        self.fields["job"].queryset = open_jobs()
+        self.fields["job"].label_from_instance = lambda obj: f"{obj.code} – {obj.name} ({obj.customer.name})"
+        self.fields["job"].help_text = "Facoltativo per le bolle, utile per le foto del cantiere."
+        self.fields["kind"].widget.attrs["class"] = "form-check-input"
+        self.fields["file"].widget.attrs["class"] = "form-control"
+        self.fields["file"].help_text = "Le foto vengono ridimensionate automaticamente. Sono ammesse anche le bolle in PDF."
+        self.fields["job"].widget.attrs["class"] = "form-select"
+        self.fields["notes"].widget.attrs["class"] = "form-control"
+
+    def clean_file(self):
+        caricato = self.cleaned_data.get("file")
+        if caricato and caricato.size > 25 * 1024 * 1024:
+            raise forms.ValidationError("Il file supera i 25 MB: ridimensiona la foto e riprova.")
+        return caricato
+
+
 # ------------------------------------------------------------ collaboratori
 class CollaboratorForm(BaseBootstrapModelForm):
     """Anagrafica di un collaboratore esterno."""

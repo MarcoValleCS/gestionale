@@ -44,6 +44,7 @@
         <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
         {% if roles.is_admin or roles.is_hr %}
         <a class="btn btn-primary btn-sm" href="{% url 'hr:timeentry_bulk' %}"><i class="bi bi-lightning"></i> Ore del giorno</a>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:timeentry_standard' %}"><i class="bi bi-calendar-check"></i> Ore standard</a>
         {% endif %}
       </div>
     </form>
@@ -52,6 +53,7 @@
     <span class="text-muted small">Totale ore filtrate: <strong>{{ filtered_total|floatformat:"-2" }} h</strong></span>
     {% if roles.is_admin or roles.is_hr %}
     <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:timeentry_create' %}"><i class="bi bi-plus-lg"></i> Nuova registrazione</a>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'hr:timeentry_standard' %}"><i class="bi bi-calendar-check"></i> Ore standard</a>
     {% endif %}
   </div>
   <div class="table-responsive">

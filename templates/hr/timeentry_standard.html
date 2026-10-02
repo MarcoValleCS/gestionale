@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Ore standard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-calendar-check me-1"></i> Registra le ore standard</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Per chi lavora sempre lo stesso orario: scegli il periodo e le ore giornaliere, e le giornate
+          lavorative (dal lunedì al venerdì) vengono registrate in una volta sola.
+          Se una giornata ha già una registrazione viene lasciata com'è, a meno che tu non scelga di sovrascriverla.
+        </p>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="row">
+            <div class="col-md-6">{% include "partials/field.html" with field=form.employee %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.start_date %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.end_date %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.hours %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.kind %}</div>
+            <div class="col-md-6">{% include "partials/field.html" with field=form.job %}</div>
+            <div class="col-12">{% include "partials/field.html" with field=form.description %}</div>
+            <div class="col-md-6">
+              <div class="mb-3 form-check">
+                {{ form.include_saturday }}
+                <label class="form-check-label" for="{{ form.include_saturday.id_for_label }}">{{ form.include_saturday.label }}</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3 form-check">
+                {{ form.overwrite }}
+                <label class="form-check-label" for="{{ form.overwrite.id_for_label }}">{{ form.overwrite.label }}</label>
+                {% if form.overwrite.help_text %}<div class="form-text">{{ form.overwrite.help_text }}</div>{% endif %}
+              </div>
+            </div>
+          </div>
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2">{% for errore in form.non_field_errors %}{{ errore }}<br>{% endfor %}</div>
+          {% endif %}
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Registra le ore</button>
+            <a class="btn btn-outline-secondary" href="{% url 'hr:timeentry_list' %}">Annulla</a>
+            <a class="btn btn-outline-primary ms-auto" href="{% url 'hr:timeentry_bulk' %}">
+              <i class="bi bi-people"></i> Inserimento rapido di una giornata
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

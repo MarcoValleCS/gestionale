@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Foto del cantiere{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h2 class="h4 mb-1">Foto del cantiere</h2>
+    <div class="text-muted small">
+      Scatta una foto all'inizio e alla fine della giornata, oppure carica la bolla di acquisto.
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'hr:collaborator_area' %}"><i class="bi bi-clock-history"></i> Le mie ore</a>
+    <a class="btn btn-primary" href="{% url 'hr:collaborator_entry_create' %}"><i class="bi bi-plus-lg"></i> Registra le ore</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-camera me-1"></i> Carica una foto</div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label d-block">{{ form.kind.label }}</label>
+        {% for scelta in form.kind %}
+        <div class="form-check">
+          {{ scelta.tag }}
+          <label class="form-check-label" for="{{ scelta.id_for_label }}">{{ scelta.choice_label }}</label>
+        </div>
+        {% endfor %}
+        {% for error in form.kind.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+            {{ form.file }}
+            {% if form.file.help_text %}<div class="form-text">{{ form.file.help_text }}</div>{% endif %}
+            {% for error in form.file.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.job.id_for_label }}">{{ form.job.label }}</label>
+            {{ form.job }}
+            {% for error in form.job.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit"><i class="bi bi-upload"></i> Carica</button>
+      <span class="text-muted small ms-2">Le foto vengono ridimensionate automaticamente per occupare meno spazio.</span>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <i class="bi bi-images me-1"></i> Foto del cantiere
+    <span class="badge text-bg-light border ms-1">{{ photos_site|length }}</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-2">
+      {% for foto in photos_site %}
+      <div class="col-6 col-md-4 col-xl-3">
+        <div class="border rounded overflow-hidden h-100 d-flex flex-column">
+          {% if foto.is_image %}
+          <a href="{{ foto.file.url }}" target="_blank">
+            <img src="{{ foto.file.url }}" alt="{{ foto.name }}" class="w-100" style="height:150px;object-fit:cover;">
+          </a>
+          {% else %}
+          <a href="{{ foto.file.url }}" target="_blank" class="d-flex align-items-center justify-content-center bg-light text-decoration-none" style="height:150px;">
+            <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
+          </a>
+          {% endif %}
+          <div class="p-2 small flex-grow-1">
+            <div class="fw-semibold text-truncate">{{ foto.name }}</div>
+            <div class="text-muted">{{ foto.created_at|date:"d/m/Y H:i" }}</div>
+            {% if foto.job %}<div class="text-muted text-truncate"><i class="bi bi-cone-striped"></i> {{ foto.job.name }}</div>{% endif %}
+            {% if foto.notes %}<div class="text-muted">{{ foto.notes }}</div>{% endif %}
+          </div>
+          <form method="post" action="{% url 'hr:collaborator_photo_delete' foto.pk %}" class="p-2 pt-0"
+                onsubmit="return confirm('Eliminare questa foto?');">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-12 text-center text-muted py-4">
+        Nessuna foto caricata. Scatta una foto del cantiere con il telefono e caricala qui.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-receipt me-1"></i> Bolle e documenti di acquisto
+    <span class="badge text-bg-light border ms-1">{{ photos_receipt|length }}</span>
+  </div>
+  <ul class="list-group list-group-flush">
+    {% for foto in photos_receipt %}
+    <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+      <div class="text-truncate">
+        <i class="bi {% if foto.is_image %}bi-file-earmark-image{% else %}bi-file-earmark-pdf{% endif %} me-1"></i>
+        <a href="{{ foto.file.url }}" target="_blank">{{ foto.name }}</a>
+        <div class="small text-muted">
+          {{ foto.created_at|date:"d/m/Y H:i" }}
+          {% if foto.job %} · {{ foto.job.name }}{% endif %}
+          {% if foto.notes %} · {{ foto.notes }}{% endif %}
+        </div>
+      </div>
+      <form method="post" action="{% url 'hr:collaborator_photo_delete' foto.pk %}"
+            onsubmit="return confirm('Eliminare questo documento?');">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+      </form>
+    </li>
+    {% empty %}
+    <li class="list-group-item text-center text-muted py-3">Nessuna bolla caricata</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
