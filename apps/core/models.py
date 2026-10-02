@@ -7,7 +7,7 @@ from django.db import models, transaction
 from django.db.models import F
 from django.utils import timezone
 
-from .utils import format_quantity
+from .utils import format_quantity, mescola_colori, normalizza_colore, rgba, schiarisci, scurisci
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField("Creato il", auto_now_add=True)
@@ -228,6 +228,54 @@ class CompanySettings(models.Model):
         default="Pagamento: come concordato.\nPrezzi IVA esclusa salvo diversa indicazione.",
     )
 
+    # -------------------------------------------------------- aspetto grafico
+    BACKGROUND_CHOICES = [
+        ("soft", "Azzurro tenue"),
+        ("white", "Bianco"),
+        ("grey", "Grigio chiaro"),
+        ("warm", "Caldo"),
+        ("blue", "Azzurro"),
+    ]
+    BACKGROUND_COLORS = {
+        "soft": "#f4f6fb",
+        "white": "#ffffff",
+        "grey": "#eef0f3",
+        "warm": "#faf7f1",
+        "blue": "#eaf2fc",
+    }
+    DOCUMENT_STYLE_CHOICES = [
+        ("classico", "Classico"),
+        ("moderno", "Moderno"),
+        ("sobrio", "Sobrio"),
+        ("elegante", "Elegante"),
+    ]
+
+    app_logo = models.ImageField(
+        "Logo del gestionale",
+        upload_to="company/",
+        null=True,
+        blank=True,
+        help_text="Sostituisce l'icona in alto a sinistra nel gestionale (PNG con sfondo trasparente).",
+    )
+    theme_color = models.CharField(
+        "Colore del gestionale",
+        max_length=7,
+        default="#2563eb",
+        help_text="Colore di menu, pulsanti e collegamenti.",
+    )
+    theme_background = models.CharField(
+        "Sfondo del gestionale",
+        max_length=10,
+        choices=BACKGROUND_CHOICES,
+        default="soft",
+    )
+    document_style = models.CharField(
+        "Stile dei preventivi e documenti",
+        max_length=10,
+        choices=DOCUMENT_STYLE_CHOICES,
+        default="classico",
+    )
+
     class Meta:
         verbose_name = "Dati azienda"
         verbose_name_plural = "Dati azienda"
@@ -244,18 +292,83 @@ class CompanySettings(models.Model):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
+    # ------------------------------------------------------------- colori
+    @property
+    def theme_color_hex(self):
+        return normalizza_colore(self.theme_color)
+
+    @property
+    def theme_color_dark(self):
+        return scurisci(self.theme_color_hex, 0.22)
+
+    @property
+    def theme_color_soft(self):
+        return schiarisci(self.theme_color_hex, 0.88)
+
+    @property
+    def background_hex(self):
+        return self.BACKGROUND_COLORS.get(self.theme_background, "#f4f6fb")
+
+    @property
+    def sidebar_colors(self):
+        """Toni della barra laterale derivati dal colore principale."""
+        colore = self.theme_color_hex
+        return {
+            "top": mescola_colori(colore, "#0b1224", 0.86),
+            "mid": mescola_colori(colore, "#0b1224", 0.78),
+            "bottom": mescola_colori(colore, "#0b1224", 0.74),
+            "glow": rgba(colore, 0.35),
+            "active": rgba(colore, 0.95),
+        }
+
+    @property
+    def logo_url(self):
+        try:
+            return self.logo.url if self.logo else ""
+        except ValueError:
+            return ""
+
+    @property
+    def app_logo_url(self):
+        """Logo del gestionale: se non impostato si usa quello aziendale."""
+        for campo in (self.app_logo, self.logo):
+            try:
+                if campo:
+                    return campo.url
+            except ValueError:
+                continue
+        return ""
+
 
 class Attachment(TimeStampedModel):
-    """Allegato su articolo o cantiere (schede tecniche, foto, documenti)."""
+    """Allegato su articolo, cantiere o collaboratore (schede tecniche, foto, bolle)."""
+
+    KIND_DOCUMENT = "document"
+    KIND_SITE = "site"
+    KIND_RECEIPT = "receipt"
+    KIND_CHOICES = [
+        (KIND_DOCUMENT, "Documento"),
+        (KIND_SITE, "Foto cantiere"),
+        (KIND_RECEIPT, "Bolla / acquisto"),
+    ]
 
     name = models.CharField("Nome", max_length=150, blank=True)
     file = models.FileField("File", upload_to="attachments/%Y/%m/")
     notes = models.CharField("Note", max_length=200, blank=True)
+    kind = models.CharField("Tipo", max_length=20, choices=KIND_CHOICES, default=KIND_DOCUMENT)
     product = models.ForeignKey(
         "catalog.Product", on_delete=models.CASCADE, null=True, blank=True, related_name="attachments", verbose_name="Articolo"
     )
     job = models.ForeignKey(
         "jobs.Job", on_delete=models.CASCADE, null=True, blank=True, related_name="attachments", verbose_name="Cantiere"
+    )
+    collaborator = models.ForeignKey(
+        "hr.Collaborator",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="photos",
+        verbose_name="Collaboratore",
     )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="attachments", verbose_name="Caricato da"
@@ -265,9 +378,10 @@ class Attachment(TimeStampedModel):
         verbose_name = "Allegato"
         verbose_name_plural = "Allegati"
         ordering = ["-created_at"]
+        indexes = [models.Index(fields=["kind", "-created_at"], name="attachment_kind_date_idx")]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(product__isnull=False) | models.Q(job__isnull=False),
+                condition=models.Q(product__isnull=False) | models.Q(job__isnull=False) | models.Q(collaborator__isnull=False),
                 name="attachment_has_target",
             )
         ]
@@ -278,6 +392,11 @@ class Attachment(TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.name and self.file:
             self.name = self.file.name.rsplit("/", 1)[-1]
+        # le immagini nuove vengono raddrizzate e compresse; i file già salvati no
+        if self.file and not getattr(self.file, "_committed", True):
+            from .images import comprimi_immagine
+
+            comprimi_immagine(self.file)
         return super().save(*args, **kwargs)
 
     @property

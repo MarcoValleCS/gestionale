@@ -90,14 +90,20 @@ class CompanySettingsForm(BaseBootstrapModelForm):
             "website",
             "iban",
             "logo",
+            "app_logo",
             "document_color",
+            "document_style",
+            "theme_color",
+            "theme_background",
             "quote_footer",
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["document_color"].widget.attrs["type"] = "color"
-        self.fields["document_color"].widget.attrs["class"] = "form-control form-control-color"
+        for campo in ("document_color", "theme_color"):
+            self.fields[campo].widget.attrs["type"] = "color"
+            self.fields[campo].widget.attrs["class"] = "form-control form-control-color"
+        self.fields["quote_footer"].widget.attrs["rows"] = 4
 
 
 class AttachmentForm(BaseBootstrapModelForm):

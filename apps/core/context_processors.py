@@ -12,6 +12,30 @@ def company(request):
         return {"company": None}
 
 
+def tema(request):
+    """Colori e sfondo scelti dall'utente, pronti per il foglio di stile."""
+    try:
+        azienda = CompanySettings.load()
+    except Exception:  # tabelle non ancora migrate
+        return {"tema": {}}
+    laterale = azienda.sidebar_colors
+    return {
+        "tema": {
+            "colore": azienda.theme_color_hex,
+            "colore_scuro": azienda.theme_color_dark,
+            "colore_tenue": azienda.theme_color_soft,
+            "sfondo": azienda.background_hex,
+            "laterale_alto": laterale["top"],
+            "laterale_centro": laterale["mid"],
+            "laterale_basso": laterale["bottom"],
+            "laterale_luce": laterale["glow"],
+            "laterale_attivo": laterale["active"],
+            "logo": azienda.app_logo_url,
+            "stile_documenti": azienda.document_style,
+        }
+    }
+
+
 def roles(request):
     """Flag dei ruoli per i template.
 

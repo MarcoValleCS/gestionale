@@ -2,21 +2,124 @@
 {% block title %}Dati azienda{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="card-header">Dati azienda</div>
-      <div class="card-body">
-        <form method="post" novalidate>
-          {% csrf_token %}
-          {% include "partials/form_fields.html" %}
-          <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
-            <a class="btn btn-outline-secondary" href="{% url 'core:settings' %}">Annulla</a>
+<form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-building me-2"></i>Dati azienda</div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-8">{% include "partials/field.html" with field=form.name %}</div>
+            <div class="col-md-4">{% include "partials/field.html" with field=form.vat_number %}</div>
+            <div class="col-md-4">{% include "partials/field.html" with field=form.tax_code %}</div>
+            <div class="col-md-8">{% include "partials/field.html" with field=form.pec %}</div>
+            <div class="col-md-8">{% include "partials/field.html" with field=form.fiscal_regime %}</div>
+            <div class="col-md-4">{% include "partials/field.html" with field=form.country %}</div>
+            <div class="col-md-6">{% include "partials/field.html" with field=form.address %}</div>
+            <div class="col-md-2">{% include "partials/field.html" with field=form.zip_code %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.city %}</div>
+            <div class="col-md-1">{% include "partials/field.html" with field=form.province %}</div>
+            <div class="col-md-4">{% include "partials/field.html" with field=form.email %}</div>
+            <div class="col-md-4">{% include "partials/field.html" with field=form.phone %}</div>
+            <div class="col-md-4">{% include "partials/field.html" with field=form.website %}</div>
+            <div class="col-md-6">{% include "partials/field.html" with field=form.iban %}</div>
           </div>
-        </form>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-palette me-2"></i>Aspetto del gestionale</div>
+        <div class="card-body">
+          <p class="text-muted small">
+            Scegli colore e sfondo dell'interfaccia. Le modifiche si vedono subito dopo il salvataggio.
+          </p>
+          <div class="row">
+            <div class="col-md-4">{% include "partials/field.html" with field=form.theme_color %}</div>
+            <div class="col-md-8">{% include "partials/field.html" with field=form.theme_background %}</div>
+            <div class="col-md-6">{% include "partials/field.html" with field=form.app_logo %}</div>
+            <div class="col-md-6">
+              <label class="form-label">Logo attuale nel menu</label>
+              <div class="d-flex align-items-center gap-2 border rounded p-2" style="background: {{ company.sidebar_colors.top }};">
+                {% if company.app_logo_url %}
+                <img src="{{ company.app_logo_url }}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.08);padding:3px;">
+                {% else %}
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:{{ company.theme_color_hex }};color:#fff;">
+                  <i class="bi bi-box-seam"></i>
+                </span>
+                {% endif %}
+                <span class="text-white fw-bold text-truncate">{{ company.name|default:"Gestionale" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-file-earmark-text me-2"></i>Documenti stampati</div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">{% include "partials/field.html" with field=form.logo %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.document_color %}</div>
+            <div class="col-md-3">{% include "partials/field.html" with field=form.document_style %}</div>
+            <div class="col-12">{% include "partials/field.html" with field=form.quote_footer %}</div>
+          </div>
+          <div class="border rounded p-3">
+            <div class="small text-muted mb-2">Anteprima stile «{{ company.get_document_style_display }}»</div>
+            <div class="d-flex gap-2 align-items-center">
+              {% for valore, etichetta in form.fields.document_style.choices %}
+              <span class="badge {% if company.document_style == valore %}text-bg-primary{% else %}text-bg-light border{% endif %}">{{ etichetta }}</span>
+              {% endfor %}
+            </div>
+            <p class="small text-muted mb-0 mt-2">
+              Lo stile cambia solo la grafica dei documenti stampati: intestazione, tabelle e totali.
+              Puoi provarlo aprendo la stampa di un preventivo.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-image me-2"></i>Anteprima</div>
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <span class="d-inline-block rounded" style="width:38px;height:38px;background:{{ company.theme_color_hex }};"></span>
+              <span class="inlne-block rounded" style="width:38px;height:38px;background:{{ company.theme_color_dark }};"></span>
+              <span class="d-inline-block rounded" style="width:38px;height:38px;background:{{ company.theme_color_soft }};"></span>
+            </div>
+            <span class="small text-muted">colore principale</span>
+          </div>
+          <div class="border rounded p-3" style="background: {{ company.background_hex }};">
+            <div class="d-flex gap-2">
+              <div class="rounded p-3 text-white" style="background: {{ company.sidebar_colors.mid }}; min-width: 120px;">
+                <div class="small opacity-75">Menu</div>
+                <div class="fw-bold">Dashboard</div>
+              </div>
+              <div class="flex-grow-1">
+                <button type="button" class="btn btn-primary btn-sm" disabled>Pulsante</button>
+                <div class="small mt-2" style="color: {{ company.theme_color_hex }};">Collegamento di esempio</div>
+              </div>
+            </div>
+          </div>
+          {% if company.logo_url %}
+          <div class="mt-3">
+            <div class="small text-muted mb-1">Logo sui documenti</div>
+            <img src="{{ company.logo_url }}" alt="Logo" class="img-fluid border rounded p-2 bg-white" style="max-height:90px;">
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <button class="btn btn-primary w-100" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+          <a class="btn btn-outline-secondary w-100 mt-2" href="{% url 'core:settings' %}">Annulla</a>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</form>
 {% endblock %}
