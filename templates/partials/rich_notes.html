@@ -40,7 +40,7 @@
   </div>
   <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true"
        data-placeholder="Condizioni di vendita, tempi di consegna, note da stampare…">{{ field.value|richtext }}</div>
-  <div class="rich-hidden">{{ field }}</div>
+  <div class="rich-hidden d-none" hidden style="display: none;">{{ field }}</div>
   {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
   {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 </div>
