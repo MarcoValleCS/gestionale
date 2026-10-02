@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Scadenzario{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <span class="text-muted small">Scadenze al {{ oggi|date:"d/m/Y" }}</span>
+    {% if solo_scadute %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:scadenzario' %}">Mostra tutte</a>
+    {% else %}
+    <a class="btn btn-outline-danger btn-sm" href="{% url 'billing:scadenzario' %}?scadute=1">Solo scadute</a>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_list' %}?stato=aperte">
+      <i class="bi bi-receipt"></i> Fatture aperte
+    </a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:purchaseinvoice_list' %}?stato=aperte">
+      <i class="bi bi-receipt-cutoff"></i> Fatture da pagare
+    </a>
+  </div>
+</div>
+
+{% if not email_configurata %}
+<div class="alert alert-warning py-2 small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  L'invio email non è configurato: i solleciti non partiranno finché non imposti le variabili <code>EMAIL_*</code> nel file <code>.env</code>.
+  <a href="{% url 'core:email_settings' %}">Vedi le impostazioni email</a>.
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Da incassare</div>
+        <div class="fs-3 fw-bold number-badge">{{ totale_incasso|money }} €</div>
+        <div class="small {% if totale_scaduto_incasso %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+          di cui scaduto: {{ totale_scaduto_incasso|money }} €
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">Da pagare</div>
+        <div class="fs-3 fw-bold number-badge">{{ totale_pagamento|money }} €</div>
+        <div class="small {% if totale_scaduto_pagamento %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+          di cui scaduto: {{ totale_scaduto_pagamento|money }} €
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if righe_incasso %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-arrow-down-circle text-success me-1"></i> Incassi da clienti</span>
+    <span class="text-muted small">{{ righe_incasso|length }} fatture</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Scadenza</th>
+          <th>Cliente</th>
+          <th>Fattura</th>
+          <th class="text-end">Importo</th>
+          <th class="text-center">Ritardo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for riga in righe_incasso %}
+        <tr class="{% if riga.scaduto %}table-danger{% endif %}">
+          <td class="text-nowrap">{{ riga.scadenza|date:"d/m/Y" }}</td>
+          <td>
+            <a href="{% url 'contacts:detail' riga.documento.customer.pk %}">{{ riga.documento.customer.name }}</a>
+          </td>
+          <td><a href="{% url 'billing:salesinvoice_detail' riga.documento.pk %}">{{ riga.documento.number }}</a></td>
+          <td class="text-end fw-semibold">{{ riga.documento.grand_total|money }} €</td>
+          <td class="text-center">
+            {% if riga.scaduto %}
+            <span class="badge text-bg-danger">{{ riga.giorni|cut:"-" }} gg</span>
+            {% else %}
+            <span class="text-muted small">fra {{ riga.giorni }} gg</span>
+            {% endif %}
+            <div class="small text-muted">{{ riga.fascia_label }}</div>
+          </td>
+          <td class="text-end text-nowrap">
+            {% if riga.scaduto and riga.documento.customer.email %}
+            <form method="post" action="{% url 'billing:salesinvoice_reminder' riga.documento.pk %}" class="d-inline"
+                  onsubmit="return confirm('Inviare il sollecito a {{ riga.documento.customer.name }}?');">
+              {% csrf_token %}
+              <button class="btn btn-outline-warning btn-sm" type="submit" title="Invia sollecito">
+                <i class="bi bi-envelope-exclamation"></i> Sollecita
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-group-divider">
+        <tr>
+          <th colspan="3">Totali per fascia</th>
+          <th class="text-end">
+            <div class="small">Scadute: {{ totali_incasso.scadute|money }} €</div>
+            <div class="small">0-30: {{ totali_incasso.entro30|money }} €</div>
+            <div class="small">31-60: {{ totali_incasso.entro60|money }} €</div>
+            <div class="small">61-90: {{ totali_incasso.entro90|money }} €</div>
+            <div class="small">oltre 90: {{ totali_incasso.oltre90|money }} €</div>
+          </th>
+          <th colspan="2"></th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Nessun incasso in scadenza.</div>
+{% endif %}
+
+{% if righe_pagamento %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-arrow-up-circle text-danger me-1"></i> Pagamenti a fornitori</span>
+    <span class="text-muted small">{{ righe_pagamento|length }} fatture</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Scadenza</th>
+          <th>Fornitore</th>
+          <th>Fattura</th>
+          <th class="text-end">Importo</th>
+          <th class="text-center">Ritardo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for riga in righe_pagamento %}
+        <tr class="{% if riga.scaduto %}table-danger{% endif %}">
+          <td class="text-nowrap">{{ riga.scadenza|date:"d/m/Y" }}</td>
+          <td><a href="{% url 'contacts:detail' riga.documento.supplier.pk %}">{{ riga.documento.supplier.name }}</a></td>
+          <td><a href="{% url 'billing:purchaseinvoice_detail' riga.documento.pk %}">{{ riga.documento.number }}</a></td>
+          <td class="text-end fw-semibold">{{ riga.documento.grand_total|money }} €</td>
+          <td class="text-center">
+            {% if riga.scaduto %}
+            <span class="badge text-bg-danger">{{ riga.giorni|cut:"-" }} gg</span>
+            {% else %}
+            <span class="text-muted small">fra {{ riga.giorni }} gg</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-group-divider">
+        <tr>
+          <th colspan="3">Totali per fascia</th>
+          <th class="text-end">
+            <div class="small">Scadute: {{ totali_pagamento.scadute|money }} €</div>
+            <div class="small">0-30: {{ totali_pagamento.entro30|money }} €</div>
+            <div class="small">31-60: {{ totali_pagamento.entro60|money }} €</div>
+            <div class="small">61-90: {{ totali_pagamento.entro90|money }} €</div>
+            <div class="small">oltre 90: {{ totali_pagamento.oltre90|money }} €</div>
+          </th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Nessun pagamento in scadenza.</div>
+{% endif %}
+{% endblock %}

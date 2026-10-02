@@ -5,6 +5,7 @@ from . import views
 app_name = "billing"
 
 urlpatterns = [
+    path("scadenzario/", views.scadenzario, name="scadenzario"),
     # DDT
     path("ddt/", views.DeliveryNoteListView.as_view(), name="deliverynote_list"),
     path("ddt/nuovo/", views.DeliveryNoteCreateView.as_view(), name="deliverynote_create"),
@@ -28,6 +29,7 @@ urlpatterns = [
     path("fatture/emesse/<int:pk>/elimina/", views.salesinvoice_delete, name="salesinvoice_delete"),
     # Email e fatturazione elettronica
     path("fatture/emesse/<int:pk>/email/", views.salesinvoice_email, name="salesinvoice_email"),
+    path("fatture/emesse/<int:pk>/sollecito/", views.salesinvoice_reminder, name="salesinvoice_reminder"),
     path("fatture/emesse/<int:pk>/sdi/genera/", views.salesinvoice_sdi_generate, name="salesinvoice_sdi_generate"),
     path("fatture/emesse/<int:pk>/sdi/scarica/", views.salesinvoice_sdi_download, name="salesinvoice_sdi_download"),
     path("fatture/emesse/<int:pk>/sdi/invia/", views.salesinvoice_sdi_send, name="salesinvoice_sdi_send"),

@@ -9,7 +9,11 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, role_required
+from decimal import Decimal
+
+ZERO = Decimal("0")
+
+from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, has_role, role_required
 from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
 from apps.sales.views import build_print_context, fdate, save_document_lines, with_vat_rates
@@ -40,6 +44,117 @@ DDT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
 DDT_VIEW_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, ROLE_PURCHASING)
 SALES_INVOICE_ROLES = (ROLE_ADMIN, ROLE_SALES)
 PURCHASE_INVOICE_ROLES = (ROLE_ADMIN, ROLE_PURCHASING)
+
+
+def _fascia_scadenza(giorni):
+    """In quale fascia di scadenza cade un documento (giorni di ritardo/attesa)."""
+    if giorni < 0:
+        return "scadute", "Scadute"
+    if giorni <= 30:
+        return "entro30", "Entro 30 giorni"
+    if giorni <= 60:
+        return "entro60", "31-60 giorni"
+    if giorni <= 90:
+        return "entro90", "61-90 giorni"
+    return "oltre90", "Oltre 90 giorni"
+
+
+@role_required(ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING)
+def scadenzario(request):
+    """Scadenze di incasso e pagamento, con le fasce di ritardo."""
+    oggi = timezone.localdate()
+    solo_scadute = request.GET.get("scadute") == "1"
+
+    def riepilogo(queryset, campo_data):
+        righe = []
+        totali = {"scadute": ZERO, "entro30": ZERO, "entro60": ZERO, "entro90": ZERO, "oltre90": ZERO}
+        for documento in queryset:
+            scadenza = getattr(documento, campo_data) or documento.date
+            giorni = (scadenza - oggi).days
+            chiave, etichetta = _fascia_scadenza(giorni)
+            righe.append(
+                {
+                    "documento": documento,
+                    "scadenza": scadenza,
+                    "giorni": giorni,
+                    "fascia": chiave,
+                    "fascia_label": etichetta,
+                    "scaduto": giorni < 0,
+                }
+            )
+            totali[chiave] += documento.grand_total or ZERO
+        righe.sort(key=lambda riga: riga["scadenza"])
+        if solo_scadute:
+            righe = [riga for riga in righe if riga["scaduto"]]
+        return righe, totali
+
+    da_incassare = SalesInvoice.objects.filter(
+        status__in=[SalesInvoice.STATUS_ISSUED, SalesInvoice.STATUS_SENT]
+    ).select_related("customer")
+    da_pagare = PurchaseInvoice.objects.filter(status=PurchaseInvoice.STATUS_REGISTERED).select_related("supplier")
+
+    if not (has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_SALES)):
+        da_incassare = SalesInvoice.objects.none()
+    if not (has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_PURCHASING)):
+        da_pagare = PurchaseInvoice.objects.none()
+
+    righe_incasso, totali_incasso = riepilogo(da_incassare, "due_date")
+    righe_pagamento, totali_pagamento = riepilogo(da_pagare, "due_date")
+
+    return render(
+        request,
+        "billing/scadenzario.html",
+        {
+            "page_title": "Scadenzario",
+            "righe_incasso": righe_incasso,
+            "righe_pagamento": righe_pagamento,
+            "totali_incasso": totali_incasso,
+            "totali_pagamento": totali_pagamento,
+            "totale_incasso": sum(totali_incasso.values(), ZERO),
+            "totale_pagamento": sum(totali_pagamento.values(), ZERO),
+            "totale_scaduto_incasso": totali_incasso["scadute"],
+            "totale_scaduto_pagamento": totali_pagamento["scadute"],
+            "solo_scadute": solo_scadute,
+            "oggi": oggi,
+            "email_configurata": emailing.email_configured(),
+        },
+    )
+
+
+@role_required(ROLE_ADMIN, ROLE_SALES)
+def salesinvoice_reminder(request, pk):
+    """Manda un sollecito di pagamento per una fattura scaduta."""
+    invoice = get_object_or_404(SalesInvoice.objects.select_related("customer"), pk=pk)
+    if request.method != "POST":
+        return redirect("billing:scadenzario")
+
+    scadenza = invoice.due_date or invoice.date
+    giorni = (timezone.localdate() - scadenza).days
+    if not invoice.customer.email:
+        messages.error(request, f"Il cliente {invoice.customer.name} non ha un indirizzo email.")
+        return redirect("billing:scadenzario")
+    if not emailing.email_configured():
+        messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        return redirect("billing:scadenzario")
+
+    oggetto = f"Sollecito fattura {invoice.number}"
+    corpo = (
+        f"Gentile {invoice.customer.name},\n\n"
+        f"ci risulta ancora da saldare la fattura {invoice.number} del {invoice.date:%d/%m/%Y}, "
+        f"scaduta il {scadenza:%d/%m/%Y}"
+        + (f" ({giorni} giorni fa)" if giorni > 0 else "")
+        + f", di importo {invoice.grand_total:.2f} €.\n\n"
+        "Se il pagamento è già stato effettuato, la preghiamo di ignorare questo messaggio.\n"
+        "Restiamo a disposizione per qualsiasi chiarimento.\n\n"
+        "Cordiali saluti"
+    )
+    try:
+        emailing.send_invoice_email(invoice, to_email=invoice.customer.email, subject=oggetto, message=corpo)
+    except Exception as exc:
+        messages.error(request, f"Sollecito non inviato: {exc}")
+    else:
+        messages.success(request, f"Sollecito inviato a {invoice.customer.email} per la fattura {invoice.number}.")
+    return redirect("billing:scadenzario")
 
 
 # ---------------------------------------------------------------------- DDT
