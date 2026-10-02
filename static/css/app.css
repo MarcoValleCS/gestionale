@@ -30,6 +30,13 @@
   --bs-border-radius: 10px;
   --bs-border-radius-lg: 14px;
   --bs-focus-ring-color: rgba(37, 99, 235, 0.18);
+
+  /* Barra laterale: modificabili dalle impostazioni azienda */
+  --sidebar-top: #0e1730;
+  --sidebar-mid: #142042;
+  --sidebar-bottom: #16224a;
+  --sidebar-glow: rgba(37, 99, 235, 0.35);
+  --sidebar-active: rgba(37, 99, 235, 0.95);
 }
 
 body {
@@ -116,8 +123,8 @@ a:hover {
   z-index: 1030;
   color: #b9c4d9;
   background:
-    radial-gradient(420px 260px at -10% 0%, rgba(37, 99, 235, 0.35), transparent 60%),
-    linear-gradient(180deg, #0e1730 0%, #142042 55%, #16224a 100%);
+    radial-gradient(420px 260px at -10% 0%, var(--sidebar-glow), transparent 60%),
+    linear-gradient(180deg, var(--sidebar-top) 0%, var(--sidebar-mid) 55%, var(--sidebar-bottom) 100%);
 }
 
 .sidebar-brand {
@@ -141,8 +148,18 @@ a:hover {
   flex: 0 0 34px;
   border-radius: 10px;
   font-size: 1.05rem;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  box-shadow: 0 6px 16px var(--sidebar-glow);
+}
+
+.sidebar-brand .brand-logo {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px;
 }
 
 .sidebar-nav {
@@ -170,8 +187,8 @@ a:hover {
 
 .sidebar-nav .nav-link.active {
   color: #fff;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(79, 70, 229, 0.95));
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, var(--sidebar-active), var(--brand-dark));
+  box-shadow: 0 8px 18px var(--sidebar-glow);
 }
 
 .sidebar-nav .nav-link .bi {
@@ -440,9 +457,23 @@ a:hover {
   color: #adb5bd;
 }
 
+.rich-editor .rich-hidden {
+  display: none;
+}
+
 .rich-editor .rich-content ul {
   margin-bottom: 0;
   padding-left: 1.4rem;
+}
+
+/* Campo affiancato alle condizioni: note interne più piccole */
+.field-compact .form-label {
+  font-size: 0.85rem;
+}
+
+.field-compact textarea {
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 .doc-lines .line-total {

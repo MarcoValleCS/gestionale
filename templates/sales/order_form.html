@@ -92,8 +92,8 @@
     <div class="card-header">Note e condizioni</div>
     <div class="card-body">
       <div class="row">
-        <div class="col-lg-5">{% include "partials/field.html" with field=form.notes %}</div>
         <div class="col-lg-7">{% include "partials/rich_notes.html" with field=form.terms_text %}</div>
+        <div class="col-lg-5 field-compact">{% include "partials/field.html" with field=form.notes %}</div>
       </div>
     </div>
   </div>
