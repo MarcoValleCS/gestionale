@@ -64,6 +64,15 @@
       <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'core:home' %}">
         <i class="bi bi-speedometer2"></i> Dashboard
       </a>
+      <a class="nav-link {% if 'messaggi' in request.resolver_match.url_name or 'conversazione' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:messaggi' %}">
+        <i class="bi bi-chat-dots"></i> Messaggi
+        {% if messaggi_non_letti %}<span class="badge text-bg-danger ms-auto">{{ messaggi_non_letti }}</span>{% endif %}
+      </a>
+      {% if roles.is_admin or roles.is_sales or roles.is_purchasing or roles.is_hr %}
+      <a class="nav-link {% if 'posta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:posta' %}">
+        <i class="bi bi-inbox"></i> Posta
+      </a>
+      {% endif %}
 
       <div class="nav-section">Anagrafiche</div>
       <a class="nav-link {% if request.resolver_match.namespace == 'contacts' %}active{% endif %}" href="{% url 'contacts:list' %}">
