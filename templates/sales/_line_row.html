@@ -1,4 +1,4 @@
-<tr class="line-row" data-cost="{{ lineform.instance.unit_cost|default_if_none:'' }}">
+<tr class="line-row" data-cost="{{ lineform.instance.unit_cost|default:'' }}">
   <td class="d-none">{{ lineform.id }}</td>
   <td>
     <div class="autocomplete-wrap">

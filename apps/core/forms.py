@@ -12,12 +12,81 @@ def active_vat_rates():
     return VatRate.objects.filter(is_active=True)
 
 
+def menu_unita():
+    """Elenco delle unità di misura attive, pronto per i menu a tendina.
+
+    Nei documenti ogni riga ha il suo menu: senza condivisione sarebbero una
+    query per riga. L'elenco si rinnova al salvataggio di un'unità di misura
+    (vedi i segnali in ``apps.core.models``).
+    """
+    from .cache import memoizza
+
+    return memoizza("menu_unita", lambda: [("", "---------")] + [(u.pk, str(u)) for u in active_units()], 300)
+
+
+def menu_aliquote():
+    """Elenco delle aliquote IVA attive, pronto per i menu a tendina."""
+    from .cache import memoizza
+
+    return memoizza("menu_aliquote", lambda: [("", "---------")] + [(v.pk, str(v)) for v in active_vat_rates()], 300)
+
+
 def active_payment_terms():
     return PaymentTerm.objects.all()
 
 
 def all_tags():
     return Tag.objects.all()
+
+
+class AutocompleteSelect(forms.Select):
+    """Menu a tendina che rende solo l'opzione già scelta.
+
+    I campi con autocompletamento (articolo, cliente, fornitore) usano un menu
+    nascosto per portare l'identificativo della voce scelta: senza questo widget
+    il browser scaricherebbe tutto l'archivio dentro ogni riga del documento
+    (con migliaia di articoli sono megabyte di pagina). Le voci mancanti le
+    aggiunge lo script di autocompletamento quando si sceglie.
+    """
+
+    def optgroups(self, name, value, attrs=None):
+        # ``value`` arriva come stringa (per i menu a scelta singola) o come
+        # elenco (scelta multipla): si normalizza in un elenco di identificativi.
+        if value in (None, ""):
+            scelti = []
+        elif isinstance(value, (list, tuple, set)):
+            scelti = [str(v) for v in value if v not in (None, "")]
+        else:
+            scelti = [str(value)]
+
+        # Si rende solo la voce scelta (o nessuna, per una riga nuova): l'elenco
+        # completo lo aggiunge l'autocompletamento quando si cerca.
+        try:
+            iteratore = self.choices
+            queryset = iteratore.queryset.filter(pk__in=scelti)
+            campo = getattr(iteratore, "field", None)
+            self.choices = [
+                (str(oggetto.pk), campo.label_from_instance(oggetto) if campo else str(oggetto))
+                for oggetto in queryset
+            ]
+        except AttributeError:
+            pass
+        return super().optgroups(name, value, attrs)
+
+
+def usa_autocomplete(campo):
+    """Fa rendere al menu solo la voce scelta: le altre le aggiunge lo script.
+
+    Serve sui campi con autocompletamento, dove il menu è nascosto e serve solo
+    a portare l'identificativo. Le voci del campo vanno portate sul nuovo menu,
+    altrimenti resterebbe vuoto e il valore scelto andrebbe perso.
+    """
+    widget = campo.widget
+    if not isinstance(widget, AutocompleteSelect):
+        nuovo = AutocompleteSelect(attrs=widget.attrs)
+        nuovo.choices = widget.choices
+        campo.widget = nuovo
+    return campo
 
 
 class BootstrapFormMixin:

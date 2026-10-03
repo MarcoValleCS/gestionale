@@ -8,6 +8,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from .utils import format_quantity, mescola_colori, normalizza_colore, rgba, schiarisci, scurisci
+from .validators import valida_file_caricato
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField("Creato il", auto_now_add=True)
@@ -185,6 +186,8 @@ class NumberSequence(models.Model):
 class CompanySettings(models.Model):
     """Dati dell'azienda (record singolo)."""
 
+    CHIAVE_CACHE = "company_settings"
+
     name = models.CharField("Ragione sociale", max_length=200, default="La mia azienda")
     vat_number = models.CharField("Partita IVA", max_length=20, blank=True)
     tax_code = models.CharField("Codice fiscale", max_length=20, blank=True)
@@ -289,8 +292,25 @@ class CompanySettings(models.Model):
 
     @classmethod
     def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
+        """Dati azienda (record singolo), con cache breve.
+
+        Vengono letti a ogni pagina dai context processor: senza cache sono due
+        query per richiesta. La cache si azzera al salvataggio.
+        """
+        from .cache import memoizza
+
+        def leggi():
+            oggetto, _ = cls.objects.get_or_create(pk=1)
+            return oggetto
+
+        return memoizza(cls.CHIAVE_CACHE, leggi, 300)
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+        from .cache import dimentica
+
+        dimentica(self.CHIAVE_CACHE)
 
     # ------------------------------------------------------------- colori
     @property
@@ -350,7 +370,7 @@ class Attachment(TimeStampedModel):
     ]
 
     name = models.CharField("Nome", max_length=150, blank=True)
-    file = models.FileField("File", upload_to="attachments/%Y/%m/")
+    file = models.FileField("File", upload_to="attachments/%Y/%m/", validators=[valida_file_caricato])
     notes = models.CharField("Note", max_length=200, blank=True)
     kind = models.CharField("Tipo", max_length=20, choices=KIND_CHOICES, default=KIND_DOCUMENT)
     product = models.ForeignKey(
@@ -547,3 +567,22 @@ class InboundEmail(TimeStampedModel):
             self.read_at = timezone.now()
             self.save(update_fields=["read_at", "updated_at"])
         return self.read_at
+
+# ------------------------------------------------- menu condivisi in cache
+# I menu di unità di misura e aliquote IVA sono uguali in tutte le righe di un
+# documento: si tengono in cache (vedi ``menu_unita`` e ``menu_aliquote``) e si
+# rinnovano appena qualcuno li modifica.
+from django.db.models.signals import post_delete, post_save  # noqa: E402
+from django.dispatch import receiver  # noqa: E402
+
+from .cache import dimentica  # noqa: E402
+
+
+@receiver([post_save, post_delete], sender=UnitOfMeasure)
+def _unita_di_misura_cambiata(sender, **kwargs):
+    dimentica("menu_unita")
+
+
+@receiver([post_save, post_delete], sender=VatRate)
+def _aliquota_cambiata(sender, **kwargs):
+    dimentica("menu_aliquote")

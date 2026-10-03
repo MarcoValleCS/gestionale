@@ -1,14 +1,25 @@
 """URL principali del progetto."""
+from pathlib import Path
+
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.decorators import login_required
 from django.urls import include, path
 from django.views.static import serve as media_serve
 
+# I file che si possono mostrare dentro la pagina (anteprima foto, logo…).
+# Tutti gli altri si scaricano: così un file caricato non può aprire una pagina
+# web nella sessione del gestionale.
+ESTENSIONI_INLINE = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".bmp", ".ico"}
+
 
 def protected_media(request, path):
     """Serve i file caricati leggendo MEDIA_ROOT a runtime (non all'avvio)."""
-    return media_serve(request, path, document_root=settings.MEDIA_ROOT)
+    risposta = media_serve(request, path, document_root=settings.MEDIA_ROOT)
+    if Path(path).suffix.lower() not in ESTENSIONI_INLINE:
+        risposta["Content-Disposition"] = "attachment"
+    risposta["X-Content-Type-Options"] = "nosniff"
+    return risposta
 
 
 admin.site.site_header = "Gestionale – Amministrazione"

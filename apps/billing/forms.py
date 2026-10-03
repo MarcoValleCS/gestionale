@@ -35,7 +35,7 @@ class DeliveryNoteLineForm(BaseBootstrapModelForm):
         from django.urls import reverse
 
         from apps.catalog.models import Product
-        from apps.core.forms import active_units
+        from apps.core.forms import menu_unita, usa_autocomplete
 
         super().__init__(*args, **kwargs)
         self.fields["product"].queryset = Product.objects.filter(active=True).select_related("uom").order_by("name")
@@ -45,7 +45,8 @@ class DeliveryNoteLineForm(BaseBootstrapModelForm):
         self.fields["product"].widget.attrs["data-context"] = "sale"
         self.fields["product"].widget.attrs["class"] = "d-none"
         self.fields["product"].widget.attrs["data-autocomplete-target"] = "1"
-        self.fields["uom"].queryset = active_units()
+        usa_autocomplete(self.fields["product"])
+        self.fields["uom"].choices = menu_unita()
         self.fields["description"].required = False
         self.fields["description"].label = "Descrizione"
 

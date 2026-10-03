@@ -50,6 +50,8 @@ def fdate(value):
 
 def statistics(request):
     """Statistiche complete: fatturato, margine e classifiche del periodo."""
+    from apps.core.cache import memoizza
+
     period = request.GET.get("periodo", analytics.PERIOD_YEAR)
     if period not in {value for value, _label in analytics.PERIOD_CHOICES}:
         period = analytics.PERIOD_YEAR
@@ -66,7 +68,7 @@ def statistics(request):
         offset = 0
     offset = max(0, min(offset, 36))
 
-    stats = analytics.breakdowns(period, limit=None)
+    stats = memoizza(f"analytics_breakdowns_{period}", lambda: analytics.breakdowns(period, limit=None), 60)
     return render(
         request,
         "sales/statistics.html",
@@ -79,7 +81,9 @@ def statistics(request):
             "margin_by_supplier": stats["by_supplier"],
             "margin_by_customer": stats["by_customer"],
             "margin_by_job": stats["by_job"],
-            "series": analytics.monthly_series(months, end_offset=offset),
+            "series": memoizza(
+                f"analytics_serie_{months}_{offset}", lambda: analytics.monthly_series(months, end_offset=offset), 60
+            ),
             "months": months,
             "offset": offset,
             "months_choices": (1, 3, 6, 12),
@@ -285,7 +289,7 @@ def build_print_context(
     }
 
 
-def with_vat_rates(context):
+def with_vat_rates(context, documento=None):
     from apps.core.forms import active_units, active_vat_rates
 
     context["vat_rates_json"] = {str(v.pk): str(v.rate) for v in VatRate.objects.filter(is_active=True)}
@@ -295,13 +299,18 @@ def with_vat_rates(context):
         str(contact.pk): str(contact.sale_discount_pct)
         for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
     }
-    # costo di acquisto per articolo: serve a mostrare il margine mentre si scrive
+    # Per il margine servono i costi: si caricano solo quelli degli articoli già
+    # presenti nel documento (pochi). Caricare tutto il catalogo significherebbe
+    # un JSON enorme da scaricare a ogni apertura del modulo. Gli articoli scelti
+    # durante la compilazione portano il costo con la chiamata di autocompletamento.
+    ids = []
+    if documento is not None:
+        ids = [pk for pk in documento.lines.values_list("product_id", flat=True) if pk]
     context["product_costs_json"] = {
         str(pk): str(costo)
-        for pk, costo in Product.objects.filter(purchase_price__gt=0).values_list("pk", "purchase_price")
+        for pk, costo in Product.objects.filter(pk__in=ids, purchase_price__gt=0).values_list("pk", "purchase_price")
     }
     return context
-
 
 def save_document_lines(document, formset, fk_field):
     lines = formset.save(commit=False)
@@ -441,7 +450,7 @@ class QuoteUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
         if "line_formset" not in context:
             context["line_formset"] = QuoteLineFormSet(prefix="lines", queryset=self.object.lines.all())
         context["cancel_url"] = reverse("sales:quote_detail", args=[self.object.pk])
-        return with_vat_rates(context)
+        return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -678,7 +687,7 @@ class SalesOrderUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateVie
         if "line_formset" not in context:
             context["line_formset"] = SalesOrderLineFormSet(prefix="lines", queryset=self.object.lines.all())
         context["cancel_url"] = reverse("sales:order_detail", args=[self.object.pk])
-        return with_vat_rates(context)
+        return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -855,7 +864,7 @@ class QuoteTemplateUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, Update
         if "line_formset" not in context:
             context["line_formset"] = QuoteTemplateLineFormSet(prefix="lines", queryset=self.object.lines.all())
         context["cancel_url"] = reverse("sales:quote_template_list")
-        return with_vat_rates(context)
+        return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

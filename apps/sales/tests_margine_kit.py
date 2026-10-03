@@ -171,11 +171,16 @@ class MargineNelModuloTest(KitTestBase):
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
         self.assertIn("Margine del preventivo", html)
-        self.assertIn('id="product-costs"', html)
         self.assertIn("Costo merce", html)
         self.assertIn("Marginalità", html)
-        # il costo del vaso è nel dizionario passato alla pagina
-        self.assertIn(f'"{self.vaso.pk}": "180.0000"', html)
+        # il costo non viaggia più con la pagina: arriva con l'autocompletamento
+        self.assertIn("data-cost=", html)
+
+    def test_il_costo_arriva_con_lautocompletamento(self):
+        self.login()
+        risposta = self.client.get(reverse("catalog:product_defaults", args=[self.vaso.pk]))
+        self.assertEqual(risposta.status_code, 200)
+        self.assertEqual(risposta.json()["cost"], "180.0000")
 
     def test_il_modulo_ordine_mostra_il_margine(self):
         self.login()
@@ -188,4 +193,5 @@ class MargineNelModuloTest(KitTestBase):
         response = self.client.get(reverse("sales:quote_update", args=[self.quote.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertIn("line-margin", response.content.decode())
+
 

@@ -4,9 +4,14 @@ Le variabili d'ambiente permettono di usare la stessa codebase in sviluppo
 (SQLite, debug attivo) e in produzione su VPS Linux (PostgreSQL, HTTPS).
 """
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# True quando si stanno eseguendo i test: alcune ottimizzazioni (cache, nomi dei
+# file statici) si disattivano, così i test non dipendono da dati raccolti prima.
+IN_TEST = "test" in sys.argv
 
 
 def env(name, default=None):
@@ -64,6 +69,10 @@ EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Gestionale <no-reply@example.com>")
 EMAIL_IS_CONFIGURED = bool(EMAIL_HOST)
 
+# Indirizzo che riceve gli avvisi automatici (backup fallito, sito irraggiungibile,
+# disco quasi pieno). Se vuoto si usa l'email dell'azienda.
+AVVISO_EMAIL = env("AVVISO_EMAIL", "")
+
 
 
 # ------------------------------------------------- Posta in arrivo (IMAP)
@@ -102,11 +111,16 @@ def _dominio_di(indirizzo):
 
 _domini_automatici = {d for d in (_dominio_di(EMAIL_HOST_USER), _dominio_di(DEFAULT_FROM_EMAIL)) if d}
 
-DOMINI_INTERNI = {d.strip().lower() for d in env("DOMINI_INTERNI", "").split(",") if d.strip()} or _domini_automatici
-
-# Mittenti che non vanno mai persi: il Sistema di Interscambio (fatture
-# elettroniche) e le PEC. Si possono aggiungere altri indirizzi, separati da
-# virgola, in MITTENTI_IMPORTANTI.
+DOMINI_INTERNI = {d.strip().lower() for d in env("DOMINI_INTERNI", "").split(",") if d.strip()} or _domini_automatici
+
+
+
+# Mittenti che non vanno mai persi: il Sistema di Interscambio (fatture
+
+# elettroniche) e le PEC. Si possono aggiungere altri indirizzi, separati da
+
+# virgola, in MITTENTI_IMPORTANTI.
+
 MITTENTI_IMPORTANTI = {m.strip().lower() for m in env("MITTENTI_IMPORTANTI", "sdi01@pec.fatturapa.it").split(",") if m.strip()}
 if not EMAIL_HOST:
     # In sviluppo (o senza SMTP configurato) le email finiscono nei log del server
@@ -241,16 +255,60 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Cartella dei backup notturni (in produzione il contenitore la vede in sola
+# lettura: si possono scaricare dal gestionale, così se ne tiene una copia
+# anche fuori dal server).
+BACKUP_ROOT = Path(env("BACKUP_ROOT", str(BASE_DIR / "backups")))
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+    # I file statici portano nel nome un'impronta del contenuto: quando
+    # cambiano, cambia l'indirizzo, quindi il browser può tenerli in cache a
+    # lungo senza rischiare di mostrare una versione vecchia.
+    # Nei test si usano i nomi normali: la mappa delle impronte richiede di
+    # avere raccolto i file, cosa che nei test non serve.
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if IN_TEST
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        )
+    },
 }
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ---------------------------------------------------------------- Log
+# Cosa finisce nei log e cosa no:
+#  - le password non vengono mai registrate (gli accessi sono richieste POST e
+#    il corpo non viene mai stampato);
+#  - le credenziali di posta stanno solo nel file .env;
+#  - i 404 non vengono registrati: l'indirizzo potrebbe contenere il testo di
+#    una ricerca (nome di un cliente), che non serve tenere nei log;
+#  - gli errori gravi restano registrati per poterli capire.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "semplice": {"format": "{levelname} {asctime} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "semplice"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        # Solo gli errori veri, non ogni pagina non trovata
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "apps": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
 
 # -------------------------------------------------------------- Cache
 # Cache su file: condivisa tra i processi di gunicorn, nessuna tabella
-# aggiuntiva e nessun servizio esterno.
+# aggiuntiva e nessun servizio esterno. La usa anche il limitatore anti-abuso.
+# Durante i test le ottimizzazioni si disattivano (vedi apps.core.cache): i test
+# scrivono dati che devono essere riletti subito.
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",

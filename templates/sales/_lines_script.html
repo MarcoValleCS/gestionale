@@ -11,17 +11,18 @@
   const vatRates = JSON.parse(document.getElementById("vat-rates-data").textContent);
   const currency = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  /* Costo di acquisto per articolo: serve a mostrare il margine in diretta.
-     Il costo della riga (se già fissato, es. su un ordine consegnato) vince
-     su quello dell'anagrafica. */
+  /* Costo di acquisto della riga: serve a mostrare il margine in diretta.
+     Priorità: il costo fissato sulla riga (ordini già consegnati), poi quello
+     dell'articolo scelto. Il dizionario "product-costs" contiene solo i costi
+     degli articoli già presenti nel documento. */
   const costsEl = document.getElementById("product-costs");
   const productCosts = costsEl ? JSON.parse(costsEl.textContent) : {};
 
   function rowCost(row) {
-    const fisso = row.dataset.cost;
-    if (fisso !== undefined && fisso !== null && String(fisso).trim() !== "") {
-      const valore = parseNumber(fisso);
-      if (!isNaN(valore)) return valore;
+    const valore = row.dataset.cost;
+    if (valore !== undefined && valore !== null && String(valore).trim() !== "") {
+      const numero = parseNumber(valore);
+      if (!isNaN(numero)) return numero;
     }
     const productSelect = row.querySelector('[name$="-product"]');
     const chiave = productSelect ? String(productSelect.value || "") : "";
@@ -164,6 +165,10 @@
         if (price) price.value = data.price;
         const vat = row.querySelector('[name$="-vat_rate"]');
         if (vat && data.vat_id) vat.value = data.vat_id;
+        // il costo dell'articolo serve al calcolo del margine
+        if (data.cost !== undefined && data.cost !== null) {
+          row.dataset.cost = data.cost;
+        }
         recalc();
         if (data.components && data.components.length) {
           expandKit(row, productSelect, data.components);

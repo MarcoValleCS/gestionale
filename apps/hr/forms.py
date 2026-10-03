@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from apps.core.forms import BaseBootstrapModelForm
+from apps.core.validators import valida_file_caricato
 from apps.jobs.models import Job
 
 from .models import Collaborator, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
@@ -271,6 +272,8 @@ class CollaboratorPhotoForm(forms.Form):
 
     def clean_file(self):
         caricato = self.cleaned_data.get("file")
+        if caricato:
+            valida_file_caricato(caricato)
         if caricato and caricato.size > 25 * 1024 * 1024:
             raise forms.ValidationError("Il file supera i 25 MB: ridimensiona la foto e riprova.")
         return caricato

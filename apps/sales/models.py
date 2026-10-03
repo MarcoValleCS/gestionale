@@ -299,6 +299,9 @@ class SalesOrder(CommissionedDocument, TotalsDocument, TimeStampedModel):
         indexes = [
             models.Index(fields=["status", "-date"], name="order_status_date_idx"),
             models.Index(fields=["customer", "-date"], name="order_customer_date_idx"),
+            # le statistiche leggono gli ordini consegnati per periodo: senza
+            # questo indice ogni apertura della dashboard scorre tutta la tabella
+            models.Index(fields=["status", "delivered_at"], name="order_delivered_idx"),
         ]
 
     def __str__(self):

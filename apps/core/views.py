@@ -1,5 +1,6 @@
 """Viste dell'app core: dashboard, impostazioni e tabelle di base."""
-from datetime import timedelta
+from datetime import datetime, timedelta
+from pathlib import Path
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -23,6 +24,7 @@ from .forms import (
     UnitOfMeasureForm,
     VatRateForm,
 )
+from .cache import memoizza
 from .models import Attachment, CompanySettings, InboundEmail, InternalMessage, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
 from .richtext import clean_notes
 
@@ -54,7 +56,9 @@ def home(request):
 
     # Riepilogo del periodo: i dettagli per articolo/cliente/fornitore stanno
     # nella pagina «Statistiche», così la dashboard resta leggera.
-    stats = analytics.summary(period)
+    # Le statistiche costano un giro su tutte le righe consegnate: si tengono in
+    # cache per un minuto, tanto i numeri cambiano solo alla consegna di un ordine.
+    stats = memoizza(f"analytics_summary_{period}", lambda: analytics.summary(period), 60)
 
     # Finestra temporale del grafico: 1 / 3 / 6 / 12 mesi, spostabile indietro
     try:
@@ -68,7 +72,9 @@ def home(request):
     except (TypeError, ValueError):
         offset = 0
     offset = max(0, min(offset, 36))
-    series = analytics.monthly_series(months, end_offset=offset)
+    series = memoizza(
+        f"analytics_serie_{months}_{offset}", lambda: analytics.monthly_series(months, end_offset=offset), 60
+    )
 
     from apps.inventory.models import StockLevel
     from apps.jobs.models import Job, MaintenancePlan
@@ -250,6 +256,66 @@ def activity_log(request):
     )
 
 
+# ------------------------------------------------------- copia di sicurezza
+def _file_di_backup():
+    """Elenco dei backup presenti (i più recenti per primi)."""
+    from django.conf import settings as dj_settings
+
+    cartella = Path(dj_settings.BACKUP_ROOT)
+    if not cartella.is_dir():
+        return []
+    voci = []
+    for percorso in cartella.glob("*.gz"):
+        try:
+            info = percorso.stat()
+        except OSError:
+            continue
+        voci.append(
+            {
+                "nome": percorso.name,
+                "byte": info.st_size,
+                "quando": datetime.fromtimestamp(info.st_mtime, tz=timezone.get_current_timezone()),
+                "database": percorso.name.startswith("db_"),
+            }
+        )
+    voci.sort(key=lambda voce: voce["quando"], reverse=True)
+    return voci
+
+
+@role_required(ROLE_ADMIN)
+def backup(request):
+    """Copia di sicurezza: elenco dei backup e scaricamento.
+
+    I backup restano sul server: da qui se ne può scaricare una copia su un
+    altro computer, così un guasto del server non porta via anche le copie.
+    """
+    from django.conf import settings as dj_settings
+
+    return render(
+        request,
+        "core/backup.html",
+        {
+            "page_title": "Copia di sicurezza",
+            "backup": _file_di_backup(),
+            "cartella": str(dj_settings.BACKUP_ROOT),
+        },
+    )
+
+
+@role_required(ROLE_ADMIN)
+def backup_download(request, nome):
+    """Scarica un file di backup (solo amministratori, solo dalla cartella)."""
+    from django.conf import settings as dj_settings
+    from django.http import FileResponse, Http404
+
+    cartella = Path(dj_settings.BACKUP_ROOT).resolve()
+    percorso = (cartella / Path(nome).name).resolve()
+    # niente percorsi costruiti a mano: si scarica solo un file della cartella
+    if percorso.parent != cartella or not percorso.is_file():
+        raise Http404("Backup non trovato.")
+    return FileResponse(percorso.open("rb"), as_attachment=True, filename=percorso.name, content_type="application/gzip")
+
+
 # ------------------------------------------------------- messaggi interni
 def _utenti_scrivibili(utente):
     from django.contrib.auth import get_user_model
@@ -370,6 +436,15 @@ def posta(request):
         )
 
     base = InboundEmail.objects.all()
+    from django.db.models import Count, Q
+
+    conteggi = base.aggregate(
+        tutte=Count("pk"),
+        rilevanti=Count("pk", filter=Q(is_relevant=True)),
+        non_lette=Count("pk", filter=Q(read_at__isnull=True)),
+        allegati=Count("pk", filter=~Q(attachments=[]) & Q(attachments__isnull=False)),
+        contatti=Count("pk", filter=Q(contact__isnull=False)),
+    )
     return render(
         request,
         "core/posta.html",
@@ -377,14 +452,8 @@ def posta(request):
             "page_title": "Posta",
             "email": elenco[:200],
             "totale": elenco.count(),
-            "non_lette": base.filter(read_at__isnull=True).count(),
-            "conteggi": {
-                "tutte": base.count(),
-                "rilevanti": base.filter(is_relevant=True).count(),
-                "non_lette": base.filter(read_at__isnull=True).count(),
-                "allegati": base.filter(attachments__isnull=False).exclude(attachments=[]).count(),
-                "contatti": base.filter(contact__isnull=False).count(),
-            },
+            "non_lette": conteggi["non_lette"],
+            "conteggi": conteggi,
             "filtro": filtro,
             "cerca": cerca,
             "configurata": posta_configurata(),
@@ -395,10 +464,21 @@ def posta(request):
 
 @role_required(*POSTA_ROLES)
 def posta_sincronizza(request):
-    """Scarica le nuove email dalla casella."""
+    """Scarica le nuove email dalla casella.
+
+    Ogni scaricamento apre una connessione al server di posta: se qualcuno
+    preme il pulsante più volte di seguito si aspetta, invece di aprire dieci
+    connessioni in un minuto.
+    """
+    from django.core.cache import cache
+
     from .imap import PostaNonConfigurata, sincronizza
 
     if request.method == "POST":
+        if cache.get("posta_sincronizzazione_in_corso"):
+            messages.info(request, "Una sincronizzazione è appena partita: attendi qualche secondo e ricarica.")
+            return redirect("core:posta")
+        cache.set("posta_sincronizzazione_in_corso", True, 20)
         try:
             esito = sincronizza()
         except PostaNonConfigurata as exc:
@@ -508,9 +588,9 @@ def posta_allegato(request, pk, indice):
 
     from io import BytesIO
 
-    risposta = FileResponse(BytesIO(contenuto), content_type=tipo or "application/octet-stream")
-    risposta["Content-Disposition"] = f'attachment; filename="{nome}"'
-    return risposta
+    # Lo scaricamento (as_attachment) evita che un allegato pericoloso venga
+    # aperto come pagina web nella sessione di chi lo riceve.
+    return FileResponse(BytesIO(contenuto), as_attachment=True, filename=nome, content_type=tipo or "application/octet-stream")
 
 
 def global_search(request):

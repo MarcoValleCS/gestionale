@@ -1,6 +1,9 @@
 /* Service worker del gestionale: cache degli asset statici e pagina offline. */
-const CACHE_NAME = "gestionale-v1";
-const PRECACHE = ["/offline/", "/static/css/app.css"];
+const CACHE_NAME = "gestionale-v2";
+// Solo la pagina offline: gli asset statici si memorizzano da soli alla prima
+// visita (i loro indirizzi cambiano a ogni versione, quindi non si possono
+// elencare qui).
+const PRECACHE = ["/offline/"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

@@ -162,6 +162,8 @@ class SalesInvoice(TotalsDocument, TimeStampedModel):
         indexes = [
             models.Index(fields=["status", "-date"], name="sinv_status_date_idx"),
             models.Index(fields=["customer", "-date"], name="sinv_customer_date_idx"),
+            # lo scadenzario cerca le fatture aperte per scadenza
+            models.Index(fields=["status", "due_date"], name="sinv_due_idx"),
         ]
 
     def __str__(self):
@@ -237,6 +239,7 @@ class PurchaseInvoice(TotalsDocument, TimeStampedModel):
         indexes = [
             models.Index(fields=["status", "-date"], name="pinv_status_date_idx"),
             models.Index(fields=["supplier", "-date"], name="pinv_supplier_date_idx"),
+            models.Index(fields=["status", "due_date"], name="pinv_due_idx"),
         ]
 
     def __str__(self):

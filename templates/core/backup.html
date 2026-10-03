@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Copia di sicurezza{% endblock %}
+
+{% block content %}
+{% url 'core:settings' as url_impostazioni %}
+{% include "partials/back_link.html" with url=url_impostazioni label="Impostazioni" %}
+
+<div class="alert alert-info d-flex gap-2 align-items-start">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div class="small mb-0">
+    Ogni notte il gestionale salva una copia del database e dei file caricati.
+    Le copie restano sul server: <strong>scaricale ogni tanto su questo computer</strong> (o su un disco esterno)
+    così, se il server si guasta, i dati restano al sicuro. Per ripristinare una copia si usa
+    <code>scripts/restore.sh</code> sul server.
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Copie disponibili</span>
+    <span class="text-muted small">{{ backup|length }} file · cartella <code>{{ cartella }}</code></span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:60px"></th>
+          <th>File</th>
+          <th style="width:170px">Quando</th>
+          <th style="width:120px" class="text-end">Dimensione</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for voce in backup %}
+        <tr>
+          <td class="text-center">
+            {% if voce.database %}
+            <i class="bi bi-database text-primary" title="Database"></i>
+            {% else %}
+            <i class="bi bi-images text-secondary" title="File caricati"></i>
+            {% endif %}
+          </td>
+          <td class="font-monospace small">{{ voce.nome }}</td>
+          <td class="text-muted small">{{ voce.quando|date:"d/m/Y H:i" }}</td>
+          <td class="text-end text-muted small">{{ voce.byte|filesizeformat }}</td>
+          <td class="text-end">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'core:backup_download' voce.nome %}">
+              <i class="bi bi-download"></i> Scarica
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">
+            Nessuna copia trovata. Il backup automatico gira ogni notte alle 3:00.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

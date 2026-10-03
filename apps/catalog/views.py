@@ -187,6 +187,7 @@ def product_defaults(request, pk):
             "vat_id": vat.pk if vat else "",
             "vat_label": str(vat) if vat else "",
             "price": str(price or Decimal("0")),
+            "cost": str(product.purchase_price or Decimal("0")),
             "supplier_id": supplier.id if supplier else "",
             "is_kit": product.is_kit,
             "components": components,

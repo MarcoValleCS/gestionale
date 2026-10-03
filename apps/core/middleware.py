@@ -48,9 +48,16 @@ class AbuseThrottleMiddleware:
 
     # ----------------------------------------------------------- conteggio
     def client_ip(self, request):
+        """Indirizzo del client, per il conteggio dei tentativi.
+
+        Dietro il proxy si prende l'**ultimo** indirizzo di ``X-Forwarded-For``:
+        è quello aggiunto dal nostro proxy, quindi non falsificabile da chi fa
+        la richiesta. Prendere il primo permetterebbe di aggirare il limite
+        cambiando l'intestazione a ogni tentativo.
+        """
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            return forwarded.split(",")[-1].strip()
         return request.META.get("REMOTE_ADDR", "0.0.0.0")
 
     def is_limited(self, request, name, limit, window):

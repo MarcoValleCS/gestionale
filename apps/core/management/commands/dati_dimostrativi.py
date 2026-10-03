@@ -319,12 +319,14 @@ class Command(BaseCommand):
             ("demo.collaboratore", "Mario Scavi", "Collaboratore"),
         ]
         for username, nome, gruppo in utenti:
+            # I profili dimostrativi NON sono staff: così non possono entrare
+            # nell'area di amministrazione di Django, che è riservata.
             utente, creato = get_user_model().objects.get_or_create(
                 username=username,
-                defaults={"first_name": nome.split()[0], "last_name": nome.split()[-1], "is_staff": True},
+                defaults={"first_name": nome.split()[0], "last_name": nome.split()[-1], "is_staff": False},
             )
             utente.set_password(PASSWORD_DEMO)
-            utente.is_staff = True
+            utente.is_staff = False
             utente.save()
             gruppo_obj = Group.objects.filter(name=gruppo).first()
             if gruppo_obj:

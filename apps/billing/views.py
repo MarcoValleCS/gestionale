@@ -262,7 +262,7 @@ class DeliveryNoteUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateV
         if "line_formset" not in context:
             context["line_formset"] = DeliveryNoteLineFormSet(prefix="lines", queryset=self.object.lines.all())
         context["cancel_url"] = reverse("billing:deliverynote_detail", args=[self.object.pk])
-        return with_vat_rates(context)
+        return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -502,7 +502,7 @@ class SalesInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateV
             str(contact.pk): str(contact.sale_discount_pct)
             for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
         }
-        return with_vat_rates(context)
+        return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -803,7 +803,7 @@ class PurchaseInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, Upda
         if "line_formset" not in context:
             context["line_formset"] = PurchaseInvoiceLineFormSet(prefix="lines", queryset=self.object.lines.all())
         context["cancel_url"] = reverse("billing:purchaseinvoice_detail", args=[self.object.pk])
-        return with_vat_rates(context)
+        return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

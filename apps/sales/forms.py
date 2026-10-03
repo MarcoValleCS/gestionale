@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
-from apps.core.forms import BaseBootstrapModelForm, active_units, active_vat_rates
+from apps.core.forms import AutocompleteSelect, BaseBootstrapModelForm, menu_aliquote, menu_unita, usa_autocomplete
 from apps.core.models import CompanySettings
 
 from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine
@@ -18,6 +18,7 @@ class CustomerChoiceFormMixin:
         self.fields["customer"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
         self.fields["customer"].widget.attrs["class"] = "d-none"
         self.fields["customer"].widget.attrs["data-autocomplete-target"] = "1"
+        usa_autocomplete(self.fields["customer"])
 
     def apply_job_queryset(self):
         from apps.jobs.models import Job
@@ -57,6 +58,7 @@ class PurchaseSupplierFormMixin:
         self.fields["supplier"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
         self.fields["supplier"].widget.attrs["class"] = "d-none"
         self.fields["supplier"].widget.attrs["data-autocomplete-target"] = "1"
+        usa_autocomplete(self.fields["supplier"])
 
 
 class LineFormMixin:
@@ -70,8 +72,12 @@ class LineFormMixin:
         self.fields["product"].widget.attrs["data-context"] = self.defaults_context
         self.fields["product"].widget.attrs["class"] = "d-none"
         self.fields["product"].widget.attrs["data-autocomplete-target"] = "1"
-        self.fields["uom"].queryset = active_units()
-        self.fields["vat_rate"].queryset = active_vat_rates()
+        # Il menu dell'articolo porta solo la voce scelta: l'elenco completo lo
+        # aggiunge l'autocompletamento. Senza questo, ogni riga scaricherebbe
+        # tutto il catalogo.
+        usa_autocomplete(self.fields["product"])
+        self.fields["uom"].choices = menu_unita()
+        self.fields["vat_rate"].choices = menu_aliquote()
         self.fields["description"].required = False
         self.fields["description"].label = "Descrizione"
         # Le sezioni raggruppano le righe per ambiente (es. «Bagno 1») e fanno

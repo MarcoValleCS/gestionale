@@ -49,8 +49,13 @@ services:
       DB_PORT: "5432"
       DJANGO_DEBUG: "false"
       DJANGO_HTTPS: "true"
+      # Dove il contenitore vede i backup notturni (in sola lettura)
+      BACKUP_ROOT: /backups
     volumes:
       - media:/app/media
+      # I backup restano sul server: da qui si possono scaricare dal gestionale
+      # per tenerne una copia su un altro computer.
+      - ${BACKUP_HOST_DIR:-/opt/backups/gestionale}:/backups:ro
     depends_on:
       db:
         condition: service_healthy
