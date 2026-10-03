@@ -6,18 +6,24 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <div class="btn-group btn-group-sm">
-      <a class="btn {% if not filtro %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'core:posta' %}">
-        Tutte <span class="badge text-bg-light border ms-1">{{ totale }}</span>
+      <a class="btn {% if filtro == 'rilevanti' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'core:posta' %}?filtro=rilevanti">
+        Rilevanti <span class="badge text-bg-light border ms-1">{{ conteggi.rilevanti }}</span>
       </a>
       <a class="btn {% if filtro == 'non_lette' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'core:posta' %}?filtro=non_lette">
-        Non lette {% if non_lette %}<span class="badge text-bg-danger ms-1">{{ non_lette }}</span>{% endif %}
+        Non lette {% if conteggi.non_lette %}<span class="badge text-bg-danger ms-1">{{ conteggi.non_lette }}</span>{% endif %}
+      </a>
+      <a class="btn {% if filtro == 'contatti' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'core:posta' %}?filtro=contatti">
+        Da contatti <span class="badge text-bg-light border ms-1">{{ conteggi.contatti }}</span>
       </a>
       <a class="btn {% if filtro == 'allegati' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'core:posta' %}?filtro=allegati">
-        Con allegati
+        Con allegati <span class="badge text-bg-light border ms-1">{{ conteggi.allegati }}</span>
+      </a>
+      <a class="btn {% if filtro == 'tutte' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'core:posta' %}?filtro=tutte">
+        Tutte <span class="badge text-bg-light border ms-1">{{ conteggi.tutte }}</span>
       </a>
     </div>
     <form method="get" class="d-flex align-items-center gap-2">
-      {% if filtro %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
+      <input type="hidden" name="filtro" value="{{ filtro }}">
       <input type="search" class="form-control form-control-sm" name="q" value="{{ cerca }}"
              placeholder="Cerca mittente o oggetto…" style="min-width: 220px;">
       <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i></button>
@@ -52,6 +58,11 @@
         <div>
           {% if not messaggio.is_read %}<span class="badge text-bg-primary me-1">nuova</span>{% endif %}
           {{ messaggio.sender_label }}
+          {% if messaggio.relevance == 'risposta' %}
+          <span class="badge text-bg-success ms-1" title="Risposta a un nostro messaggio"><i class="bi bi-reply"></i> risposta</span>
+          {% elif messaggio.relevance == 'interno' %}
+          <span class="badge text-bg-info ms-1" title="Da un indirizzo aziendale">interno</span>
+          {% endif %}
           {% if messaggio.contact %}
           <span class="badge text-bg-light border text-muted ms-1" title="Contatto in anagrafica">
             <i class="bi bi-person-check"></i> {{ messaggio.contact.name|truncatechars:22 }}
@@ -62,14 +73,20 @@
       </div>
       <div class="text-end small text-muted text-nowrap">
         {{ messaggio.received_at|date:"d/m/Y H:i"|default:"—" }}
-        {% if messaggio.has_attachments %}
+        {% if messaggio.attachments %}
         <div><i class="bi bi-paperclip"></i> {{ messaggio.attachments|length }}</div>
         {% endif %}
       </div>
     </a>
     {% empty %}
     <div class="list-group-item text-center text-muted py-5">
+      {% if filtro == 'rilevanti' %}
+      Nessuna email rilevante.<br>
+      <span class="small">Qui compaiono le risposte ai nostri messaggi e le email dai domini aziendali.
+      Le newsletter e la pubblicità le trovi in «Tutte».</span>
+      {% else %}
       Nessuna email. Usa «Scarica nuove email» per leggere la casella.
+      {% endif %}
     </div>
     {% endfor %}
   </div>

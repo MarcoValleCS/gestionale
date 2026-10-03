@@ -20,8 +20,16 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--limite", type=int, default=100, help="Quante email recenti controllare (default 100)")
         parser.add_argument("--cartella", default="", help="Cartella IMAP (default: quella configurata)")
+        parser.add_argument("--riclassifica", action="store_true", help="Ricalcola risposte/rilevanti sulle email già scaricate")
 
     def handle(self, *args, **options):
+        if options["riclassifica"]:
+            from apps.core.imap import riclassifica
+
+            aggiornate = riclassifica()
+            self.stdout.write(self.style.SUCCESS(f"Riclassificate {aggiornate} email."))
+            return
+
         if not posta_configurata():
             raise CommandError("Lettura della casella non configurata: imposta le variabili IMAP_* nel file .env.")
 

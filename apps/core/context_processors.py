@@ -63,13 +63,14 @@ def roles(request):
     spento["is_collaborator_only"] = False
 
     if not user or not user.is_authenticated:
-        return {"roles": spento, "messaggi_non_letti": 0}
+        return {"roles": spento, "messaggi_non_letti": 0, "posta_non_lette": 0}
 
     if user.is_superuser:
         # l'amministratore ha tutti i ruoli e non è mai limitato
         return {
             "roles": {**{flag: True for flag in ROLE_FLAGS}, "is_collaborator_only": False},
             "messaggi_non_letti": _messaggi_non_letti(user),
+            "posta_non_lette": _posta_non_letta(user),
         }
 
     names = set(user.groups.values_list("name", flat=True))
@@ -85,6 +86,7 @@ def roles(request):
             "is_collaborator_only": "Collaboratore" in names and names <= {"Collaboratore"},
         },
         "messaggi_non_letti": _messaggi_non_letti(user),
+        "posta_non_lette": _posta_non_letta(user),
     }
 
 
@@ -96,3 +98,14 @@ def _messaggi_non_letti(utente):
         return InternalMessage.objects.filter(recipient=utente, read_at__isnull=True).count()
     except Exception:  # tabelle non ancora migrate
         return 0
+
+
+def _posta_non_letta(utente):
+    """Quante email rilevanti non lette ci sono in casella."""
+    try:
+        from .models import InboundEmail
+
+        return InboundEmail.objects.filter(is_relevant=True, read_at__isnull=True).count()
+    except Exception:
+        return 0
+

@@ -505,6 +505,10 @@ class InboundEmail(TimeStampedModel):
     body_loaded = models.BooleanField("Corpo scaricato", default=False)
     attachments = models.JSONField("Allegati", default=list, blank=True)
     read_at = models.DateTimeField("Letta il", null=True, blank=True)
+    is_reply = models.BooleanField("È una risposta", default=False)
+    is_internal = models.BooleanField("Da dominio aziendale", default=False)
+    is_relevant = models.BooleanField("Rilevante", default=False, db_index=True)
+    relevance = models.CharField("Perché è rilevante", max_length=30, blank=True)
     contact = models.ForeignKey(
         "contacts.Contact",
         on_delete=models.SET_NULL,

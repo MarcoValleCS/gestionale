@@ -16,7 +16,8 @@ Utente = get_user_model()
 
 
 def messaggio_email(oggetto="Richiesta informazioni", mittente="cliente@example.it", nome="Cliente Prova",
-                    corpo="Buongiorno, vorrei un preventivo.", allegato=None):
+                    corpo="Buongiorno, vorrei un preventivo.", allegato=None, html=None, in_risposta=False,
+                    immagine_incorporata=False):
     """Costruisce un'email vera, come quella che arriverebbe dalla casella."""
     messaggio = EmailMessage()
     messaggio["Subject"] = oggetto
@@ -24,7 +25,14 @@ def messaggio_email(oggetto="Richiesta informazioni", mittente="cliente@example.
     messaggio["To"] = "showroom@aquaforma.it"
     messaggio["Date"] = "Fri, 03 Oct 2026 09:30:00 +0200"
     messaggio["Message-ID"] = "<prova@example.it>"
+    if in_risposta:
+        messaggio["In-Reply-To"] = "<precedente@aquaforma.it>"
+        messaggio["References"] = "<precedente@aquaforma.it>"
     messaggio.set_content(corpo)
+    if immagine_incorporata:
+        messaggio.add_related(b"finta-immagine-png", maintype="image", subtype="png", cid="<logo@aquaforma>")
+    if html:
+        messaggio.add_alternative(html, subtype="html")
     if allegato:
         messaggio.add_attachment(allegato, maintype="application", subtype="pdf", filename="documento.pdf")
     return messaggio.as_bytes()
@@ -132,21 +140,21 @@ class PostaTest(TestCase):
     def test_elenco_e_filtri(self):
         self.sincronizza([messaggio_email(oggetto="Prima"), messaggio_email(oggetto="Seconda")])
         self.login()
-        risposta = self.client.get(reverse("core:posta"))
+        risposta = self.client.get(reverse("core:posta") + "?filtro=tutte")
         self.assertContains(risposta, "Prima")
         self.assertContains(risposta, "Seconda")
 
         risposta = self.client.get(reverse("core:posta") + "?filtro=non_lette")
         self.assertContains(risposta, "Prima")
 
-        risposta = self.client.get(reverse("core:posta") + "?q=Seconda")
+        risposta = self.client.get(reverse("core:posta") + "?filtro=tutte&q=Seconda")
         self.assertContains(risposta, "Seconda")
         self.assertNotContains(risposta, ">Prima<")
 
     def test_ricerca_per_mittente(self):
         self.sincronizza([messaggio_email(mittente="fornitore@example.it", nome="Fornitore")])
         self.login()
-        self.assertContains(self.client.get(reverse("core:posta") + "?q=fornitore@"), "Fornitore")
+        self.assertContains(self.client.get(reverse("core:posta") + "?filtro=tutte&q=fornitore@"), "Fornitore")
 
     def test_scarico_dal_pulsante(self):
         self.login()
@@ -275,3 +283,4 @@ class MessaggiInterniTest(TestCase):
         risposta = self.client.get(reverse("core:messaggi"))
         self.assertEqual(risposta.context["non_letti"], 1)
         self.assertEqual(len(risposta.context["conversazioni"]), 1)
+

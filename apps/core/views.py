@@ -352,11 +352,16 @@ def posta(request):
     from .imap import posta_configurata
 
     elenco = InboundEmail.objects.select_related("contact")
-    filtro = request.GET.get("filtro", "")
+    filtro = request.GET.get("filtro", "rilevanti")
     if filtro == "non_lette":
         elenco = elenco.filter(read_at__isnull=True)
     elif filtro == "allegati":
         elenco = elenco.filter(attachments__isnull=False).exclude(attachments=[])
+    elif filtro == "contatti":
+        elenco = elenco.filter(contact__isnull=False)
+    elif filtro == "rilevanti":
+        elenco = elenco.filter(is_relevant=True)
+    # filtro vuoto o "tutte": nessun filtro
 
     cerca = (request.GET.get("q") or "").strip()
     if cerca:
@@ -364,7 +369,7 @@ def posta(request):
             Q(subject__icontains=cerca) | Q(sender_email__icontains=cerca) | Q(sender_name__icontains=cerca)
         )
 
-    non_lette = InboundEmail.objects.filter(read_at__isnull=True).count()
+    base = InboundEmail.objects.all()
     return render(
         request,
         "core/posta.html",
@@ -372,7 +377,14 @@ def posta(request):
             "page_title": "Posta",
             "email": elenco[:200],
             "totale": elenco.count(),
-            "non_lette": non_lette,
+            "non_lette": base.filter(read_at__isnull=True).count(),
+            "conteggi": {
+                "tutte": base.count(),
+                "rilevanti": base.filter(is_relevant=True).count(),
+                "non_lette": base.filter(read_at__isnull=True).count(),
+                "allegati": base.filter(attachments__isnull=False).exclude(attachments=[]).count(),
+                "contatti": base.filter(contact__isnull=False).count(),
+            },
             "filtro": filtro,
             "cerca": cerca,
             "configurata": posta_configurata(),
@@ -418,6 +430,19 @@ def posta_messaggio(request, pk):
             errore = f"Non sono riuscito a scaricare il messaggio: {exc}"
     email_ricevuta.mark_read()
 
+    # le immagini incorporate (cid:) si scaricano dal gestionale, così si vedono
+    from django.urls import reverse
+    from django.utils.safestring import mark_safe
+
+    from .richtext import clean_email_html
+
+    mappa_allegati = {
+        allegato["cid"]: reverse("core:posta_allegato", args=[email_ricevuta.pk, allegato["indice"]])
+        for allegato in (email_ricevuta.attachments or [])
+        if allegato.get("cid")
+    }
+    allegati_visibili = [a for a in (email_ricevuta.attachments or []) if not a.get("incorporato")]
+
     return render(
         request,
         "core/posta_messaggio.html",
@@ -426,7 +451,10 @@ def posta_messaggio(request, pk):
             "email": email_ricevuta,
             "errore": errore,
             "testo_sicuro": clean_notes(email_ricevuta.body_text),
-            "html_sicuro": clean_notes(email_ricevuta.body_html),
+            # il filtro di nh3 è la barriera di sicurezza: dopo di lui l'HTML
+            # può essere mostrato così com'è, altrimenti comparirebbe come testo
+            "html_sicuro": mark_safe(clean_email_html(email_ricevuta.body_html, mappa_allegati)),
+            "allegati_visibili": allegati_visibili,
         },
     )
 

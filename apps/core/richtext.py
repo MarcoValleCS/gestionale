@@ -46,3 +46,73 @@ def is_formatted(value):
     if not value:
         return False
     return any(f"<{tag}" in value for tag in ("b", "i", "u", "strong", "em", "span", "div", "p"))
+
+
+# ------------------------------------------------------------------ email
+# Le email vere sono fatte di tabelle, immagini e stili: la lista bianca delle
+# note (solo grassetto e corsivo) le ridurrebbe a testo piatto. Qui si tiene
+# molto di più, ma restano fuori script, iframe, form e ogni url pericoloso.
+
+EMAIL_TAGS = {
+    "a", "abbr", "address", "article", "aside", "b", "blockquote", "br", "caption", "center",
+    "cite", "code", "col", "colgroup", "dd", "del", "details", "div", "dl", "dt", "em",
+    "figcaption", "figure", "font", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header",
+    "hr", "i", "img", "ins", "kbd", "li", "main", "mark", "nav", "ol", "p", "pre", "q", "s",
+    "samp", "section", "small", "span", "strong", "sub", "summary", "sup", "table", "tbody",
+    "td", "tfoot", "th", "thead", "time", "tr", "u", "ul", "var",
+}
+
+EMAIL_ATTRIBUTES = {
+    "*": {"style", "class", "title", "dir", "lang", "align", "valign", "width", "height", "bgcolor"},
+    "a": {"href", "title", "target"},
+    "img": {"src", "alt", "title", "width", "height", "border"},
+    "table": {"border", "cellpadding", "cellspacing", "width", "height", "align", "bgcolor", "role"},
+    "td": {"colspan", "rowspan", "width", "height", "align", "valign", "bgcolor"},
+    "th": {"colspan", "rowspan", "width", "height", "align", "valign", "bgcolor"},
+    "tr": {"align", "valign", "bgcolor"},
+    "font": {"color", "face", "size"},
+    "col": {"width", "span"},
+}
+
+EMAIL_STYLES = {
+    "color", "background", "background-color", "font", "font-family", "font-size", "font-weight",
+    "font-style", "font-variant", "text-decoration", "text-align", "text-transform",
+    "vertical-align", "line-height", "letter-spacing", "word-break", "overflow-wrap", "white-space",
+    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+    "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+    "border", "border-top", "border-right", "border-bottom", "border-left",
+    "border-color", "border-style", "border-width", "border-collapse", "border-spacing", "border-radius",
+    "width", "max-width", "min-width", "height", "max-height", "min-height", "display",
+    "float", "clear", "list-style", "list-style-type", "table-layout",
+}
+
+EMAIL_URL_SCHEMES = {"http", "https", "mailto", "tel", "data", "cid"}
+
+
+def clean_email_html(value, mappa_allegati=None):
+    """Ripulisce l'HTML di un'email mantenendone la grafica.
+
+    ``mappa_allegati`` collega gli identificativi delle immagini incorporate
+    (``cid:...``) all'indirizzo da cui scaricarle dal gestionale: così i loghi e
+    le immagini dentro il messaggio si vedono.
+    """
+    if not value:
+        return ""
+    mappa = {str(chiave).strip().strip("<>").lower(): url for chiave, url in (mappa_allegati or {}).items()}
+
+    def filtra_attributo(tag, attributo, valore):
+        if attributo in ("src", "href") and valore.lower().startswith("cid:"):
+            chiave = valore[4:].strip().strip("<>").lower()
+            return mappa.get(chiave)  # None = attributo rimosso
+        return valore
+
+    return nh3.clean(
+        value,
+        tags=EMAIL_TAGS,
+        attributes=EMAIL_ATTRIBUTES,
+        attribute_filter=filtra_attributo,
+        filter_style_properties=EMAIL_STYLES,
+        url_schemes=EMAIL_URL_SCHEMES,
+        strip_comments=True,
+        link_rel="noopener noreferrer",
+    )

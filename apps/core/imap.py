@@ -11,6 +11,7 @@ posta.
 import email
 import imaplib
 import logging
+import re
 from datetime import timezone as dt_timezone
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
@@ -46,6 +47,35 @@ def _testo(valore):
         return str(make_header(decode_header(valore)))
     except Exception:
         return str(valore)
+
+
+# Prefissi con cui i programmi di posta segnano una risposta
+PREFISSI_RISPOSTA = re.compile(r"^\s*(re|r|rif|aw|i|ris|resp|odp|sv|vs)\s*(\[\d+\])?\s*:", re.IGNORECASE)
+
+
+def domini_interni():
+    """Domini considerati "di casa" (es. aquaforma.it)."""
+    from django.conf import settings
+
+    return {dominio.strip().lower() for dominio in getattr(settings, "DOMINI_INTERNI", set()) if dominio.strip()}
+
+
+def classifica(oggetto, mittente_email, in_risposta=False):
+    """Dice se un'email è una risposta o arriva da un dominio aziendale.
+
+    Restituisce ``(is_reply, is_internal, is_relevant, motivo)``. Le newsletter
+    e la pubblicità restano fuori dall'elenco principale: si vedono solo
+    scegliendo «Tutte».
+    """
+    oggetto = oggetto or ""
+    dominio = mittente_email.split("@")[-1].strip().lower() if "@" in (mittente_email or "") else ""
+    interno = bool(dominio) and dominio in domini_interni()
+    risposta = bool(PREFISSI_RISPOSTA.match(oggetto)) or bool(in_risposta)
+    if risposta:
+        return True, interno, True, "risposta"
+    if interno:
+        return False, True, True, "interno"
+    return False, False, False, ""
 
 
 def _data(valore):
@@ -109,6 +139,10 @@ def sincronizza(limite=100, cartella=None):
             if uid in uid_esistenti:
                 continue
             nome, indirizzo = _indirizzo(messaggio.get("From"))
+            oggetto = _testo(messaggio.get("Subject"))[:300] or "(senza oggetto)"
+            risposta, interno, rilevante, motivo = classifica(
+                oggetto, indirizzo, in_risposta=bool(messaggio.get("In-Reply-To") or messaggio.get("References"))
+            )
             InboundEmail.objects.create(
                 uid=uid,
                 folder=cartella,
@@ -116,8 +150,12 @@ def sincronizza(limite=100, cartella=None):
                 sender_name=nome[:200],
                 sender_email=indirizzo[:254],
                 recipients=_testo(messaggio.get("To"))[:500],
-                subject=_testo(messaggio.get("Subject"))[:300] or "(senza oggetto)",
+                subject=oggetto,
                 received_at=_data(messaggio.get("Date")),
+                is_reply=risposta,
+                is_internal=interno,
+                is_relevant=rilevante,
+                relevance=motivo,
             )
             esito["nuove"] += 1
     finally:
@@ -148,26 +186,65 @@ def _collega_contatti():
             messaggio.save(update_fields=["contact", "updated_at"])
 
 
+def riclassifica():
+    """Ricalcola «risposta» e «rilevante» sulle email già scaricate."""
+    from .models import InboundEmail
+
+    aggiornate = 0
+    for messaggio in InboundEmail.objects.all():
+        risposta, interno, rilevante, motivo = classifica(messaggio.subject, messaggio.sender_email)
+        if (messaggio.is_reply, messaggio.is_internal, messaggio.is_relevant, messaggio.relevance) != (
+            risposta, interno, rilevante, motivo
+        ):
+            messaggio.is_reply = risposta
+            messaggio.is_internal = interno
+            messaggio.is_relevant = rilevante
+            messaggio.relevance = motivo
+            messaggio.save(update_fields=["is_reply", "is_internal", "is_relevant", "relevance", "updated_at"])
+            aggiornate += 1
+    _collega_contatti()
+    return aggiornate
+
+
 def _corpo(messaggio):
-    """Estrae testo e HTML dal messaggio, con l'elenco degli allegati."""
+    """Estrae testo e HTML dal messaggio, con l'elenco degli allegati.
+
+    Gli allegati "incorporati" (le immagini della firma o del corpo) vengono
+    registrati con il loro identificativo ``cid``: servono a far comparire le
+    immagini dentro il messaggio.
+    """
     testo = ""
     html = ""
     allegati = []
     indice = 0
     for parte in messaggio.walk():
         tipo = parte.get_content_type()
-        disposizione = str(parte.get("Content-Disposition") or "")
+        disposizione = str(parte.get("Content-Disposition") or "").lower()
         nome_file = parte.get_filename()
         if nome_file:
             nome_file = _testo(nome_file)
-        if "attachment" in disposizione.lower() or (nome_file and tipo not in ("text/plain", "text/html")):
+        identificativo = (parte.get("Content-ID") or "").strip().strip("<>")
+        incorporato = "inline" in disposizione or bool(identificativo)
+        if nome_file or "attachment" in disposizione or incorporato:
             contenuto = parte.get_payload(decode=True) or b""
+            if not contenuto and tipo not in ("text/plain", "text/html"):
+                continue
+            if tipo in ("text/plain", "text/html") and not nome_file:
+                # testo del messaggio travestito da allegato: non è un allegato
+                if not incorporato:
+                    if tipo == "text/plain" and not testo:
+                        testo = contenuto.decode(parte.get_content_charset() or "utf-8", "replace")
+                    elif tipo == "text/html" and not html:
+                        html = contenuto.decode(parte.get_content_charset() or "utf-8", "replace")
+                    continue
             allegati.append(
                 {
                     "indice": indice,
                     "nome": (nome_file or f"allegato-{indice + 1}")[:150],
                     "tipo": tipo,
                     "dimensione": len(contenuto),
+                    "cid": identificativo[:200],
+                    "incorporato": incorporato,
                 }
             )
             indice += 1

@@ -71,6 +71,7 @@
       {% if roles.is_admin or roles.is_sales or roles.is_purchasing or roles.is_hr %}
       <a class="nav-link {% if 'posta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'core:posta' %}">
         <i class="bi bi-inbox"></i> Posta
+        {% if posta_non_lette %}<span class="badge text-bg-danger ms-auto">{{ posta_non_lette }}</span>{% endif %}
       </a>
       {% endif %}
 
