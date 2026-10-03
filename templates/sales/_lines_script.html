@@ -39,6 +39,14 @@
     return checkbox && checkbox.checked;
   }
 
+  /* Il pulsante «apri scheda articolo» si attiva solo quando la riga ha un articolo. */
+  function aggiornaPulsanteArticolo(row) {
+    const pulsante = row.querySelector("[data-open-product]");
+    const select = row.querySelector('[name$="-product"]');
+    if (!pulsante || !select) return;
+    pulsante.disabled = !select.value;
+  }
+
   function recalc() {
     let subtotal = 0;
     let costoTotale = 0;
@@ -188,6 +196,21 @@
       field.addEventListener("input", recalc);
       field.addEventListener("change", recalc);
     });
+    // pulsante «apri la scheda articolo»: attivo solo se c'è un articolo scelto
+    const apriArticolo = row.querySelector("[data-open-product]");
+    if (apriArticolo) {
+      aggiornaPulsanteArticolo(row);
+      apriArticolo.addEventListener("click", function () {
+        const select = row.querySelector('[name$="-product"]');
+        const base = apriArticolo.dataset.productUrl || "";
+        if (select && select.value && base) {
+          window.open(base.replace("/0/", "/" + select.value + "/"), "_blank");
+        }
+      });
+      if (productSelect) {
+        productSelect.addEventListener("change", function () { aggiornaPulsanteArticolo(row); });
+      }
+    }
     const removeButton = row.querySelector(".remove-line");
     if (removeButton) {
       removeButton.addEventListener("click", function () {
@@ -235,6 +258,7 @@
     setFieldValue(row, '[name$="-unit_price"]', values.unitPrice);
     setFieldValue(row, '[name$="-discount_pct"]', values.discount);
     setSelectValue(row.querySelector('[name$="-vat_rate"]'), values.vat);
+    aggiornaPulsanteArticolo(row);
   }
 
   function addRow(values) {

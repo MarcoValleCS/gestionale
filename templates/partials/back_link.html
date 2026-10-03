@@ -1,0 +1,5 @@
+{% comment %}Freccia «torna all'elenco»: si include con url e label.
+Esempio: {% include "partials/back_link.html" with url=url_elenco label="Tutti i preventivi" %}{% endcomment %}
+<a class="btn btn-sm btn-outline-secondary mb-2 no-print" href="{{ url }}">
+  <i class="bi bi-arrow-left"></i> {{ label }}
+</a>

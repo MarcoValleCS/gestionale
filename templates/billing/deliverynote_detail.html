@@ -3,6 +3,8 @@
 {% block title %}{{ note.number }}{% endblock %}
 
 {% block content %}
+{% url 'billing:deliverynote_list' as url_elenco %}
+{% include "partials/back_link.html" with url=url_elenco label="Tutti i DDT" %}
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
     <h2 class="h4 mb-1">DDT <span class="number-badge">{{ note.number }}</span></h2>
@@ -55,7 +57,7 @@
             <tr>
               <td class="text-muted">{{ forloop.counter }}</td>
               <td>
-                {% if line.product %}<span class="text-muted number-badge">{{ line.product.code }}</span>{% endif %}
+                {% if line.product %}<a class="text-muted number-badge text-decoration-none" href="{% url 'catalog:product_detail' line.product.pk %}" target="_blank" title="Apri la scheda dell'articolo"><i class="bi bi-box-arrow-up-right"></i> {{ line.product.code }}</a>{% endif %}
                 {{ line.description|default:"—" }}
               </td>
               <td class="text-muted">{{ line.section|default:"—" }}</td>

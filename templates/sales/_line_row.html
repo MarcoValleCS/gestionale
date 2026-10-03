@@ -10,6 +10,11 @@
         <button class="btn btn-outline-primary" type="button" data-quick-product title="Crea nuovo articolo">
           <i class="bi bi-plus-lg"></i>
         </button>
+        <button class="btn btn-outline-secondary" type="button" data-open-product
+                data-product-url="{% url 'catalog:product_detail' 0 %}"
+                title="Apri la scheda dell'articolo" disabled>
+          <i class="bi bi-box-arrow-up-right"></i>
+        </button>
       </div>
       {{ lineform.product }}
     </div>
