@@ -784,12 +784,18 @@ class Command(BaseCommand):
         Nel mondo reale la merce arriva dal fornitore prima della consegna: qui
         si registra un carico, così il DDT si può emettere senza andare in
         giacenza negativa.
+
+        Il fabbisogno si somma per articolo: lo stesso pezzo può comparire in più
+        righe (per esempio il componente di un kit e la voce singola).
         """
+        richiesti = {}
         for riga in nota.lines.select_related("product"):
             prodotto = riga.product
             if prodotto is None or not prodotto.is_stock_tracked:
                 continue
-            mancante = Decimal(riga.qty or 0) - prodotto.total_stock
+            richiesti[prodotto] = richiesti.get(prodotto, ZERO) + Decimal(riga.qty or 0)
+        for prodotto, quantita in richiesti.items():
+            mancante = quantita - prodotto.total_stock
             if mancante > 0:
                 register_movement(
                     product=prodotto,
