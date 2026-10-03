@@ -46,6 +46,12 @@ class DeliveryNoteLineForm(BaseBootstrapModelForm):
         self.fields["product"].widget.attrs["class"] = "d-none"
         self.fields["product"].widget.attrs["data-autocomplete-target"] = "1"
         usa_autocomplete(self.fields["product"])
+        if not self.is_bound:
+            prodotto = getattr(self.instance, "product", None)
+            if prodotto is not None:
+                self.fields["product"].widget.choices = [
+                    (str(prodotto.pk), self.fields["product"].label_from_instance(prodotto))
+                ]
         self.fields["uom"].choices = menu_unita()
         self.fields["description"].required = False
         self.fields["description"].label = "Descrizione"

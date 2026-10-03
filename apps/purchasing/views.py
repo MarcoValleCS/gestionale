@@ -314,14 +314,14 @@ class PurchaseOrderUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, Update
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica ordine fornitore {self.object.number}"
         if "line_formset" not in context:
-            context["line_formset"] = PurchaseOrderLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = PurchaseOrderLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("purchasing:po_detail", args=[self.object.pk])
         return with_vat_rates(context)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = PurchaseOrderLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = PurchaseOrderLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "po")

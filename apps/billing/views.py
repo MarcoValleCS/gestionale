@@ -260,14 +260,14 @@ class DeliveryNoteUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateV
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica DDT {self.object.number}"
         if "line_formset" not in context:
-            context["line_formset"] = DeliveryNoteLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = DeliveryNoteLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("billing:deliverynote_detail", args=[self.object.pk])
         return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = DeliveryNoteLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = DeliveryNoteLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "delivery_note")
@@ -496,7 +496,7 @@ class SalesInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateV
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica fattura {self.object.number}"
         if "line_formset" not in context:
-            context["line_formset"] = SalesInvoiceLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = SalesInvoiceLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("billing:salesinvoice_detail", args=[self.object.pk])
         context["customer_discounts_json"] = {
             str(contact.pk): str(contact.sale_discount_pct)
@@ -507,7 +507,7 @@ class SalesInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateV
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = SalesInvoiceLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = SalesInvoiceLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "invoice")
@@ -801,14 +801,14 @@ class PurchaseInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, Upda
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica fattura ricevuta {self.object.number}"
         if "line_formset" not in context:
-            context["line_formset"] = PurchaseInvoiceLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = PurchaseInvoiceLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("billing:purchaseinvoice_detail", args=[self.object.pk])
         return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = PurchaseInvoiceLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = PurchaseInvoiceLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "invoice")

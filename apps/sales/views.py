@@ -448,14 +448,14 @@ class QuoteUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica preventivo {self.object.number}"
         if "line_formset" not in context:
-            context["line_formset"] = QuoteLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = QuoteLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("sales:quote_detail", args=[self.object.pk])
         return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = QuoteLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = QuoteLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "quote")
@@ -685,14 +685,14 @@ class SalesOrderUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateVie
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica ordine {self.object.number}"
         if "line_formset" not in context:
-            context["line_formset"] = SalesOrderLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = SalesOrderLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("sales:order_detail", args=[self.object.pk])
         return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = SalesOrderLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = SalesOrderLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "order")
@@ -862,14 +862,14 @@ class QuoteTemplateUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, Update
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica modello: {self.object.name}"
         if "line_formset" not in context:
-            context["line_formset"] = QuoteTemplateLineFormSet(prefix="lines", queryset=self.object.lines.all())
+            context["line_formset"] = QuoteTemplateLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("sales:quote_template_list")
         return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = QuoteTemplateLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.all())
+        formset = QuoteTemplateLineFormSet(request.POST, prefix="lines", queryset=self.object.lines.select_related("product"))
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
             save_document_lines(self.object, formset, "template")

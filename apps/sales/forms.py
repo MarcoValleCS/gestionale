@@ -76,6 +76,16 @@ class LineFormMixin:
         # aggiunge l'autocompletamento. Senza questo, ogni riga scaricherebbe
         # tutto il catalogo.
         usa_autocomplete(self.fields["product"])
+        # Se la riga esiste già, il suo articolo è stato caricato insieme alle
+        # righe del documento: si usa quello, senza una query per riga. Sui
+        # moduli inviati si lascia invece al campo il compito di leggere il
+        # valore ricevuto.
+        if not self.is_bound:
+            prodotto = getattr(self.instance, "product", None)
+            if prodotto is not None:
+                self.fields["product"].widget.choices = [
+                    (str(prodotto.pk), self.fields["product"].label_from_instance(prodotto))
+                ]
         self.fields["uom"].choices = menu_unita()
         self.fields["vat_rate"].choices = menu_aliquote()
         self.fields["description"].required = False
