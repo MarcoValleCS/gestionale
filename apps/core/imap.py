@@ -65,10 +65,21 @@ def classifica(oggetto, mittente_email, in_risposta=False):
 
     Restituisce ``(is_reply, is_internal, is_relevant, motivo)``. Le newsletter
     e la pubblicità restano fuori dall'elenco principale: si vedono solo
-    scegliendo «Tutte».
+    scegliendo «Tutte». Le comunicazioni ufficiali (SDI, PEC) sono sempre
+    rilevanti: contengono fatture e notifiche che non si possono perdere.
     """
+    from django.conf import settings
+
     oggetto = oggetto or ""
-    dominio = mittente_email.split("@")[-1].strip().lower() if "@" in (mittente_email or "") else ""
+    indirizzo = (mittente_email or "").strip().lower()
+    dominio = indirizzo.split("@")[-1] if "@" in indirizzo else ""
+
+    importanti = {mittente.strip().lower() for mittente in getattr(settings, "MITTENTI_IMPORTANTI", set())}
+    if indirizzo and indirizzo in importanti:
+        return False, False, True, "sdi"
+    if dominio.startswith("pec.") or ".pec." in dominio or dominio.endswith(".pec"):
+        return False, False, True, "pec"
+
     interno = bool(dominio) and dominio in domini_interni()
     risposta = bool(PREFISSI_RISPOSTA.match(oggetto)) or bool(in_risposta)
     if risposta:

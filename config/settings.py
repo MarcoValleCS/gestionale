@@ -82,17 +82,32 @@ IMAP_PASSWORD = env("IMAP_PASSWORD", EMAIL_HOST_PASSWORD)
 
 IMAP_FOLDER = env("IMAP_FOLDER", "INBOX")
 
-IMAP_IS_CONFIGURED = bool(IMAP_HOST and IMAP_USER and IMAP_PASSWORD)
+IMAP_IS_CONFIGURED = bool(IMAP_HOST and IMAP_USER and IMAP_PASSWORD)
+
+
+
+# Domini considerati "di casa": le email che arrivano da qui sono sempre
+
+# mostrate (colleghi, PEC, SDI). Si ricavano dall'indirizzo di invio, oppure
+
+# si indicano a mano in DOMINI_INTERNI (separati da virgola).
+
+def _dominio_di(indirizzo):
+
+    return indirizzo.split("@")[-1].strip().lower() if "@" in indirizzo else ""
+
+
+
+
+
+_domini_automatici = {d for d in (_dominio_di(EMAIL_HOST_USER), _dominio_di(DEFAULT_FROM_EMAIL)) if d}
+
+DOMINI_INTERNI = {d.strip().lower() for d in env("DOMINI_INTERNI", "").split(",") if d.strip()} or _domini_automatici
 
-# Domini considerati "di casa": le email che arrivano da qui sono sempre
-# mostrate (colleghi, PEC, SDI). Si ricavano dall'indirizzo di invio, oppure
-# si indicano a mano in DOMINI_INTERNI (separati da virgola).
-def _dominio_di(indirizzo):
-    return indirizzo.split("@")[-1].strip().lower() if "@" in indirizzo else ""
-
-
-_domini_automatici = {d for d in (_dominio_di(EMAIL_HOST_USER), _dominio_di(DEFAULT_FROM_EMAIL)) if d}
-DOMINI_INTERNI = {d.strip().lower() for d in env("DOMINI_INTERNI", "").split(",") if d.strip()} or _domini_automatici
+# Mittenti che non vanno mai persi: il Sistema di Interscambio (fatture
+# elettroniche) e le PEC. Si possono aggiungere altri indirizzi, separati da
+# virgola, in MITTENTI_IMPORTANTI.
+MITTENTI_IMPORTANTI = {m.strip().lower() for m in env("MITTENTI_IMPORTANTI", "sdi01@pec.fatturapa.it").split(",") if m.strip()}
 if not EMAIL_HOST:
     # In sviluppo (o senza SMTP configurato) le email finiscono nei log del server
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

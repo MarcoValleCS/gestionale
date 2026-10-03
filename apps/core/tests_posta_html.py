@@ -52,6 +52,25 @@ class ClassificazionePostaTest(TestCase):
         self.assertFalse(rilevante)
         self.assertEqual(motivo, "")
 
+    @override_settings(MITTENTI_IMPORTANTI={"sdi01@pec.fatturapa.it"})
+    def test_le_comunicazioni_ufficiali_sono_sempre_rilevanti(self):
+        from apps.core.imap import classifica
+
+        # il Sistema di Interscambio (fatture elettroniche)
+        _r, _i, rilevante, motivo = classifica("Fattura 123 inviata", "sdi01@pec.fatturapa.it")
+        self.assertTrue(rilevante)
+        self.assertEqual(motivo, "sdi")
+
+        # una PEC di un fornitore
+        _r, _i, rilevante, motivo = classifica("Sollecito di pagamento", "fornitore@pec.it")
+        self.assertTrue(rilevante)
+        self.assertEqual(motivo, "pec")
+
+        # una PEC Aruba
+        _r, _i, rilevante, motivo = classifica("Notifica", "cliente@pec.aruba.it")
+        self.assertTrue(rilevante)
+        self.assertEqual(motivo, "pec")
+
     def test_risposta_con_intestazione_in_reply_to(self):
         from apps.core.imap import classifica
 
