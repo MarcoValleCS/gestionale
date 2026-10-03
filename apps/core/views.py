@@ -11,7 +11,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, ListView, UpdateView
 
-from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, has_role, role_required
+from apps.accounts.permissions import ROLE_ADMIN, ROLE_HR, ROLE_PURCHASING, ROLE_SALES, ROLE_WAREHOUSE, RoleRequiredMixin, has_role, role_required
 
 from .forms import (
     AttachmentForm,
@@ -23,7 +23,8 @@ from .forms import (
     UnitOfMeasureForm,
     VatRateForm,
 )
-from .models import Attachment, CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .models import Attachment, CompanySettings, InboundEmail, InternalMessage, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .richtext import clean_notes
 
 
 def home(request):
@@ -247,6 +248,241 @@ def activity_log(request):
             "utente_id": utente_id,
         },
     )
+
+
+# ------------------------------------------------------- messaggi interni
+def _utenti_scrivibili(utente):
+    from django.contrib.auth import get_user_model
+
+    return get_user_model().objects.filter(is_active=True).exclude(pk=utente.pk).order_by("first_name", "username")
+
+
+def messaggi(request):
+    """Bacheca dei messaggi interni: conversazioni con gli altri utenti."""
+    from django.db.models import Q
+
+    from .models import InternalMessage
+
+    if request.method == "POST":
+        destinatario_id = request.POST.get("recipient") or ""
+        testo = (request.POST.get("body") or "").strip()
+        destinatario = _utenti_scrivibili(request.user).filter(pk=destinatario_id).first() if destinatario_id.isdigit() else None
+        if destinatario is None:
+            messages.error(request, "Scegli a chi mandare il messaggio.")
+        elif not testo:
+            messages.error(request, "Scrivi il testo del messaggio.")
+        else:
+            InternalMessage.objects.create(sender=request.user, recipient=destinatario, body=testo)
+            return redirect("core:conversazione", pk=destinatario.pk)
+
+    scambiati = (
+        InternalMessage.objects.filter(Q(sender=request.user) | Q(recipient=request.user))
+        .select_related("sender", "recipient")
+        .order_by("created_at", "pk")
+    )
+    conversazioni = {}
+    for messaggio in scambiati:
+        altro = messaggio.recipient if messaggio.sender_id == request.user.pk else messaggio.sender
+        voce = conversazioni.setdefault(
+            altro.pk, {"utente": altro, "ultimo": messaggio, "totale": 0, "non_letti": 0}
+        )
+        voce["ultimo"] = messaggio
+        voce["totale"] += 1
+        if messaggio.recipient_id == request.user.pk and not messaggio.is_read:
+            voce["non_letti"] += 1
+    elenco = sorted(conversazioni.values(), key=lambda voce: voce["ultimo"].created_at, reverse=True)
+
+    return render(
+        request,
+        "core/messaggi.html",
+        {
+            "page_title": "Messaggi",
+            "conversazioni": elenco,
+            "utenti": _utenti_scrivibili(request.user),
+            "non_letti": sum(voce["non_letti"] for voce in elenco),
+        },
+    )
+
+
+def conversazione(request, pk):
+    """Scambio di messaggi con un utente."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    from .models import InternalMessage
+
+    altro = get_object_or_404(get_user_model(), pk=pk, is_active=True)
+    if altro.pk == request.user.pk:
+        return redirect("core:messaggi")
+
+    if request.method == "POST":
+        testo = (request.POST.get("body") or "").strip()
+        if testo:
+            InternalMessage.objects.create(sender=request.user, recipient=altro, body=testo)
+        return redirect("core:conversazione", pk=altro.pk)
+
+    scambio = (
+        InternalMessage.objects.filter(
+            Q(sender=request.user, recipient=altro) | Q(sender=altro, recipient=request.user)
+        )
+        .select_related("sender", "recipient")
+        .order_by("created_at", "pk")
+    )
+    da_leggere = [m for m in scambio if m.recipient_id == request.user.pk and not m.is_read]
+    for messaggio in da_leggere:
+        messaggio.mark_read()
+
+    return render(
+        request,
+        "core/conversazione.html",
+        {"page_title": f"Messaggi con {altro.get_full_name() or altro.username}", "altro": altro, "messaggi": scambio},
+    )
+
+
+# ----------------------------------------------------------- posta in arrivo
+POSTA_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_HR)
+
+
+@role_required(*POSTA_ROLES)
+def posta(request):
+    """Casella aziendale: elenco delle email ricevute."""
+    from django.conf import settings as dj_settings
+    from django.db.models import Q
+
+    from .imap import posta_configurata
+
+    elenco = InboundEmail.objects.select_related("contact")
+    filtro = request.GET.get("filtro", "")
+    if filtro == "non_lette":
+        elenco = elenco.filter(read_at__isnull=True)
+    elif filtro == "allegati":
+        elenco = elenco.filter(attachments__isnull=False).exclude(attachments=[])
+
+    cerca = (request.GET.get("q") or "").strip()
+    if cerca:
+        elenco = elenco.filter(
+            Q(subject__icontains=cerca) | Q(sender_email__icontains=cerca) | Q(sender_name__icontains=cerca)
+        )
+
+    non_lette = InboundEmail.objects.filter(read_at__isnull=True).count()
+    return render(
+        request,
+        "core/posta.html",
+        {
+            "page_title": "Posta",
+            "email": elenco[:200],
+            "totale": elenco.count(),
+            "non_lette": non_lette,
+            "filtro": filtro,
+            "cerca": cerca,
+            "configurata": posta_configurata(),
+            "cartella": dj_settings.IMAP_FOLDER,
+        },
+    )
+
+
+@role_required(*POSTA_ROLES)
+def posta_sincronizza(request):
+    """Scarica le nuove email dalla casella."""
+    from .imap import PostaNonConfigurata, sincronizza
+
+    if request.method == "POST":
+        try:
+            esito = sincronizza()
+        except PostaNonConfigurata as exc:
+            messages.error(request, str(exc))
+        except Exception as exc:
+            messages.error(request, f"Non sono riuscito a leggere la casella: {exc}")
+        else:
+            if esito["nuove"]:
+                messages.success(request, f"{esito['nuove']} nuove email scaricate ({esito['esaminate']} controllate).")
+            else:
+                messages.info(request, f"Nessuna email nuova ({esito['esaminate']} controllate).")
+    return redirect("core:posta")
+
+
+@role_required(*POSTA_ROLES)
+def posta_messaggio(request, pk):
+    """Legge una email (scarica il corpo la prima volta)."""
+    from .imap import PostaNonConfigurata, scarica_corpo
+    from .models import InboundEmail
+
+    email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
+    errore = None
+    if not email_ricevuta.body_loaded:
+        try:
+            scarica_corpo(email_ricevuta)
+        except PostaNonConfigurata as exc:
+            errore = str(exc)
+        except Exception as exc:
+            errore = f"Non sono riuscito a scaricare il messaggio: {exc}"
+    email_ricevuta.mark_read()
+
+    return render(
+        request,
+        "core/posta_messaggio.html",
+        {
+            "page_title": email_ricevuta.subject,
+            "email": email_ricevuta,
+            "errore": errore,
+            "testo_sicuro": clean_notes(email_ricevuta.body_text),
+            "html_sicuro": clean_notes(email_ricevuta.body_html),
+        },
+    )
+
+
+@role_required(*POSTA_ROLES)
+def posta_rispondi(request, pk):
+    """Risponde a una email dalla casella aziendale."""
+    from .mailing import email_configured, send_document_email
+    from .models import InboundEmail
+
+    email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
+    if request.method != "POST":
+        return redirect("core:posta_messaggio", pk=pk)
+
+    testo = (request.POST.get("body") or "").strip()
+    if not email_ricevuta.sender_email:
+        messages.error(request, "Questa email non ha un mittente a cui rispondere.")
+    elif not testo:
+        messages.error(request, "Scrivi il testo della risposta.")
+    elif not email_configured():
+        messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+    else:
+        oggetto = email_ricevuta.subject
+        if not oggetto.lower().startswith("re:"):
+            oggetto = f"Re: {oggetto}"
+        try:
+            send_document_email(to_email=email_ricevuta.sender_email, subject=oggetto, message=testo)
+        except Exception as exc:
+            messages.error(request, f"Risposta non inviata: {exc}")
+        else:
+            messages.success(request, f"Risposta inviata a {email_ricevuta.sender_email}.")
+    return redirect("core:posta_messaggio", pk=pk)
+
+
+@role_required(*POSTA_ROLES)
+def posta_allegato(request, pk, indice):
+    """Scarica un allegato dell'email."""
+    from django.http import FileResponse, Http404
+
+    from .imap import PostaNonConfigurata, scarica_allegato
+    from .models import InboundEmail
+
+    email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
+    try:
+        nome, tipo, contenuto = scarica_allegato(email_ricevuta, indice)
+    except PostaNonConfigurata as exc:
+        messages.error(request, str(exc))
+        return redirect("core:posta_messaggio", pk=pk)
+    except Exception as exc:
+        raise Http404(f"Allegato non disponibile: {exc}")
+
+    from io import BytesIO
+
+    risposta = FileResponse(BytesIO(contenuto), content_type=tipo or "application/octet-stream")
+    risposta["Content-Disposition"] = f'attachment; filename="{nome}"'
+    return risposta
 
 
 def global_search(request):

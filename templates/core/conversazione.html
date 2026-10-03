@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Messaggi con {{ altro.get_full_name|default:altro.username }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div>
+        <h2 class="h5 mb-0">{{ altro.get_full_name|default:altro.username }}</h2>
+        <div class="text-muted small">
+          {% if altro.employee %}Dipendente{% elif altro.collaborator %}Collaboratore{% else %}Utente{% endif %}
+        </div>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:messaggi' %}">
+        <i class="bi bi-arrow-left"></i> Tutte le conversazioni
+      </a>
+    </div>
+
+    <div class="card">
+      <div class="card-body" style="max-height: 60vh; overflow-y: auto;" id="chat">
+        {% for messaggio in messaggi %}
+        <div class="d-flex mb-3 {% if messaggio.sender_id == user.pk %}justify-content-end{% endif %}">
+          <div class="p-2 px-3 rounded-3 {% if messaggio.sender_id == user.pk %}bg-primary text-white{% else %}bg-light border{% endif %}"
+               style="max-width: 78%;">
+            <div style="white-space: pre-wrap;">{{ messaggio.body }}</div>
+            <div class="small {% if messaggio.sender_id == user.pk %}text-white-50{% else %}text-muted{% endif %} mt-1">
+              {{ messaggio.sender.get_full_name|default:messaggio.sender.username }} · {{ messaggio.created_at|date:"d/m/Y H:i" }}
+              {% if messaggio.sender_id == user.pk and messaggio.is_read %}· letto{% endif %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-center text-muted py-4 mb-0">Nessun messaggio: scrivi il primo.</p>
+        {% endfor %}
+      </div>
+      <div class="card-footer">
+        <form method="post" class="d-flex gap-2 align-items-end">
+          {% csrf_token %}
+          <textarea class="form-control" name="body" rows="2" placeholder="Scrivi un messaggio…" required></textarea>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i> Invia</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const chat = document.getElementById("chat");
+    if (chat) chat.scrollTop = chat.scrollHeight;
+  })();
+</script>
+{% endblock %}

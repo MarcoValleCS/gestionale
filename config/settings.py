@@ -62,7 +62,17 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Gestionale <no-reply@example.com>")
-EMAIL_IS_CONFIGURED = bool(EMAIL_HOST)
+EMAIL_IS_CONFIGURED = bool(EMAIL_HOST)
+
+# ------------------------------------------------- Posta in arrivo (IMAP)
+# Serve a leggere la casella aziendale dal gestionale. Se non indicate, si
+# usano le stesse credenziali dell'invio.
+IMAP_HOST = env("IMAP_HOST", "imaps.aruba.it")
+IMAP_PORT = int(env("IMAP_PORT", "993"))
+IMAP_USER = env("IMAP_USER", EMAIL_HOST_USER)
+IMAP_PASSWORD = env("IMAP_PASSWORD", EMAIL_HOST_PASSWORD)
+IMAP_FOLDER = env("IMAP_FOLDER", "INBOX")
+IMAP_IS_CONFIGURED = bool(IMAP_HOST and IMAP_USER and IMAP_PASSWORD)
 if not EMAIL_HOST:
     # In sviluppo (o senza SMTP configurato) le email finiscono nei log del server
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

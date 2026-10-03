@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ email.subject }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:posta' %}">
+        <i class="bi bi-arrow-left"></i> Torna alla posta
+      </a>
+      <div class="text-muted small">{{ email.received_at|date:"d/m/Y H:i" }}</div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5 mb-2">{{ email.subject }}</h2>
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div class="small">
+            <div><span class="text-muted">Da:</span> <span class="fw-semibold">{{ email.sender_label }}</span>
+              {% if email.sender_email %}<span class="text-muted">&lt;{{ email.sender_email }}&gt;</span>{% endif %}
+            </div>
+            {% if email.recipients %}<div class="text-muted">A: {{ email.recipients }}</div>{% endif %}
+          </div>
+          <div class="d-flex gap-2">
+            {% if email.contact %}
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'contacts:detail' email.contact.pk %}">
+              <i class="bi bi-person"></i> Scheda contatto
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if errore %}
+    <div class="alert alert-warning py-2 small">
+      <i class="bi bi-exclamation-triangle me-1"></i> {{ errore }}
+    </div>
+    {% endif %}
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-envelope-open me-1"></i> Messaggio</div>
+      <div class="card-body">
+        {% if html_sicuro %}
+        <div class="email-body">{{ html_sicuro }}</div>
+        {% elif testo_sicuro %}
+        <div style="white-space: pre-wrap;">{{ testo_sicuro }}</div>
+        {% else %}
+        <p class="text-muted mb-0">Il messaggio non ha testo (solo allegati).</p>
+        {% endif %}
+      </div>
+      {% if email.attachments %}
+      <div class="card-footer">
+        <div class="small text-muted mb-2"><i class="bi bi-paperclip"></i> Allegati</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for allegato in email.attachments %}
+          <a class="btn btn-outline-secondary btn-sm"
+             href="{% url 'core:posta_allegato' email.pk allegato.indice %}">
+            <i class="bi bi-file-earmark-arrow-down"></i> {{ allegato.nome }}
+            <span class="text-muted small">{{ allegato.dimensione|filesizeformat }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-reply me-1"></i> Rispondi</div>
+      <div class="card-body">
+        {% if email.sender_email %}
+        <form method="post" action="{% url 'core:posta_rispondi' email.pk %}">
+          {% csrf_token %}
+          <div class="mb-2 small text-muted">A: {{ email.sender_email }}</div>
+          <textarea class="form-control mb-2" name="body" rows="4" required
+                    placeholder="Scrivi la risposta…"></textarea>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i> Invia risposta</button>
+        </form>
+        {% else %}
+        <p class="text-muted mb-0">Questa email non ha un mittente a cui rispondere.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

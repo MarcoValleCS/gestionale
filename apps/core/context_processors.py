@@ -63,11 +63,14 @@ def roles(request):
     spento["is_collaborator_only"] = False
 
     if not user or not user.is_authenticated:
-        return {"roles": spento}
+        return {"roles": spento, "messaggi_non_letti": 0}
 
     if user.is_superuser:
         # l'amministratore ha tutti i ruoli e non è mai limitato
-        return {"roles": {**{flag: True for flag in ROLE_FLAGS}, "is_collaborator_only": False}}
+        return {
+            "roles": {**{flag: True for flag in ROLE_FLAGS}, "is_collaborator_only": False},
+            "messaggi_non_letti": _messaggi_non_letti(user),
+        }
 
     names = set(user.groups.values_list("name", flat=True))
     return {
@@ -80,5 +83,16 @@ def roles(request):
             "is_collaborator": "Collaboratore" in names,
             # limitato solo se ha il ruolo Collaboratore e nessun altro
             "is_collaborator_only": "Collaboratore" in names and names <= {"Collaboratore"},
-        }
+        },
+        "messaggi_non_letti": _messaggi_non_letti(user),
     }
+
+
+def _messaggi_non_letti(utente):
+    """Quanti messaggi interni non letti ha l'utente (per il pallino nel menu)."""
+    try:
+        from .models import InternalMessage
+
+        return InternalMessage.objects.filter(recipient=utente, read_at__isnull=True).count()
+    except Exception:  # tabelle non ancora migrate
+        return 0

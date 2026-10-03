@@ -440,3 +440,106 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} {self.model_name} {self.object_label}".strip()
+
+
+class InternalMessage(TimeStampedModel):
+    """Messaggio interno fra utenti del gestionale (bacheca privata)."""
+
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_internal_messages",
+        verbose_name="Mittente",
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_internal_messages",
+        verbose_name="Destinatario",
+    )
+    body = models.TextField("Messaggio")
+    read_at = models.DateTimeField("Letto il", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Messaggio interno"
+        verbose_name_plural = "Messaggi interni"
+        ordering = ["created_at", "pk"]
+        indexes = [
+            models.Index(fields=["recipient", "read_at"], name="message_recipient_read_idx"),
+            models.Index(fields=["sender", "recipient"], name="message_pair_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.sender} → {self.recipient}: {self.body[:40]}"
+
+    @property
+    def is_read(self):
+        return self.read_at is not None
+
+    def mark_read(self):
+        if self.read_at is None:
+            self.read_at = timezone.now()
+            self.save(update_fields=["read_at", "updated_at"])
+        return self.read_at
+
+
+class InboundEmail(TimeStampedModel):
+    """Email scaricata dalla casella aziendale, per leggerla dal gestionale.
+
+    Il messaggio viene copiato qui al momento della sincronizzazione: così la
+    posta si legge senza aspettare il server IMAP, e resta consultabile anche
+    quando la casella è momentaneamente irraggiungibile. Il corpo completo e gli
+    allegati si scaricano alla prima apertura.
+    """
+
+    uid = models.CharField("UID IMAP", max_length=64, unique=True)
+    folder = models.CharField("Cartella", max_length=60, default="INBOX")
+    message_id = models.CharField("Message-ID", max_length=255, blank=True)
+    sender_name = models.CharField("Mittente", max_length=200, blank=True)
+    sender_email = models.EmailField("Email mittente", blank=True)
+    recipients = models.CharField("Destinatari", max_length=500, blank=True)
+    subject = models.CharField("Oggetto", max_length=300, blank=True)
+    received_at = models.DateTimeField("Ricevuta il", null=True, blank=True)
+    body_text = models.TextField("Testo", blank=True)
+    body_html = models.TextField("HTML", blank=True)
+    body_loaded = models.BooleanField("Corpo scaricato", default=False)
+    attachments = models.JSONField("Allegati", default=list, blank=True)
+    read_at = models.DateTimeField("Letta il", null=True, blank=True)
+    contact = models.ForeignKey(
+        "contacts.Contact",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emails",
+        verbose_name="Contatto collegato",
+    )
+
+    class Meta:
+        verbose_name = "Email ricevuta"
+        verbose_name_plural = "Posta ricevuta"
+        ordering = ["-received_at", "-pk"]
+        indexes = [
+            models.Index(fields=["-received_at"], name="email_received_idx"),
+            models.Index(fields=["read_at"], name="email_read_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.sender_email}: {self.subject}"
+
+    @property
+    def is_read(self):
+        return self.read_at is not None
+
+    @property
+    def has_attachments(self):
+        return bool(self.attachments)
+
+    @property
+    def sender_label(self):
+        return self.sender_name or self.sender_email or "(sconosciuto)"
+
+    def mark_read(self):
+        if self.read_at is None:
+            self.read_at = timezone.now()
+            self.save(update_fields=["read_at", "updated_at"])
+        return self.read_at

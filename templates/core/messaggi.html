@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Messaggi{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5 col-xl-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-pencil-square me-1"></i> Nuovo messaggio</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label" for="msg-recipient">A chi</label>
+            <select class="form-select" id="msg-recipient" name="recipient" required>
+              <option value="">— scegli un collega —</option>
+              {% for utente in utenti %}
+              <option value="{{ utente.pk }}">{{ utente.get_full_name|default:utente.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="msg-body">Messaggio</label>
+            <textarea class="form-control" id="msg-body" name="body" rows="3" required></textarea>
+          </div>
+          <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send"></i> Invia</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-chat-dots me-1"></i> Conversazioni</span>
+        {% if non_letti %}<span class="badge text-bg-danger">{{ non_letti }} non letti</span>{% endif %}
+      </div>
+      <div class="list-group list-group-flush">
+        {% for voce in conversazioni %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{% url 'core:conversazione' voce.utente.pk %}">
+          <div class="text-truncate">
+            <div class="fw-semibold">
+              {{ voce.utente.get_full_name|default:voce.utente.username }}
+              {% if voce.non_letti %}<span class="badge text-bg-danger ms-1">{{ voce.non_letti }}</span>{% endif %}
+            </div>
+            <div class="small text-muted text-truncate">
+              {% if voce.ultimo.sender_id == user.pk %}Tu: {% endif %}{{ voce.ultimo.body|truncatechars:48 }}
+            </div>
+          </div>
+          <div class="text-end small text-muted text-nowrap ms-2">
+            {{ voce.ultimo.created_at|date:"d/m H:i" }}
+            <div>{{ voce.totale }} msg</div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="list-group-item text-center text-muted py-4">
+          Nessun messaggio. Scrivi al primo collega qui sopra.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7 col-xl-8">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column justify-content-center text-center text-muted py-5">
+        <i class="bi bi-chat-square-text fs-1 mb-3"></i>
+        <p class="mb-0">Scegli una conversazione qui a fianco,<br>oppure scrivi un nuovo messaggio.</p>
+        <p class="small mt-3 mb-0">I messaggi restano dentro il gestionale: i colleghi li vedono appena entrano.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -7,6 +7,15 @@ app_name = "core"
 urlpatterns = [
     path("", views.home, name="home"),
     path("cerca/", views.global_search, name="search"),
+    # Messaggi interni fra utenti
+    path("messaggi/", views.messaggi, name="messaggi"),
+    path("messaggi/<int:pk>/", views.conversazione, name="conversazione"),
+    # Posta in arrivo della casella aziendale
+    path("posta/", views.posta, name="posta"),
+    path("posta/sincronizza/", views.posta_sincronizza, name="posta_sincronizza"),
+    path("posta/<int:pk>/", views.posta_messaggio, name="posta_messaggio"),
+    path("posta/<int:pk>/rispondi/", views.posta_rispondi, name="posta_rispondi"),
+    path("posta/<int:pk>/allegato/<int:indice>/", views.posta_allegato, name="posta_allegato"),
     path("impostazioni/", views.settings_home, name="settings"),
     path("impostazioni/azienda/", views.CompanyUpdateView.as_view(), name="company_update"),
     path("impostazioni/email/", views.email_settings, name="email_settings"),

@@ -403,6 +403,22 @@ a:hover {
 .doc-lines .col-totale { min-width: 120px; }
 .doc-lines .col-margine { min-width: 110px; }
 .doc-lines .col-azioni { min-width: 56px; }
+
+/* ----------------------------------------------------- posta ricevuta */
+.email-body {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.email-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+.email-body table {
+  max-width: 100%;
+}
 .doc-lines td input,
 .doc-lines td select {
   min-width: 100%;
