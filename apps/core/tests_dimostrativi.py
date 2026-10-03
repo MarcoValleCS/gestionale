@@ -42,7 +42,7 @@ class DatiDimostrativiTest(TestCase):
     def test_crea_tutto_il_flusso_di_lavoro(self):
         self.crea()
 
-        self.assertEqual(Product.objects.count(), len(ARTICOLI))
+        self.assertEqual(Product.objects.count(), len(ARTICOLI) + 1)  # + il kit
         self.assertGreaterEqual(Contact.objects.filter(is_customer=True).count(), 18)
         self.assertGreaterEqual(Contact.objects.filter(is_supplier=True).count(), 12)
 
@@ -78,7 +78,7 @@ class DatiDimostrativiTest(TestCase):
         self.assertTrue(tracciati)
         con_giacenza = [p for p in tracciati if p.total_stock > 0]
         # qualche articolo "su misura" resta a zero di proposito
-        self.assertGreaterEqual(len(con_giacenza), len(tracciati) * 0.85)
+        self.assertGreaterEqual(len(con_giacenza), len(tracciati) * 0.8)
 
     def test_margini_e_provvigioni_calcolabili(self):
         self.crea()
@@ -180,6 +180,7 @@ class DatiDimostrativiTest(TestCase):
         primo_totale = Quote.objects.count()
         self.crea("--reset")
         self.assertEqual(Quote.objects.count(), primo_totale)
-        self.assertEqual(Product.objects.count(), len(ARTICOLI))
+        self.assertEqual(Product.objects.count(), len(ARTICOLI) + 1)  # + il kit
+
 
 

@@ -207,6 +207,7 @@ class Command(BaseCommand):
                 self._utenti()
                 self._contatti()
                 self._articoli()
+                self._kit()
                 self._listini()
                 self._cantieri()
                 self._preventivi()
@@ -274,6 +275,9 @@ class Command(BaseCommand):
         TimeEntry.objects.all().delete()
         LeaveRequest.objects.all().delete()
         Employee.objects.all().delete()
+        from apps.catalog.models import KitComponent
+
+        KitComponent.objects.all().delete()
         Product.objects.all().delete()
         Category.objects.all().delete()
         Contact.objects.all().delete()
@@ -422,6 +426,35 @@ class Command(BaseCommand):
 
         self.stdout.write(f"  Articoli: {len(self.articoli)} in {len(categorie)} categorie, giacenze caricate")
 
+    def _kit(self):
+        """Un articolo composto: serve a provare l'espansione in componenti."""
+        from apps.catalog.models import KitComponent
+
+        kit = Product.objects.create(
+            code="KIT.BAGNO.CLIENTE",
+            name="Kit bagno completo: wc + bidet + sedile + fissaggi",
+            category=self.articoli["0201801"].category,
+            uom=self.rif["pz"],
+            sale_price=Decimal("780.00"),
+            sale_vat=self.rif["vat22"],
+            purchase_price=Decimal("0"),
+            purchase_vat=self.rif["vat22"],
+            main_supplier=self.fornitori["Azzurra Sanitari in Ceramica spa"],
+            is_kit=True,
+            is_stock_tracked=False,
+            description="Composizione: i pezzi vengono scaricati singolarmente dal magazzino.",
+        )
+        componenti = [
+            ("0201801", "1"),   # wc sospeso
+            ("0202001", "1"),   # bidet sospeso
+            ("339101", "1"),    # sedile soft close
+            ("FI010", "2"),     # fissaggi
+        ]
+        for codice, quantita in componenti:
+            KitComponent.objects.create(kit=kit, component=self.articoli[codice], qty=Decimal(quantita))
+        self.articoli[kit.code] = kit
+        self.stdout.write(f"  Kit: 1 articolo composto con {len(componenti)} componenti")
+
     # ---------------------------------------------------------------- listini
     def _listini(self):
         listini = {
@@ -555,6 +588,7 @@ class Command(BaseCommand):
 
         # (cliente, stato, giorni fa, righe, provvigione %, cantiere)
         bagno_base = [
+            ("Composizione", "Kit bagno completo: wc + bidet + sedile + fissaggi", "KIT.BAGNO.CLIENTE", "1", "780.00", "10"),
             ("Sanitari", "Vaso sospeso scarico A-SOUND bianco lucido", "0201801", "1", "315.00", "10"),
             ("Sanitari", "Bidet sospeso bianco lucido", "0202001", "1", "294.00", "10"),
             ("Sanitari", "Sedile soft closing sgancio rapido", "339101", "1", "91.00", "10"),
@@ -641,6 +675,8 @@ class Command(BaseCommand):
                 discount_pct=Decimal(sconto),
                 vat_rate=self.rif["vat22"],
             )
+        # i kit si aprono nei loro componenti, come fa il modulo del preventivo
+        sales_services.espandi_kit(preventivo, "quote")
         preventivo.recalculate()
 
     # -------------------------------------------------------- ordini cliente
@@ -823,7 +859,7 @@ class Command(BaseCommand):
 
     # ----------------------------------------------------------------- fatture
     def _fatture(self):
-        emesse = incassate = 0
+        emesse = incassate = scadute = 0
         for indice, ordine in enumerate(SalesOrder.objects.filter(status=SalesOrder.STATUS_DELIVERED).order_by("delivered_at")):
             if SalesInvoice.objects.filter(source_order=ordine).exists():
                 continue
@@ -831,7 +867,10 @@ class Command(BaseCommand):
             if fattura is None or not fattura.lines.exists():
                 continue
             fattura.date = (ordine.delivered_at or timezone.now()).date() + timedelta(days=2)
-            fattura.save(update_fields=["date"])
+            # la scadenza segue la data della fattura: così qualcuna risulta scaduta
+            giorni_pagamento = fattura.payment_term.days if fattura.payment_term else 30
+            fattura.due_date = fattura.date + timedelta(days=giorni_pagamento)
+            fattura.save(update_fields=["date", "due_date"])
             if indice % 4 != 3:
                 billing_services.issue_sales_invoice(fattura)
                 emesse += 1
@@ -840,6 +879,8 @@ class Command(BaseCommand):
                 if indice % 4 == 0:
                     billing_services.mark_sales_invoice_paid(fattura)
                     incassate += 1
+                elif fattura.due_date < timezone.localdate():
+                    scadute += 1
             else:
                 emesse += 1
 
@@ -851,13 +892,15 @@ class Command(BaseCommand):
             if fattura is None or not fattura.lines.exists():
                 continue
             fattura.date = (ordine.date + timedelta(days=5))
-            fattura.save(update_fields=["date"])
+            giorni_pagamento = fattura.payment_term.days if fattura.payment_term else 60
+            fattura.due_date = fattura.date + timedelta(days=giorni_pagamento)
+            fattura.save(update_fields=["date", "due_date"])
             billing_services.register_purchase_invoice(fattura)
             if ricevute % 2 == 0:
                 billing_services.mark_purchase_invoice_paid(fattura)
             ricevute += 1
 
-        self.stdout.write(f"  Fatture: {emesse} emesse (di cui {incassate} incassate) e {ricevute} ricevute")
+        self.stdout.write(f"  Fatture: {emesse} emesse (di cui {incassate} incassate, {scadute} scadute da sollecitare) e {ricevute} ricevute")
 
     # ------------------------------------------------------------ manutenzioni
     def _manutenzioni(self):
