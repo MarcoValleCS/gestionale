@@ -103,6 +103,7 @@
     menu.appendChild(createButton);
 
     document.body.appendChild(menu);
+    menu._acInput = input;
     positionMenu(menu, input);
   }
 
@@ -147,7 +148,12 @@
   });
 
   document.addEventListener("click", function (event) {
-    if (!event.target.closest || !event.target.closest(".autocomplete-wrap")) closeAll();
+    const target = event.target;
+    if (!target || !target.closest) return;
+    /* La tendina sta fuori dal campo: un click sulla sua barra di scorrimento
+       non deve chiuderla. */
+    if (target.closest(".autocomplete-wrap") || target.closest(".autocomplete-menu")) return;
+    closeAll();
   });
 
   document.addEventListener("keydown", function (event) {
@@ -156,6 +162,35 @@
     if (input) closeAll();
   });
 
-  document.addEventListener("scroll", function () { closeAll(); }, true);
+  /* Lo scorrimento della pagina sposta il campo: la tendina lo segue invece di
+     chiudersi. Lo scorrimento DENTRO la tendina (per cercare fra i risultati)
+     non la chiude di certo. */
+  function repositionMenus() {
+    document.querySelectorAll(".autocomplete-menu").forEach(function (menu) {
+      const input = menu._acInput;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        menu.remove(); // il campo è uscito dallo schermo
+        return;
+      }
+      positionMenu(menu, input);
+    });
+  }
+
+  let scrollFrame = null;
+  document.addEventListener(
+    "scroll",
+    function (event) {
+      const target = event.target;
+      if (target && target.closest && target.closest(".autocomplete-menu")) return;
+      if (scrollFrame) return;
+      scrollFrame = requestAnimationFrame(function () {
+        scrollFrame = null;
+        repositionMenus();
+      });
+    },
+    true
+  );
   window.addEventListener("resize", function () { closeAll(); });
 })();
