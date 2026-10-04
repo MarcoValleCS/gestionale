@@ -565,6 +565,8 @@ a:hover {
   z-index: 1080;
   max-height: 300px;
   overflow-y: auto;
+  /* niente barra orizzontale: i nomi lunghi finiscono con «…» */
+  overflow-x: hidden;
   padding: 0.3rem;
 }
 
@@ -581,6 +583,15 @@ a:hover {
   border-radius: 8px;
   font-size: 0.875rem;
   color: var(--ink);
+  min-width: 0;
+}
+
+.autocomplete-item .ac-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .autocomplete-item:hover,
