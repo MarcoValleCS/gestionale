@@ -26,12 +26,24 @@
 <div class="row g-3">
   <div class="col-lg-8">
     <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-list-ul me-1"></i> Articoli del listino ({{ items|length }})</div>
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-list-ul me-1"></i> Articoli del listino ({{ totale_voci }})</span>
+        <form method="get" class="d-flex gap-2 align-items-center">
+          <input type="search" class="form-control form-control-sm" name="q" value="{{ cerca }}"
+                 placeholder="Cerca per codice o nome…" aria-label="Cerca nel listino" style="min-width: 220px">
+          <button class="btn btn-outline-primary btn-sm" type="submit">Cerca</button>
+          {% if cerca %}<a class="btn btn-outline-secondary btn-sm" href="?">Azzera</a>{% endif %}
+        </form>
+      </div>
+      {% if cerca %}
+      <div class="card-body py-2 text-muted small">Voci trovate: {{ voci_trovate }}</div>
+      {% endif %}
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
           <thead>
             <tr>
               <th>Codice</th>
+              <th>Cod. fornitore</th>
               <th>Articolo</th>
               <th class="text-end">Prezzo</th>
               <th class="text-end">Sconto %</th>
@@ -44,6 +56,7 @@
             {% for item in items %}
             <tr>
               <td class="text-muted number-badge">{{ item.product.code }}</td>
+              <td class="text-muted small">{{ item.supplier_code|default:"—" }}</td>
               <td><a class="text-decoration-none" href="{% url 'catalog:product_detail' item.product.pk %}">{{ item.product.name }}</a></td>
               <td class="text-end">{{ item.price|money }} €</td>
               <td class="text-end">{{ item.discount_pct|qty }}%</td>
@@ -58,11 +71,28 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="7" class="text-center text-muted py-4">Nessun articolo nel listino. Aggiungilo dal pannello a destra.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">Nessun articolo trovato{% if cerca %} per «{{ cerca }}»{% endif %}.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+      {% if is_paginated %}
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Pagina {{ page_obj.number }} di {{ paginator.num_pages }}</span>
+        <div class="d-flex gap-2">
+          {% if page_obj.has_previous %}
+          <a class="btn btn-outline-secondary btn-sm" href="?{% if cerca %}q={{ cerca }}&{% endif %}page={{ page_obj.previous_page_number }}">
+            <i class="bi bi-chevron-left"></i> Precedente
+          </a>
+          {% endif %}
+          {% if page_obj.has_next %}
+          <a class="btn btn-outline-secondary btn-sm" href="?{% if cerca %}q={{ cerca }}&{% endif %}page={{ page_obj.next_page_number }}">
+            Successiva <i class="bi bi-chevron-right"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="card">
@@ -111,11 +141,27 @@
       <div class="card-body">
         <form method="post" action="{% url 'purchasing:pricelist_item_create' pricelist.pk %}" novalidate>
           {% csrf_token %}
-          {% include "partials/form_fields.html" with form=item_form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ item_form.product.id_for_label }}">Articolo</label>
+            <div class="autocomplete-wrap">
+              <input type="text" class="form-control autocomplete-input" autocomplete="off"
+                     placeholder="Cerca per nome o codice…"
+                     data-autocomplete="{% url 'catalog:search' %}"
+                     data-target="#{{ item_form.product.id_for_label }}" data-kind="product">
+              {{ item_form.product }}
+            </div>
+            <div class="form-text">Cerca anche con il codice del fornitore.</div>
+          </div>
+          {% include "partials/form_fields.html" with form=item_form escludi="product" %}
           <button class="btn btn-outline-primary w-100" type="submit">Aggiungi al listino</button>
         </form>
       </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+<script src="{% static 'js/autocomplete.js' %}"></script>
 {% endblock %}

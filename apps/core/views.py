@@ -599,6 +599,7 @@ def global_search(request):
 
     from apps.billing.models import DeliveryNote, PurchaseInvoice, SalesInvoice
     from apps.catalog.models import Product
+    from apps.catalog.search import filtro_articoli
     from apps.contacts.models import Contact
     from apps.jobs.models import Job
     from apps.purchasing.models import PurchaseOrder
@@ -612,9 +613,9 @@ def global_search(request):
             | Q(city__icontains=testo) | Q(email__icontains=testo)
         ).order_by("name")[:15]
 
-        risultati["articoli"] = Product.objects.filter(
-            Q(name__icontains=testo) | Q(code__icontains=testo) | Q(barcode__icontains=testo)
-        ).select_related("uom").order_by("name")[:15]
+        risultati["articoli"] = (
+            Product.objects.filter(filtro_articoli(testo)).select_related("uom").order_by("name")[:15]
+        )
 
         documenti = {}
         if has_role(request.user, ROLE_ADMIN) or has_role(request.user, ROLE_SALES):

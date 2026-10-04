@@ -122,19 +122,48 @@ class PriceListUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView
 
 
 class PriceListDetailView(RoleRequiredMixin, DetailView):
+    """Dettaglio del listino con le voci paginate.
+
+    I listini dei produttori hanno migliaia di voci: senza paginazione la pagina
+    diventerebbe di diversi megabyte.
+    """
+
     allowed_roles = PRICELIST_ROLES
     model = SupplierPriceList
     template_name = "purchasing/pricelist_detail.html"
     context_object_name = "pricelist"
+    paginate_by = 100
 
     def get_queryset(self):
         return SupplierPriceList.objects.select_related("supplier")
 
     def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+
         context = super().get_context_data(**kwargs)
-        context["page_title"] = str(self.object)
-        context["items"] = self.object.items.select_related("product", "product__uom").order_by("product__name")
-        context["adjustments"] = self.object.adjustments.select_related("applied_by")[:10]
+        listino = self.object
+        voci = listino.items.select_related("product", "product__uom").order_by("product__name")
+        cerca = self.request.GET.get("q", "").strip()
+        if cerca:
+            from django.db.models import Q
+
+            voci = voci.filter(
+                Q(product__name__icontains=cerca)
+                | Q(product__code__icontains=cerca)
+                | Q(supplier_code__icontains=cerca)
+                | Q(product__barcode__icontains=cerca)
+            )
+        paginatore = Paginator(voci, self.paginate_by)
+        pagina = paginatore.get_page(self.request.GET.get("page"))
+        context["items"] = pagina
+        context["page_obj"] = pagina
+        context["paginator"] = paginatore
+        context["is_paginated"] = pagina.has_other_pages()
+        context["totale_voci"] = listino.items.count()
+        context["voci_trovate"] = voci.count()
+        context["cerca"] = cerca
+        context["page_title"] = str(listino)
+        context["adjustments"] = listino.adjustments.select_related("applied_by")[:10]
         context["item_form"] = PriceListItemForm()
         context["adjust_form"] = PriceListAdjustForm()
         return context

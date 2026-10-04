@@ -1,4 +1,5 @@
 {% for field in form %}
+{% if field.name != escludi %}
 <div class="mb-3">
   {% if field.field.widget.input_type == "checkbox" %}
   <div class="form-check">
@@ -14,6 +15,7 @@
   {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
   {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 </div>
+{% endif %}
 {% endfor %}
 {% for error in form.non_field_errors %}
 <div class="alert alert-danger py-2">{{ error }}</div>

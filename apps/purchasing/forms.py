@@ -23,12 +23,20 @@ class SupplierPriceListForm(BaseBootstrapModelForm):
 class PriceListItemForm(BaseBootstrapModelForm):
     class Meta:
         model = PriceListItem
-        fields = ["product", "price", "discount_pct", "min_qty", "note"]
+        fields = ["product", "supplier_code", "price", "discount_pct", "min_qty", "note"]
+        labels = {"supplier_code": "Codice fornitore"}
 
     def __init__(self, *args, **kwargs):
+        from apps.core.forms import usa_autocomplete
+
         super().__init__(*args, **kwargs)
         self.fields["product"].queryset = Product.objects.filter(active=True).order_by("name")
         self.fields["product"].label_from_instance = lambda obj: f"{obj.code} – {obj.name}"
+        # il menu dell'articolo porta solo la voce scelta: l'elenco lo cerca
+        # l'autocompletamento (con migliaia di articoli non ci sta in pagina)
+        self.fields["product"].widget.attrs["class"] = "d-none"
+        self.fields["product"].widget.attrs["data-autocomplete-target"] = "1"
+        usa_autocomplete(self.fields["product"])
 
 
 class PriceListAdjustForm(BootstrapFormMixin, forms.Form):

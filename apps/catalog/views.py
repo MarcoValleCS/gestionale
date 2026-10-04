@@ -53,7 +53,9 @@ class ProductListView(ListView):
         )
         search = self.request.GET.get("q", "").strip()
         if search:
-            queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search) | Q(barcode__icontains=search))
+            from apps.catalog.search import filtro_articoli
+
+            queryset = queryset.filter(filtro_articoli(search))
         category_id = self.request.GET.get("categoria", "")
         if category_id:
             queryset = queryset.filter(category_id=category_id)
@@ -291,7 +293,9 @@ def product_search(request):
     context_type = request.GET.get("context", "sale")
     queryset = Product.objects.filter(active=True).select_related("uom")
     if query:
-        queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query) | Q(barcode__icontains=query))
+        from apps.catalog.search import filtro_articoli
+
+        queryset = queryset.filter(filtro_articoli(query))
 
     results = []
     for product in queryset.order_by("name")[:12]:

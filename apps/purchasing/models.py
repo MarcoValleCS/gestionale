@@ -50,6 +50,13 @@ class SupplierPriceList(TimeStampedModel):
 class PriceListItem(TimeStampedModel):
     pricelist = models.ForeignKey(SupplierPriceList, on_delete=models.CASCADE, related_name="items", verbose_name="Listino")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="price_list_items", verbose_name="Articolo")
+    supplier_code = models.CharField(
+        "Codice fornitore",
+        max_length=60,
+        blank=True,
+        db_index=True,
+        help_text="Codice con cui il fornitore identifica l'articolo nel suo listino.",
+    )
     price = models.DecimalField("Prezzo", max_digits=12, decimal_places=4, default=ZERO)
     discount_pct = models.DecimalField("Sconto %", max_digits=5, decimal_places=2, default=ZERO)
     min_qty = models.DecimalField("Quantità minima", max_digits=12, decimal_places=3, default=Decimal("1"))
