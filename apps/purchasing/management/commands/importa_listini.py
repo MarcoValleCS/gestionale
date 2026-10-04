@@ -261,6 +261,7 @@ class Voce:
     descrizione: str = ""
     variante_di: str = ""          # codice dell'articolo principale (esiste già)
     famiglia: str = ""             # nome della famiglia da creare (piatti doccia)
+    serie: str = ""                # serie/collezione da mettere davanti al nome
     etichetta_variante: str = ""
     note: str = ""
 
@@ -310,12 +311,38 @@ def leggi_axa(percorso):
     libro.close()
 
 
+# Serie dei box doccia Lacus (isole e località): compaiono nelle descrizioni e
+# servono a ritrovarli facilmente (es. «Torcello», «Giglio», «Vulcano»).
+SERIE_LACUS = [
+    "LA MADDALENA", "MADDALENA", "PELLESTRINA", "TORCELLO", "FILICUDI", "STROMBOLI",
+    "ALICUDI", "PANAREA", "VULCANO", "CAPRAIA", "ASINARA", "MURANO", "BURANO",
+    "GIGLIO", "LIPARI", "SALINA", "ISCHIA", "EWALL", "PONZA", "CAPRI", "ELBA",
+    "ALBARELLA", "PALMARIA", "FAVIGNANA", "PANTELLERIA", "GIANNUTRI",
+]
+
+
+def serie_lacus(testo):
+    """Serie (isola/località) citata nella descrizione, se c'è."""
+    for serie in SERIE_LACUS:
+        if re.search(rf"\b{re.escape(serie)}\b", testo, flags=re.I):
+            return serie.title()
+    return ""
+
+
 def leggi_lacus(percorso):
-    """Lacus: descrizione italiana lunga (colonna 6) e codice a barre."""
+    """Lacus: descrizione breve (con la serie nel nome) e codice a barre.
+
+    La serie (isola/località) si ricava dalla descrizione; quando la descrizione
+    non la cita, si usa il prefisso del codice se punta sempre alla stessa serie
+    (es. LPST → Torcello).
+    """
     import xlrd
+    from collections import Counter, defaultdict
 
     libro = xlrd.open_workbook(percorso)
     foglio = libro.sheet_by_name("ARTICOLI") if "ARTICOLI" in libro.sheet_names() else libro.sheet_by_index(0)
+
+    righe = []
     for indice in range(1, foglio.nrows):
         codice = normalizza_spazi(foglio.cell_value(indice, 1))
         if not codice:
@@ -324,17 +351,34 @@ def leggi_lacus(percorso):
         italiana = normalizza_spazi(foglio.cell_value(indice, 5))
         # «70x120h3p.d» → «70x120 h3 p.d»: misure e sigle attaccate
         breve = re.sub(r"(?<=[0-9])(h|cm|mm|p|l)(?=[0-9a-z]|\b)", r" \1", breve, flags=re.I)
-        # Il nome è la descrizione breve del listino (quella italiana è spesso la
-        # finitura o il materiale: va nella descrizione estesa).
+        righe.append((codice, breve, italiana, numero(foglio.cell_value(indice, 3)), normalizza_spazi(foglio.cell_value(indice, 4)), normalizza_spazi(foglio.cell_value(indice, 0))))
+
+    def prefisso(codice):
+        return re.split(r"[-0-9]", codice.upper())[0] or codice.upper()
+
+    serie_per_riga = [serie_lacus(f"{breve} {italiana}") for _codice, breve, italiana, _p, _b, _g in righe]
+
+    # prefissi che indicano sempre la stessa serie (almeno 5 casi e 80%)
+    conteggi = defaultdict(Counter)
+    for (codice, *_resto), serie in zip(righe, serie_per_riga):
+        if serie:
+            conteggi[prefisso(codice)][serie] += 1
+    dominanti = {}
+    for codice_prefisso, contatore in conteggi.items():
+        serie, quante = contatore.most_common(1)[0]
+        if quante >= 5 and quante / sum(contatore.values()) >= 0.8:
+            dominanti[codice_prefisso] = serie
+
+    for (codice, breve, italiana, prezzo, barcode, gruppo), serie in zip(righe, serie_per_riga):
         nome = breve or italiana
-        gruppo = normalizza_spazi(foglio.cell_value(indice, 0))
         yield Voce(
             codice=codice,
             nome=pulisci_nome(nome),
-            prezzo=numero(foglio.cell_value(indice, 3)),
-            barcode=normalizza_spazi(foglio.cell_value(indice, 4)),
+            prezzo=prezzo,
+            barcode=barcode,
             gruppo="Componenti box doccia" if gruppo.upper() == "COMPONENTE" else "Box doccia",
             descrizione=pulisci_nome(italiana) if italiana and italiana != nome else "",
+            serie=serie or dominanti.get(prefisso(codice), ""),
         )
 
 
@@ -567,6 +611,9 @@ class Command(BaseCommand):
                         prodotti_per_nome[voce.famiglia] = genitore
 
                 nome_finale = voce.nome
+                if voce.serie and voce.serie.lower() not in voce.nome.lower():
+                    # la serie davanti al nome facilita la ricerca («Torcello…»)
+                    nome_finale = f"{voce.serie} – {voce.nome}"
                 if genitore is not None and voce.etichetta_variante:
                     nome_finale = f"{genitore.name} – {voce.etichetta_variante}"[:200]
 

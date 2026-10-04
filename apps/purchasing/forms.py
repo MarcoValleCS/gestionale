@@ -49,6 +49,24 @@ class PriceListAdjustForm(BootstrapFormMixin, forms.Form):
     )
 
 
+class SupplierDiscountForm(BootstrapFormMixin, forms.Form):
+    """Sconto che il fornitore applica sul listino (per il prezzo di acquisto)."""
+
+    percent = forms.DecimalField(
+        label="Sconto fornitore %",
+        max_digits=5,
+        decimal_places=2,
+        initial="0",
+        help_text="Il prezzo di acquisto diventa listino meno questo sconto.",
+    )
+
+    def clean_percent(self):
+        valore = self.cleaned_data["percent"]
+        if valore < 0 or valore > 100:
+            raise forms.ValidationError("Lo sconto deve essere fra 0 e 100.")
+        return valore
+
+
 class PurchaseOrderForm(PurchaseSupplierFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = PurchaseOrder

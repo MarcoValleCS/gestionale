@@ -120,12 +120,36 @@
   </div>
 
   <div class="col-lg-4">
+    <div class="card mb-3 border-success">
+      <div class="card-header bg-success-subtle text-success-emphasis">
+        <i class="bi bi-cash-coin me-1"></i> Sconto fornitore
+      </div>
+      <div class="card-body">
+        {% if sconto_attuale is not None %}
+        <p class="small mb-2">
+          Sconto attualmente applicato: <strong>{{ sconto_attuale|qty }}%</strong>
+        </p>
+        {% else %}
+        <p class="small text-muted mb-2">Le voci del listino hanno sconti diversi.</p>
+        {% endif %}
+        <form method="post" action="{% url 'purchasing:pricelist_discount' pricelist.pk %}" onsubmit="return confirm('Applicare lo sconto a TUTTI i {{ totale_voci }} articoli del listino?');">
+          {% csrf_token %}
+          {% include "partials/form_fields.html" with form=discount_form %}
+          <button class="btn btn-success w-100" type="submit"><i class="bi bi-check-lg"></i> Applica lo sconto</button>
+        </form>
+        <p class="text-muted small mb-0 mt-2">
+          Il <strong>prezzo di acquisto</strong> di ogni articolo diventa «prezzo di listino meno lo sconto».
+          Il prezzo di vendita non cambia.
+        </p>
+      </div>
+    </div>
+
     <div class="card mb-3 border-primary">
       <div class="card-header bg-primary-subtle text-primary-emphasis">
         <i class="bi bi-percent me-1"></i> Adeguamento prezzi del listino
       </div>
       <div class="card-body">
-        <form method="post" action="{% url 'purchasing:pricelist_adjust' pricelist.pk %}" onsubmit="return confirm('Applicare la variazione a TUTTI i {{ items|length }} articoli del listino?');">
+        <form method="post" action="{% url 'purchasing:pricelist_adjust' pricelist.pk %}" onsubmit="return confirm('Applicare la variazione a TUTTI i {{ totale_voci }} articoli del listino?');">
           {% csrf_token %}
           {% include "partials/form_fields.html" with form=adjust_form %}
           <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat"></i> Applica a tutti gli articoli</button>

@@ -11,6 +11,7 @@ urlpatterns = [
     path("listini/<int:pk>/", views.PriceListDetailView.as_view(), name="pricelist_detail"),
     path("listini/<int:pk>/modifica/", views.PriceListUpdateView.as_view(), name="pricelist_update"),
     path("listini/<int:pk>/variazione/", views.pricelist_adjust, name="pricelist_adjust"),
+    path("listini/<int:pk>/sconto/", views.pricelist_discount, name="pricelist_discount"),
     path("listini/<int:pk>/articolo/nuovo/", views.pricelist_item_create, name="pricelist_item_create"),
     path("listini/articolo/<int:pk>/", views.PriceListItemUpdateView.as_view(), name="pricelist_item_update"),
     path("listini/articolo/<int:pk>/elimina/", views.pricelist_item_delete, name="pricelist_item_delete"),
