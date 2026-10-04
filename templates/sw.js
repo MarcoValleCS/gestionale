@@ -1,5 +1,5 @@
 /* Service worker del gestionale: cache degli asset statici e pagina offline. */
-const CACHE_NAME = "gestionale-v2";
+const CACHE_NAME = "gestionale-v3";
 // Solo la pagina offline: gli asset statici si memorizzano da soli alla prima
 // visita (i loro indirizzi cambiano a ogni versione, quindi non si possono
 // elencare qui).
@@ -30,17 +30,21 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Asset statici: prima la cache, poi la rete
+  // Asset statici: si mostra subito la copia in cache e intanto si scarica
+  // quella aggiornata, così una modifica al file si vede al ricaricamento
+  // successivo (prima la copia vecchia restava per sempre).
   if (url.pathname.startsWith("/static/")) {
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-            return response;
-          })
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(request).then((cached) => {
+          const aggiornata = fetch(request)
+            .then((response) => {
+              if (response && response.ok) cache.put(request, response.clone());
+              return response;
+            })
+            .catch(() => cached);
+          return cached || aggiornata;
+        })
       )
     );
     return;
