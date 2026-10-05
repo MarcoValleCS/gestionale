@@ -256,8 +256,120 @@ def activity_log(request):
     )
 
 
-# ------------------------------------------------------- copia di sicurezza
-def _file_di_backup():
+# ------------------------------------------------------------------- guida
+def _pagine_visibili(utente):
+    """Pagine della guida che questo utente può leggere, in ordine."""
+    from .models import WikiPage
+
+    return [pagina for pagina in WikiPage.objects.all() if pagina.visible_to(utente)]
+
+
+def wiki(request):
+    """Guida del gestionale: elenco delle pagine visibili all'utente."""
+    pagine = _pagine_visibili(request.user)
+    cerca = (request.GET.get("q") or "").strip()
+    if cerca:
+        termine = cerca.lower()
+        pagine = [
+            pagina
+            for pagina in pagine
+            if termine in pagina.title.lower()
+            or termine in pagina.summary.lower()
+            or termine in pagina.area.lower()
+            or termine in pagina.body.lower()
+        ]
+
+    sezioni = {}
+    for pagina in pagine:
+        sezioni.setdefault(pagina.area, []).append(pagina)
+    return render(
+        request,
+        "core/wiki.html",
+        {
+            "page_title": "Guida",
+            "sezioni": sezioni,
+            "cerca": cerca,
+            "totale": len(pagine),
+        },
+    )
+
+
+def wiki_page(request, slug):
+    """Una pagina della guida, con l'elenco della sua sezione."""
+    from django.http import Http404
+
+    from .models import WikiPage
+
+    pagina = WikiPage.objects.filter(slug=slug).first()
+    if pagina is None or not pagina.visible_to(request.user):
+        raise Http404("Pagina della guida non trovata.")
+    sorelle = [altra for altra in WikiPage.objects.filter(area=pagina.area) if altra.visible_to(request.user)]
+    return render(
+        request,
+        "core/wiki_page.html",
+        {
+            "page_title": pagina.title,
+            "pagina": pagina,
+            "sorelle": sorelle,
+        },
+    )
+
+
+@role_required(ROLE_ADMIN)
+def wiki_edit(request, slug):
+    """Modifica di una pagina della guida (solo amministratori)."""
+    from .forms import WikiPageForm
+    from .models import WikiPage
+
+    pagina = get_object_or_404(WikiPage, slug=slug)
+    if request.method == "POST":
+        form = WikiPageForm(request.POST, instance=pagina)
+        if form.is_valid():
+            pagina = form.save(commit=False)
+            pagina.updated_by = request.user
+            pagina.save()
+            messages.success(request, f"Pagina «{pagina.title}» aggiornata.")
+            return redirect("core:wiki_page", slug=pagina.slug)
+        messages.error(request, "Controlla i campi segnalati.")
+    else:
+        form = WikiPageForm(instance=pagina)
+    return render(
+        request,
+        "core/wiki_form.html",
+        {"page_title": f"Modifica: {pagina.title}", "form": form, "pagina": pagina, "aree": _aree_guida()},
+    )
+
+
+@role_required(ROLE_ADMIN)
+def wiki_create(request):
+    """Nuova pagina della guida (solo amministratori)."""
+    from .forms import WikiPageForm
+
+    if request.method == "POST":
+        form = WikiPageForm(request.POST)
+        if form.is_valid():
+            pagina = form.save(commit=False)
+            pagina.updated_by = request.user
+            pagina.save()
+            messages.success(request, f"Pagina «{pagina.title}» creata.")
+            return redirect("core:wiki_page", slug=pagina.slug)
+        messages.error(request, "Controlla i campi segnalati.")
+    else:
+        form = WikiPageForm(initial={"order": 100, "is_published": True})
+    return render(
+        request,
+        "core/wiki_form.html",
+        {"page_title": "Nuova pagina della guida", "form": form, "pagina": None, "aree": _aree_guida()},
+    )
+
+
+def _aree_guida():
+    from .models import WikiPage
+
+    return sorted({area for area in WikiPage.objects.values_list("area", flat=True).distinct() if area})
+
+
+# ------------------------------------------------------- copia di sicurezzadef _file_di_backup():
     """Elenco dei backup presenti (i più recenti per primi)."""
     from django.conf import settings as dj_settings
 

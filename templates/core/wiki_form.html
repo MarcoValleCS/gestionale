@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+{% if pagina %}
+{% url 'core:wiki_page' pagina.slug as url_pagina %}
+{% include "partials/back_link.html" with url=url_pagina label=pagina.title %}
+{% else %}
+{% url 'core:wiki' as url_guida %}
+{% include "partials/back_link.html" with url=url_guida label="Tutta la guida" %}
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">Contenuto della pagina</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.title %}
+          {% include "partials/field.html" with field=form.summary %}
+          {% include "partials/editor_guida.html" with field=form.body %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">Dove e per chi</div>
+        <div class="card-body">
+          {% include "partials/field.html" with field=form.area %}
+          <datalist id="aree-guida">
+            {% for area in aree %}<option value="{{ area }}"></option>{% endfor %}
+            <option value="Generale"></option>
+            <option value="Anagrafiche"></option>
+            <option value="Vendite"></option>
+            <option value="Acquisti"></option>
+            <option value="Magazzino"></option>
+            <option value="Cantieri"></option>
+            <option value="Personale"></option>
+            <option value="Comunicazione"></option>
+            <option value="Numeri"></option>
+            <option value="Impostazioni"></option>
+            <option value="Collaboratori"></option>
+          </datalist>
+          {% include "partials/field.html" with field=form.roles %}
+          {% include "partials/field.html" with field=form.order %}
+          <div class="form-check mt-2">
+            {{ form.is_published }}
+            <label class="form-check-label" for="{{ form.is_published.id_for_label }}">{{ form.is_published.label }}</label>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva pagina</button>
+        <a class="btn btn-outline-secondary" href="{% if pagina %}{% url 'core:wiki_page' pagina.slug %}{% else %}{% url 'core:wiki' %}{% endif %}">Annulla</a>
+      </div>
+      <p class="text-muted small mt-3 mb-0">
+        Il testo accetta titoli, elenchi, grassetto e link. Tutto il resto viene rimosso al salvataggio.
+      </p>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/rich_notes.js' %}"></script>
+{% endblock %}

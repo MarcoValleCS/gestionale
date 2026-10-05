@@ -22,6 +22,11 @@ urlpatterns = [
     path("impostazioni/attivita/", views.activity_log, name="activity_log"),
     path("impostazioni/backup/", views.backup, name="backup"),
     path("impostazioni/backup/<str:nome>/", views.backup_download, name="backup_download"),
+    # Guida (wiki) del gestionale
+    path("guida/", views.wiki, name="wiki"),
+    path("guida/nuova/", views.wiki_create, name="wiki_create"),
+    path("guida/<slug:slug>/", views.wiki_page, name="wiki_page"),
+    path("guida/<slug:slug>/modifica/", views.wiki_edit, name="wiki_edit"),
     path("impostazioni/iva/", views.VatRateListView.as_view(), name="vat_list"),
     path("impostazioni/iva/nuova/", views.VatRateCreateView.as_view(), name="vat_create"),
     path("impostazioni/iva/<int:pk>/", views.VatRateUpdateView.as_view(), name="vat_update"),

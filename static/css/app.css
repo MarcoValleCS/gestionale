@@ -619,6 +619,99 @@ a:hover {
   font-size: 0.8rem;
 }
 
+/* --------------------------------------------------------------- guida */
+.guida-testo {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.guida-testo h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 1.4rem 0 0.6rem;
+}
+
+.guida-testo h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.2rem 0 0.5rem;
+}
+
+.guida-testo h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+}
+
+.guida-testo p {
+  margin-bottom: 0.7rem;
+}
+
+.guida-testo ul,
+.guida-testo ol {
+  margin-bottom: 0.8rem;
+  padding-left: 1.35rem;
+}
+
+.guida-testo li {
+  margin-bottom: 0.25rem;
+}
+
+.guida-testo a {
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.guida-testo a:hover {
+  text-decoration: underline;
+}
+
+.guida-testo code {
+  background: #f2f5fb;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+.guida-testo blockquote {
+  border-left: 3px solid #dbe2ee;
+  padding-left: 0.9rem;
+  color: #5a6474;
+  margin: 0.8rem 0;
+}
+
+.guida-testo table {
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.guida-testo th,
+.guida-testo td {
+  border-bottom: 1px solid #eef0f4;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.guida-testo th {
+  background: #f8fafd;
+  font-weight: 600;
+}
+
+.rich-content.guida-testo {
+  min-height: 320px;
+}
+
+.guida-testo .guida-avviso {
+  background: #fff8e6;
+  border: 1px solid #f3e2b8;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.8rem 0;
+}
+
 /* ---------------------------------------------------------------- login */
 .login-page {
   min-height: 100vh;

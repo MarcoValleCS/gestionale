@@ -76,6 +76,14 @@ def richtext(value):
 
 
 @register.filter
+def guida(value):
+    """Rende il contenuto di una pagina della guida (titoli, elenchi, link)."""
+    from ..richtext import clean_guida
+
+    return mark_safe(clean_guida(value))
+
+
+@register.filter
 def net_price(value):
     """Prezzo unitario per i documenti che vanno al cliente.
 

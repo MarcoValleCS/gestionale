@@ -13,7 +13,7 @@ from django.shortcuts import redirect
 from .permissions import COLLABORATOR_AREA_PREFIX, RESTRICTED_ROLES, ROLE_COLLABORATOR
 
 # Pagine sempre raggiungibili: accesso, uscita, cambio password, file statici
-ALWAYS_ALLOWED_PREFIXES = ("/accounts/", "/static/", "/media/")
+ALWAYS_ALLOWED_PREFIXES = ("/accounts/", "/static/", "/media/", "/guida/")
 ALWAYS_ALLOWED_EXACT = ("/manifest.webmanifest", "/sw.js", "/offline/")
 
 

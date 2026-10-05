@@ -175,6 +175,36 @@ class CompanySettingsForm(BaseBootstrapModelForm):
         self.fields["quote_footer"].widget.attrs["rows"] = 4
 
 
+class WikiPageForm(BaseBootstrapModelForm):
+    """Modifica di una pagina della guida."""
+
+    class Meta:
+        from .models import WikiPage as _WikiPage
+
+        model = _WikiPage
+        fields = ["title", "area", "summary", "body", "roles", "order", "is_published"]
+        labels = {
+            "title": "Titolo",
+            "area": "Sezione",
+            "summary": "Sommario (una riga)",
+            "body": "Contenuto",
+            "roles": "Ruoli che possono leggerla",
+            "order": "Ordine nella sezione",
+            "is_published": "Pubblicata",
+        }
+        help_texts = {
+            "area": "Le pagine con la stessa sezione stanno insieme (es. Vendite, Magazzino, Impostazioni).",
+            "roles": "Vuoto = tutti. Altrimenti: Vendite, Acquisti, Magazzino, Personale, Collaboratore, Amministratore.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["body"].widget.attrs["rows"] = 16
+        self.fields["summary"].widget.attrs["placeholder"] = "Es. Come preparare e inviare un preventivo al cliente."
+        self.fields["area"].widget.attrs["list"] = "aree-guida"
+        self.fields["roles"].widget.attrs["placeholder"] = "Es. Vendite, Amministratore"
+
+
 class AttachmentForm(BaseBootstrapModelForm):
     class Meta:
         model = Attachment

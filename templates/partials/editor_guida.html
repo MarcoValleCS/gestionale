@@ -1,0 +1,38 @@
+{% load core_extras %}
+{% comment %} Editor del contenuto della guida: titoli, elenchi, grassetto e link.
+   Il valore viaggia in una textarea nascosta, sincronizzata all'invio.
+   Il contenuto passa dal filtro «guida», che lo ripulisce.{% endcomment %}
+<div class="mb-3 rich-editor">
+  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+  <div class="rich-toolbar" role="toolbar" aria-label="Formattazione della guida">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="formatBlock" data-value="h3" title="Titolo">
+      <i class="bi bi-type-h3"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="formatBlock" data-value="p" title="Testo normale">
+      <i class="bi bi-paragraph"></i>
+    </button>
+    <span class="rich-sep"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="bold" title="Grassetto (Ctrl+B)">
+      <i class="bi bi-type-bold"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="italic" title="Corsivo (Ctrl+I)">
+      <i class="bi bi-type-italic"></i>
+    </button>
+    <span class="rich-sep"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="insertUnorderedList" title="Elenco puntato">
+      <i class="bi bi-list-ul"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="insertOrderedList" title="Elenco numerato">
+      <i class="bi bi-list-ol"></i>
+    </button>
+    <span class="rich-sep"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-rich="removeFormat" title="Togli la formattazione">
+      <i class="bi bi-eraser"></i>
+    </button>
+  </div>
+  <div class="rich-content guida-testo" contenteditable="true" role="textbox" aria-multiline="true"
+       data-placeholder="Scrivi qui le istruzioni: usa «Titolo» per i paragrafi e l'elenco numerato per i passaggi.">{{ field.value|guida }}</div>
+  <div class="rich-hidden d-none" hidden style="display: none;">{{ field }}</div>
+  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+</div>

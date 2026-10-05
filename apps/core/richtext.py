@@ -48,6 +48,35 @@ def is_formatted(value):
     return any(f"<{tag}" in value for tag in ("b", "i", "u", "strong", "em", "span", "div", "p"))
 
 
+# ------------------------------------------------------------------- guida
+# La guida del gestionale è scritta da chi amministra il programma: servono
+# titoli, elenchi, link e tabelle, ma non script né immagini esterne.
+
+GUIDA_TAGS = {
+    "h2", "h3", "h4", "p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li",
+    "a", "code", "pre", "blockquote", "div", "span", "small", "hr",
+    "table", "thead", "tbody", "tr", "th", "td", "caption",
+}
+
+GUIDA_ATTRIBUTES = {"a": {"href", "title", "target"}, "*": {"class"}}
+
+GUIDA_URL_SCHEMES = {"http", "https", "mailto"}
+
+
+def clean_guida(value):
+    """Ripulisce l'HTML di una pagina della guida."""
+    if not value:
+        return ""
+    return nh3.clean(
+        value,
+        tags=GUIDA_TAGS,
+        attributes=GUIDA_ATTRIBUTES,
+        url_schemes=GUIDA_URL_SCHEMES,
+        strip_comments=True,
+        link_rel="noopener noreferrer",
+    )
+
+
 # ------------------------------------------------------------------ email
 # Le email vere sono fatte di tabelle, immagini e stili: la lista bianca delle
 # note (solo grassetto e corsivo) le ridurrebbe a testo piatto. Qui si tiene

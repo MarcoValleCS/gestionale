@@ -568,6 +568,80 @@ class InboundEmail(TimeStampedModel):
             self.save(update_fields=["read_at", "updated_at"])
         return self.read_at
 
+
+# ------------------------------------------------------------------- guida
+class WikiPage(TimeStampedModel):
+    """Pagina della guida: come si usa una funzione del gestionale.
+
+    Ogni pagina è visibile solo ai ruoli indicati (vuoto = tutti), così ognuno
+    trova le istruzioni delle funzioni che può davvero usare.
+    """
+
+    slug = models.SlugField("Indirizzo", max_length=90, unique=True, blank=True)
+    title = models.CharField("Titolo", max_length=160)
+    area = models.CharField("Sezione", max_length=60, default="Generale")
+    summary = models.CharField("Sommario", max_length=250, blank=True)
+    body = models.TextField("Contenuto", help_text="Testo della guida (titoli, elenchi, link).")
+    roles = models.CharField(
+        "Ruoli che possono leggerla",
+        max_length=250,
+        blank=True,
+        help_text="Vuoto = tutti. Altrimenti i nomi dei ruoli separati da virgola (es. Vendite, Amministratore).",
+    )
+    order = models.PositiveSmallIntegerField("Ordine", default=100)
+    is_published = models.BooleanField("Pubblicata", default=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="wiki_pages",
+        verbose_name="Modificata da",
+    )
+
+    class Meta:
+        verbose_name = "Pagina della guida"
+        verbose_name_plural = "Guida"
+        ordering = ["area", "order", "title"]
+        indexes = [models.Index(fields=["is_published", "area", "order"], name="wiki_visibile_idx")]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def elenco_ruoli(self):
+        return [ruolo.strip() for ruolo in self.roles.split(",") if ruolo.strip()]
+
+    def visible_to(self, utente):
+        """True se questo utente può leggere la pagina."""
+        if not utente or not getattr(utente, "is_authenticated", False):
+            return False
+        if not self.is_published:
+            return False
+        if utente.is_superuser:
+            return True
+        richiesti = self.elenco_ruoli
+        if not richiesti:
+            return True
+        return utente.groups.filter(name__in=richiesti).exists()
+
+    def save(self, *args, **kwargs):
+        from django.utils.text import slugify
+
+        from .richtext import clean_guida
+
+        self.body = clean_guida(self.body)
+        if not self.slug:
+            base = slugify(self.title)[:80] or "pagina"
+            slug = base
+            numero = 2
+            while WikiPage.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{numero}"
+                numero += 1
+            self.slug = slug
+        return super().save(*args, **kwargs)
+
+
 # ------------------------------------------------- menu condivisi in cache
 # I menu di unità di misura e aliquote IVA sono uguali in tutte le righe di un
 # documento: si tengono in cache (vedi ``menu_unita`` e ``menu_aliquote``) e si

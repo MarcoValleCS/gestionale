@@ -37,7 +37,8 @@
     editor.querySelectorAll("[data-rich]").forEach(function (bottone) {
       bottone.addEventListener("click", function (evento) {
         evento.preventDefault();
-        esegui(area, bottone.dataset.rich);
+        /* data-value serve ai comandi che vogliono un valore (es. formatBlock h3) */
+        esegui(area, bottone.dataset.rich, bottone.dataset.value);
         sincronizza(editor);
       });
     });

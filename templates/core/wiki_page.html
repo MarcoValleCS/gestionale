@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ pagina.title }}{% endblock %}
+
+{% block content %}
+{% url 'core:wiki' as url_guida %}
+{% include "partials/back_link.html" with url=url_guida label="Tutta la guida" %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+          <div>
+            <div class="text-muted small text-uppercase">{{ pagina.area }}</div>
+            <h1 class="h4 mt-1 mb-1">{{ pagina.title }}</h1>
+            {% if pagina.summary %}<p class="text-muted mb-0">{{ pagina.summary }}</p>{% endif %}
+          </div>
+          {% if request.user.is_superuser %}
+          <div class="d-flex gap-2 no-print">
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:wiki_edit' pagina.slug %}">
+              <i class="bi bi-pencil"></i> Modifica
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:wiki_create' %}">
+              <i class="bi bi-plus-lg"></i> Nuova
+            </a>
+          </div>
+          {% endif %}
+        </div>
+        <hr>
+        <div class="guida-testo">{{ pagina.body|guida }}</div>
+      </div>
+      {% if pagina.updated_at %}
+      <div class="card-footer text-muted small">
+        Ultima modifica: {{ pagina.updated_at|date:"d/m/Y H:i" }}{% if pagina.updated_by %} da {{ pagina.updated_by }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card position-sticky" style="top: 80px">
+      <div class="card-header"><i class="bi bi-list-ul me-1"></i> {{ pagina.area }}</div>
+      <div class="list-group list-group-flush">
+        {% for altra in sorelle %}
+        <a class="list-group-item list-group-item-action {% if altra.pk == pagina.pk %}active{% endif %}"
+           href="{% url 'core:wiki_page' altra.slug %}">
+          {{ altra.title }}
+        </a>
+        {% endfor %}
+      </div>
+      <div class="card-body">
+        <a class="btn btn-outline-primary btn-sm w-100" href="{% url 'core:wiki' %}">
+          <i class="bi bi-search"></i> Cerca nella guida
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Guida{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1"><i class="bi bi-book me-2"></i>Guida del gestionale</h2>
+    <p class="text-muted small mb-0">
+      Le istruzioni delle funzioni che puoi usare con il tuo profilo.
+      {% if totale %}{{ totale }} pagine.{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:home' %}"><i class="bi bi-arrow-left"></i> Dashboard</a>
+    {% if request.user.is_superuser %}
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'core:wiki_create' %}"><i class="bi bi-plus-lg"></i> Nuova pagina</a>
+    {% endif %}
+  </div>
+</div>
+
+<form method="get" class="mb-4">
+  <div class="input-group">
+    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+    <input type="search" class="form-control" name="q" value="{{ cerca }}"
+           placeholder="Cerca nella guida (es. preventivo, sconto, magazzino, backup…)" aria-label="Cerca nella guida">
+    <button class="btn btn-primary" type="submit">Cerca</button>
+    {% if cerca %}
+    <a class="btn btn-outline-secondary" href="{% url 'core:wiki' %}">Azzera</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if cerca and not sezioni %}
+<div class="alert alert-warning">
+  <i class="bi bi-info-circle me-1"></i> Nessuna pagina trovata per «{{ cerca }}».
+  {% if request.user.is_superuser %}Puoi <a href="{% url 'core:wiki_create' %}">creare una pagina</a>.{% endif %}
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for area, pagine in sezioni.items %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>{{ area }}</span>
+        <span class="badge text-bg-light border">{{ pagine|length }}</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for pagina in pagine %}
+        <a class="list-group-item list-group-item-action py-3" href="{% url 'core:wiki_page' pagina.slug %}">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <strong>{{ pagina.title }}</strong>
+            <i class="bi bi-chevron-right text-muted small mt-1"></i>
+          </div>
+          {% if pagina.summary %}<div class="text-muted small mt-1">{{ pagina.summary }}</div>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if not sezioni and not cerca %}
+<div class="alert alert-info">
+  La guida è vuota: le pagine si creano da qui.
+  {% if request.user.is_superuser %}<a href="{% url 'core:wiki_create' %}">Crea la prima pagina</a>.{% endif %}
+</div>
+{% endif %}
+{% endblock %}
