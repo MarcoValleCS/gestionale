@@ -618,8 +618,10 @@ l'eventuale utente collegato per l'accesso al gestionale.</p>
 o bolle di acquisto</strong>. Le foto vengono ridimensionate automaticamente.</p>
 
 <h3>Resoconto per la fatturazione</h3>
-<p>Il resoconto ore per collaboratore e periodo serve a controllare le fatture
-che arrivano: si esporta in Excel e si confronta con il documento ricevuto.</p>
+<p>La pagina <strong>Ore dei collaboratori</strong> raccoglie tutte le ore
+registrate, con i filtri per collaboratore, cantiere e mese e il totale del
+periodo: serve a controllare le fatture che arrivano, confrontandole con le ore
+effettivamente lavorate.</p>
 """,
     },
     {
@@ -640,7 +642,8 @@ cliente, fornitore e cantiere. Il periodo si cambia dal menu in alto.</p>
 consegnati, raggruppate per agente e per mese. Ogni ordine può avere un agente e
 una percentuale di provvigione: si impostano nella scheda dell'ordine o del
 preventivo.</p>
-<p>Il resoconto mensile si può esportare per il pagamento.</p>
+<p>Il mese si cambia dal menu in alto, e si può scegliere se considerare tutti
+gli ordini, solo quelli consegnati o quelli in lavorazione.</p>
 
 <div class="guida-avviso">I numeri delle statistiche si basano sugli <strong>ordini
 consegnati</strong>: se un ordine non è segnato come consegnato, non entra nel
