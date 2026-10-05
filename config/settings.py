@@ -26,6 +26,11 @@ def env_bool(name, default=False):
 SECRET_KEY = env("DJANGO_SECRET_KEY", "chiave-di-sviluppo-non-utilizzare-in-produzione")
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+# Gli healthcheck interni di Docker chiamano http://127.0.0.1:8000: si aggiungono
+# sempre localhost e 127.0.0.1 (in coda), senza togliere i domini pubblici.
+for _host_interno in ("localhost", "127.0.0.1"):
+    if _host_interno not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host_interno)
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 
 if env_bool("DJANGO_HTTPS", False):
