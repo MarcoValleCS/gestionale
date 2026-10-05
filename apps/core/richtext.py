@@ -133,6 +133,10 @@ def clean_email_html(value, mappa_allegati=None):
         if attributo in ("src", "href") and valore.lower().startswith("cid:"):
             chiave = valore[4:].strip().strip("<>").lower()
             return mappa.get(chiave)  # None = attributo rimosso
+        # I link «data:» possono contenere HTML/script: si lascia il «data:» solo
+        # per le immagini incorporate (img src), non per i collegamenti.
+        if attributo in ("src", "href") and valore.lower().startswith("data:") and not (tag == "img" and attributo == "src"):
+            return None
         return valore
 
     return nh3.clean(

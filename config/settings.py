@@ -35,6 +35,9 @@ if env_bool("DJANGO_HTTPS", False):
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = False
+    # Difesa in profondità: Caddy redirige già HTTP→HTTPS, ma così lo fa anche
+    # Django se una richiesta arrivasse in chiaro (es. da un altro proxy).
+    SECURE_SSL_REDIRECT = True
 
 # ------------------------------------------------------- Difese aggiuntive
 X_FRAME_OPTIONS = "DENY"
@@ -231,7 +234,7 @@ AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]

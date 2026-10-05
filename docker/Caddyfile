@@ -1,5 +1,5 @@
 {$DOMAIN} {
-	encode gzip
+	encode zstd gzip
 
 	# Header di sicurezza
 	header {
@@ -9,6 +9,9 @@
 		X-Frame-Options "DENY"
 		Referrer-Policy "same-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Tutto è servito dal gestionale (niente CDN esterni). 'unsafe-inline' serve
+		# per il tema (stili) e per i piccoli script inline già presenti nelle pagine.
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; media-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self'"
 	}
 
 	# Limite dimensione richieste (protegge da upload abnormi)

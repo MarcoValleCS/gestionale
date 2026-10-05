@@ -37,7 +37,7 @@ class UserForm(BootstrapFormMixin, forms.ModelForm):
 
 
 class UserCreateForm(UserForm):
-    password1 = forms.CharField(label="Password", widget=forms.PasswordInput, min_length=8)
+    password1 = forms.CharField(label="Password", widget=forms.PasswordInput, min_length=10)
     password2 = forms.CharField(label="Conferma password", widget=forms.PasswordInput)
 
     def clean(self):
@@ -60,7 +60,7 @@ class UserUpdateForm(UserForm):
         label="Nuova password",
         widget=forms.PasswordInput,
         required=False,
-        min_length=8,
+        min_length=10,
         help_text="Compilare solo per cambiare la password.",
     )
 

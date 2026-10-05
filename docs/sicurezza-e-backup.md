@@ -63,6 +63,8 @@ Sono avvisi brevi: se ne arriva uno, c'è qualcosa da guardare sul server.
   ricerca).
 - **Collegamento cifrato**: HTTPS obbligatorio, cookie di sessione solo su
   HTTPS, HSTS attivo.
+- **Content-Security-Policy**: le pagine caricano solo risorse del gestionale
+  (niente CDN esterni) e nessun oggetto incorporato da altri siti.
 
 ## Prestazioni
 
@@ -88,10 +90,11 @@ Sono avvisi brevi: se ne arriva uno, c'è qualcosa da guardare sul server.
 
 ## Cose da valutare (non ancora fatte)
 
-1. **Accesso SSH con chiave**: sul server l'accesso con password è ancora
-   permesso (protegto da fail2ban). Si può disattivare
-   (`PasswordAuthentication no`) quando si è sicuri di avere la chiave su tutti
-   i computer da cui ci si collega.
+1. **Accesso SSH con chiave**: sul server esiste già una chiave funzionante, ma
+   l'accesso con password e il login di `root` sono ancora permessi (protetti da
+   fail2ban). Conviene disattivarli (`PasswordAuthentication no`,
+   `PermitRootLogin prohibit-password`) dopo aver verificato di poter entrare
+   con la chiave.
 2. **Copia su un secondo posto**: oltre all'email, si può aggiungere una copia
    su spazio cloud (Backblaze/S3/Drive) con `rclone` o su un secondo server.
 3. **Ambiente di prova**: una seconda installazione (anche su questo PC) per

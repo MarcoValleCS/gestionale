@@ -23,11 +23,19 @@ if [ "$answer" != "SI" ]; then
   exit 0
 fi
 
-echo "→ Svuoto lo schema corrente…"
-docker compose exec -T db psql -U "$DB_USER" -d "$DB_NAME" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+# Prima di sovrascrivere si salva lo stato attuale: se il file di ripristino è
+# sbagliato (o corrotto), si può tornare indietro.
+SALVATAGGIO="$(dirname "$FILE")/pre-restore_$(date +%F_%H%M).sql.gz"
+echo "→ Copia di sicurezza dello stato attuale in $SALVATAGGIO"
+docker compose exec -T db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$SALVATAGGIO"
 
+echo "→ Svuoto lo schema corrente…"
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+# ON_ERROR_STOP=1 fa fallire subito il ripristino al primo errore;
+# --single-transaction lo rende atomico (o tutto, o niente).
 echo "→ Ripristino i dati…"
-gunzip -c "$FILE" | docker compose exec -T db psql -U "$DB_USER" -d "$DB_NAME"
+gunzip -c "$FILE" | docker compose exec -T db psql -v ON_ERROR_STOP=1 --single-transaction -U "$DB_USER" -d "$DB_NAME"
 
 echo "→ Riavvio l'applicazione…"
 docker compose restart web

@@ -12,8 +12,15 @@ test_db.sqlite3-journal
 test_db.sqlite3-wal
 test_db.sqlite3-shm
 .env
+.env.*
+!.env.example
 staticfiles/
 media/
+backups/
+
+# ----------------------------------------------- file generati / personali
+_build_*.py
+*.docx
 
 # ------------------------------------------------------------------- editor
 .idea/

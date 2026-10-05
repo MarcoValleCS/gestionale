@@ -37,6 +37,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    # Se un processo viene compromesso non può guadagnare privilegi aggiuntivi.
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     logging: *default-logging
 
   web:
@@ -59,6 +63,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Attende che Gunicorn abbia finito le richieste in corso (graceful-timeout 30s).
+    stop_grace_period: 40s
+    # Se un processo viene compromesso non può guadagnare privilegi aggiuntivi.
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    healthcheck:
+      # L'app risponde? Si accettano 200 e i redirect (login, Django admin).
+      # Niente curl nell'immagine: si usa il Python già presente.
+      test: ["CMD", "python", "-c", "import http.client as h; c=h.HTTPConnection('127.0.0.1',8000,timeout=5); c.request('GET','/accounts/login/'); r=c.getresponse(); exit(0 if r.status in (200,301,302) else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     logging: *default-logging
 
   caddy:
@@ -71,11 +89,15 @@ services:
       DOMAIN: ${DOMAIN:-localhost}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
-      - media:/srv/media:ro
       - caddy_data:/data
       - caddy_config:/config
+    # Parte solo quando l'app è pronta: meno errori 502 all'avvio e agli aggiornamenti.
     depends_on:
-      - web
+      web:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
     logging: *default-logging
 
 volumes:

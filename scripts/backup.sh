@@ -43,6 +43,14 @@ trap esito EXIT
 echo "→ Backup del database in $BACKUP_DIR/db_$STAMP.sql.gz"
 docker compose exec -T db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_DIR/db_$STAMP.sql.gz"
 
+# Un backup illeggibile è peggio di nessun backup: dà una falsa sicurezza.
+# Si controlla subito che l'archivio appena creato non sia corrotto.
+if ! gzip -t "$BACKUP_DIR/db_$STAMP.sql.gz"; then
+    echo "Il file di backup del database è corrotto."
+    avvisa "Il backup del database di stanotte è CORROTTO (controllo gzip fallito). Controlla il server." "Backup non valido"
+    exit 1
+fi
+
 echo "→ Backup dei file caricati in $BACKUP_DIR/media_$STAMP.tar.gz"
 docker compose exec -T web mkdir -p /app/media
 docker compose exec -T web tar czf - -C /app media > "$BACKUP_DIR/media_$STAMP.tar.gz"

@@ -108,8 +108,9 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   (o il pulsante «+»): viene creato al volo, con anche il **codice fiscale**, e inserito
   subito nel documento.
 
-Non sono ancora inclusi: fatturazione elettronica (SDI), DDT, fatture di vendita/acquisto.
-Sono i candidati naturali per le prossime fasi.
+Sono inclusi anche la **fatturazione elettronica (SDI)**, i **DDT** e le **fatture di
+vendita/acquisto**: trovi le sezioni dedicate più avanti. Le prossime tappe suggerite sono in
+fondo al documento.
 
 ## Fatturato e marginalità
 
@@ -371,7 +372,8 @@ git pull && docker compose up -d --build
   IP e 120 ricerche al minuto; oltre la soglia risponde 429. I contatori sono condivisi tra i
   processi grazie alla cache su file.
 - **Header di sicurezza** (Django + Caddy): `X-Frame-Options: DENY`, `X-Content-Type-Options`,
-  `Referrer-Policy`, `Permissions-Policy`, HSTS quando HTTPS è attivo, header `Server` rimosso.
+  `Referrer-Policy`, `Permissions-Policy`, `Content-Security-Policy`, HSTS quando HTTPS è
+  attivo, header `Server` rimosso.
 - **HTTPS automatico** con Caddy (certificato Let's Encrypt) quando c'è un dominio.
 - **Limiti di caricamento**: 25 MB per richiesta in Caddy, 10 MB in Django (import Excel).
 - **Cookie** di sessione e CSRF `Secure` con HTTPS, `SameSite=Lax`, `HttpOnly`.
@@ -449,7 +451,6 @@ static/js/autocomplete.js   ricerca a digitazione
 static/js/quote_template.js caricamento dei modelli di preventivo
 scripts/                backup e ripristino per il VPS
 docker/                 entrypoint e configurazione Caddy
-CONSIGLI-ARREDO-BAGNO-PISCINE.md   idee e roadmap per il tuo settore
 ```
 
 ## Test
@@ -469,9 +470,9 @@ worker), le protezioni anti-abuso e i permessi dei ruoli.
 
 ## Prossime tappe suggerite
 
-1. **Fatturazione elettronica SDI** (i campi P.IVA/SDI/PEC e i codici natura IVA sono già
-   predisposti).
-2. DDT / documento di trasporto e fatture di vendita.
-3. Export Excel delle liste e reportistica avanzata (fatturato per cliente, stagionalità).
-4. Invio email di preventivi e ordini direttamente dal gestionale.
-5. Backup automatici pianificati sul VPS.
+1. **Conservazione sostitutiva a norma** dell'XML FatturaPA (tramite conservatore AgID o
+   commercialista): il gestionale genera e trasmette il file, non lo conserva a valore legale.
+2. **Copia di sicurezza fuori dal server**: attivare `BACKUP_EMAIL` nel `.env` oppure una copia
+   con `rclone` verso uno spazio cloud; provare periodicamente un ripristino.
+3. **Autenticazione a due fattori** per gli amministratori (es. `django-otp`).
+4. **Export Excel delle liste** e reportistica avanzata (fatturato per cliente, stagionalità).

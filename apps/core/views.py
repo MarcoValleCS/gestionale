@@ -369,7 +369,10 @@ def _aree_guida():
     return sorted({area for area in WikiPage.objects.values_list("area", flat=True).distinct() if area})
 
 
-# ------------------------------------------------------- copia di sicurezzadef _file_di_backup():
+# ------------------------------------------------------- copia di sicurezza
+
+
+def _file_di_backup():
     """Elenco dei backup presenti (i più recenti per primi)."""
     from django.conf import settings as dj_settings
 

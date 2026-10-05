@@ -242,3 +242,14 @@ class RenderingHtmlEmailTest(TestCase):
         self.assertNotIn("iframe", pulito.lower())
         self.assertNotIn("onclick", pulito.lower())
         self.assertNotIn("javascript:", pulito.lower())
+
+    def test_i_link_data_non_sono_ammessi(self):
+        from apps.core.richtext import clean_email_html
+
+        sporco = (
+            "<a href=\"data:text/html,<script>alert(1)</script>\">apri</a>"
+            "<img src=\"data:image/png;base64,AAAA\" alt=\"logo\">"
+        )
+        pulito = clean_email_html(sporco)
+        self.assertNotIn("data:text/html", pulito, "i link «data:» possono contenere script")
+        self.assertIn("data:image/png", pulito, "le immagini incorporate restano visibili")
