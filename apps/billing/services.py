@@ -346,7 +346,6 @@ def create_job_invoice(job, kind, *, percent=None, amount=None, user=None):
             customer=job.customer,
             job=job,
             kind=kind,
-            source_order=ordine,
             sal_number=sal_number,
             sal_percent=percentuale if kind in {SalesInvoice.KIND_ADVANCE, SalesInvoice.KIND_SAL} else None,
             contract_amount=contract,
@@ -364,6 +363,124 @@ def create_job_invoice(job, kind, *, percent=None, amount=None, user=None):
         )
         invoice.recalculate()
     return invoice
+
+
+# ------------------------------------------- acconti e resto su un ordine
+def order_billing_summary(order):
+    """Fatturazione dell'ordine: totale, acconti, fatturato e resto da fatturare."""
+    documenti = list(
+        SalesInvoice.objects.filter(source_order=order).exclude(status=SalesInvoice.STATUS_CANCELLED).order_by("-date", "-pk")
+    )
+    per_tipo = {chiave: Decimal("0") for chiave, _ in SalesInvoice.KIND_CHOICES}
+    committed = Decimal("0")
+    for documento in documenti:
+        committed += Decimal(documento.subtotal or 0)
+        if documento.status in INVOICED_STATUSES:
+            per_tipo[documento.kind] += Decimal(documento.subtotal or 0)
+    totale = Decimal(order.subtotal or 0)
+    return {
+        "total": totale,
+        "advances": per_tipo[SalesInvoice.KIND_ADVANCE],
+        "invoiced": sum(per_tipo.values(), Decimal("0")),
+        "committed": committed,
+        "residual": totale - committed,
+        "documents": documenti,
+        "drafts": sum(1 for d in documenti if d.status == SalesInvoice.STATUS_DRAFT),
+    }
+
+
+def _order_lines_scaled(order, ratio):
+    """Righe dell'ordine ridotte alla percentuale indicata (quantità)."""
+    from decimal import ROUND_HALF_UP
+
+    payload = []
+    for line in order.lines.select_related("product"):
+        qty = Decimal(line.qty or 0)
+        prezzo = Decimal(line.unit_price or 0)
+        if qty == 0:
+            continue
+        nuova_qty = (qty * ratio).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        nuovo_prezzo = prezzo
+        if nuova_qty <= 0:
+            # quantità troppo piccola per essere ridotta: si riduce il prezzo
+            nuova_qty = Decimal("1")
+            nuovo_prezzo = (prezzo * ratio).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        payload.append(
+            {
+                "position": line.position,
+                "section": line.section,
+                "product": line.product,
+                "description": line.description,
+                "qty": nuova_qty,
+                "uom": line.uom,
+                "unit_price": nuovo_prezzo,
+                "discount_pct": line.discount_pct,
+                "vat_rate": line.vat_rate,
+            }
+        )
+    return payload
+
+
+def _create_order_linked_invoice(order, kind, payload, *, percent=None, user=None):
+    invoice = SalesInvoice.objects.create(
+        customer=order.customer,
+        job=order.job,
+        source_order=order,
+        kind=kind,
+        sal_percent=percent,
+        contract_amount=Decimal(order.subtotal or 0),
+        payment_term=order.payment_term,
+        reference=order.reference,
+        due_date=_due_date(timezone.localdate(), order.payment_term),
+        created_by=user,
+    )
+    for row in payload:
+        SalesInvoiceLine.objects.create(invoice=invoice, **row)
+    invoice.recalculate()
+    return invoice
+
+
+def create_order_advance(order, percent, user=None):
+    """Acconto su un ordine: le righe sono ridotte alla percentuale indicata.
+
+    Esempio: ordine di 3.000 € con acconto al 30% → fattura di 900 € con le
+    quantità di ogni riga ridotte del 30%. Le voci restano quelle dell'ordine.
+    """
+    from apps.core.rounding import round2
+
+    percentuale = Decimal(percent)
+    if percentuale <= 0 or percentuale > 100:
+        raise ValidationError("La percentuale dell'acconto deve essere fra 0 e 100.")
+    summary = order_billing_summary(order)
+    if summary["total"] <= 0:
+        raise ValidationError("L'ordine non ha un imponibile.")
+    importo = round2(summary["total"] * percentuale / 100)
+    if importo > summary["residual"] + Decimal("0.01"):
+        raise ValidationError(
+            f"L'acconto del {percentuale}% ({importo:.2f} €) supera quanto resta da fatturare "
+            f"({summary['residual']:.2f} €)."
+        )
+    payload = _order_lines_scaled(order, percentuale / 100)
+    if not payload:
+        raise ValidationError("L'ordine non ha righe fatturabili.")
+    with transaction.atomic():
+        return _create_order_linked_invoice(order, SalesInvoice.KIND_ADVANCE, payload, percent=percentuale, user=user)
+
+
+def create_order_balance(order, user=None):
+    """Fattura il resto dell'ordine, riducendo le righe in proporzione."""
+    summary = order_billing_summary(order)
+    totale = summary["total"]
+    residuo = summary["residual"]
+    if totale <= 0:
+        raise ValidationError("L'ordine non ha un imponibile.")
+    if residuo <= 0:
+        raise ValidationError("L'ordine risulta già interamente fatturato.")
+    payload = _order_lines_scaled(order, residuo / totale)
+    if not payload:
+        raise ValidationError("L'ordine non ha righe fatturabili.")
+    with transaction.atomic():
+        return _create_order_linked_invoice(order, SalesInvoice.KIND_BALANCE, payload, user=user)
 
 
 # --------------------------------------------------------- fatture ricevute

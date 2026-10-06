@@ -630,6 +630,9 @@ class SalesOrderDetailView(RoleRequiredMixin, DetailView):
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
         context["purchase_orders"] = self.object.purchase_orders.select_related("supplier").order_by("pk")
+        from apps.billing.services import order_billing_summary
+
+        context["billing"] = order_billing_summary(self.object)
         return context
 
 

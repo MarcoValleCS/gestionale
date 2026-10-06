@@ -462,3 +462,50 @@ class SalSdiTest(EmailAndSdiTest):
             "f:FatturaElettronicaBody/f:DatiGenerali/f:DatiGeneraliDocumento/f:Causale", namespaces={"f": sdi.NS}
         )
         self.assertIn("SAL n. 1", causale)
+
+
+class AccontoOrdineTest(BillingTestBase):
+    """Acconto e resto su un ordine normale (non cantiere)."""
+
+    def setUp(self):
+        self.order = self.confirmed_order("300")  # 300 × 10,00 € = 3.000 €
+
+    def test_acconto_riduce_le_voci_del_30_percento(self):
+        fattura = services.create_order_advance(self.order, Decimal("30"), user=self.user)
+        self.assertEqual(fattura.kind, SalesInvoice.KIND_ADVANCE)
+        self.assertEqual(fattura.source_order, self.order)
+        self.assertEqual(fattura.subtotal, Decimal("900.00"))
+        riga = fattura.lines.get()
+        self.assertEqual(riga.qty, Decimal("90.000"), "quantità dell'ordine ridotta del 30%")
+        self.assertEqual(riga.unit_price, Decimal("10.00"))
+
+    def test_fattura_il_resto(self):
+        services.create_order_advance(self.order, Decimal("30"), user=self.user)
+        resto = services.create_order_balance(self.order, user=self.user)
+        self.assertEqual(resto.subtotal, Decimal("2100.00"))
+        self.assertEqual(resto.lines.get().qty, Decimal("210.000"))
+
+        riepilogo = services.order_billing_summary(self.order)
+        self.assertEqual(riepilogo["committed"], Decimal("3000.00"))
+        self.assertEqual(riepilogo["residual"], Decimal("0"))
+
+    def test_acconto_oltre_il_residuo(self):
+        services.create_order_advance(self.order, Decimal("70"), user=self.user)
+        with self.assertRaises(ValidationError):
+            services.create_order_advance(self.order, Decimal("50"), user=self.user)
+
+    def test_vista_acconto_e_resto(self):
+        self.login()
+        risposta = self.client.post(
+            reverse("billing:salesinvoice_from_order", args=[self.order.pk]), {"tipo": "advance", "percento": "30"}
+        )
+        self.assertEqual(risposta.status_code, 302)
+        acconto = SalesInvoice.objects.get(source_order=self.order, kind=SalesInvoice.KIND_ADVANCE)
+        self.assertEqual(acconto.subtotal, Decimal("900.00"))
+
+        risposta = self.client.post(
+            reverse("billing:salesinvoice_from_order", args=[self.order.pk]), {"tipo": "balance"}
+        )
+        self.assertEqual(risposta.status_code, 302)
+        resto = SalesInvoice.objects.get(source_order=self.order, kind=SalesInvoice.KIND_BALANCE)
+        self.assertEqual(resto.subtotal, Decimal("2100.00"))

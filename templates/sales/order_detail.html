@@ -26,11 +26,20 @@
     </form>
     {% endif %}
     {% if roles.is_admin or roles.is_sales %}
+    {% if billing.residual > 0 %}
     <form method="post" action="{% url 'billing:salesinvoice_from_order' order.pk %}">{% csrf_token %}
+      {% if billing.residual < billing.total %}
+      <input type="hidden" name="tipo" value="balance">
+      <button class="btn btn-outline-primary btn-sm" type="submit" title="Fattura il resto dell'ordine (quanto non è ancora stato fatturato)">
+        <i class="bi bi-receipt"></i> Fattura il resto
+      </button>
+      {% else %}
       <button class="btn btn-outline-primary btn-sm" type="submit" title="Crea la fattura in bozza da questo ordine">
         <i class="bi bi-receipt"></i> Crea fattura
       </button>
+      {% endif %}
     </form>
+    {% endif %}
     {% endif %}
     {% if order.is_editable %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:order_update' order.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
@@ -69,6 +78,57 @@
 
 <div class="row g-3">
   <div class="col-lg-8">
+    {% if roles.is_admin or roles.is_sales %}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cash-coin me-1"></i> Fatturazione</span>
+        <span class="small text-muted">Ordine: <b>{{ billing.total|money }} €</b></span>
+      </div>
+      <div class="card-body">
+        <div class="row row-cols-2 row-cols-md-4 g-2 text-center small mb-3">
+          <div class="col"><div class="text-muted">Acconti</div><div class="fw-semibold">{{ billing.advances|money }} €</div></div>
+          <div class="col"><div class="text-muted">Fatturato</div><div class="fw-semibold">{{ billing.invoiced|money }} €</div></div>
+          <div class="col"><div class="text-muted">Da fatturare</div><div class="fw-semibold {% if billing.residual > 0 %}text-danger{% else %}text-success{% endif %}">{{ billing.residual|money }} €</div></div>
+          <div class="col"><div class="text-muted">Bozze</div><div class="fw-semibold">{{ billing.drafts }}</div></div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap no-print">
+          <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#form-acconto-ordine" {% if billing.residual <= 0 %}disabled{% endif %}><i class="bi bi-wallet2"></i> Acconto</button>
+          {% if billing.residual > 0 and billing.residual < billing.total %}
+          <form method="post" action="{% url 'billing:salesinvoice_from_order' order.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="tipo" value="balance">
+            <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-flag"></i> Fattura il resto ({{ billing.residual|money }} €)</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="collapse mt-2" id="form-acconto-ordine">
+          <form method="post" action="{% url 'billing:salesinvoice_from_order' order.pk %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="tipo" value="advance">
+            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="ordine-acconto-percento">Acconto %</label><input class="form-control form-control-sm" id="ordine-acconto-percento" name="percento" inputmode="decimal" placeholder="es. 30" required></div>
+            <div class="col-12 col-md-3"><button class="btn btn-primary btn-sm" type="submit">Crea acconto</button></div>
+          </form>
+        </div>
+      </div>
+      {% if billing.documents %}
+      <div class="table-responsive border-top">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Documento</th><th>Data</th><th class="text-end">Imponibile</th><th class="text-center">Stato</th></tr></thead>
+          <tbody>
+            {% for doc in billing.documents %}
+            <tr>
+              <td><a class="number-badge text-decoration-none" href="{% url 'billing:salesinvoice_detail' doc.pk %}">{{ doc.number }}</a> <span class="badge text-bg-light border">{{ doc.kind_title }}</span></td>
+              <td>{{ doc.date|date:"d/m/Y" }}</td>
+              <td class="text-end">{{ doc.subtotal|money }} €</td>
+              <td class="text-center"><span class="badge text-bg-{{ doc.status|badge_class }}">{{ doc.get_status_display }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
     <div class="card mb-3">
       <div class="card-header">Righe</div>
       <div class="table-responsive">

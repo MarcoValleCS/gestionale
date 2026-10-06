@@ -538,18 +538,30 @@ class SalesInvoicePrintView(RoleRequiredMixin, DetailView):
 
 @role_required(*SALES_INVOICE_ROLES)
 def salesinvoice_create_from_order(request, pk):
+    """Crea una fattura dall'ordine: intera, un acconto (%) oppure il resto."""
     from apps.sales.models import SalesOrder
 
     order = get_object_or_404(SalesOrder, pk=pk)
     if request.method != "POST":
         return redirect("sales:order_detail", pk=order.pk)
-    only_delivered = request.POST.get("solo_consegnate") == "1"
+    tipo = request.POST.get("tipo", "")
     try:
-        invoice = services.create_sales_invoice_from_order(order, user=request.user, only_delivered=only_delivered)
+        if tipo == "advance":
+            percento = _numero_decimale(request.POST.get("percento"))
+            if percento is None:
+                raise ValidationError("Indica la percentuale dell'acconto.")
+            invoice = services.create_order_advance(order, percento, user=request.user)
+        elif tipo == "balance":
+            invoice = services.create_order_balance(order, user=request.user)
+        else:
+            only_delivered = request.POST.get("solo_consegnate") == "1"
+            invoice = services.create_sales_invoice_from_order(order, user=request.user, only_delivered=only_delivered)
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
         return redirect("sales:order_detail", pk=order.pk)
-    messages.success(request, f"Creata la fattura {invoice.number} in bozza dall'ordine {order.number}.")
+    messages.success(request, f"Creata in bozza {invoice.kind_title} ({invoice.number}) dall'ordine {order.number}.")
+    if tipo in {"advance", "balance"}:
+        return redirect("billing:salesinvoice_update", pk=invoice.pk)
     return redirect("billing:salesinvoice_detail", pk=invoice.pk)
 
 
