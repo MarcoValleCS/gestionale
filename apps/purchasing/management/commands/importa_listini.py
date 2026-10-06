@@ -7,15 +7,19 @@ listino, così i prezzi restano modificabili dal gestionale.
 Uso:
     python manage.py importa_listini colavene --file "…\\listino Colavene.xlsx"
     python manage.py importa_listini axa --file "…\\AXA_Listino.xlsx"
+    python manage.py importa_listini axor --file "…\\Listino_AXOR_2027.xlsx" --valido-dal 2027-01-01
+    python manage.py importa_listini axor-finiture --file "…\\Listino_AXOR_Finiture_2027.xlsx" --valido-dal 2027-01-01
     python manage.py importa_listini lacus --file "…\\listino 2026 barcode.xls"
     python manage.py importa_listini duplach --file "…\\Listino Prezzi DUPLACH.xlsx"
     python manage.py importa_listini forma-aquae --file "…\\LISTINO ITALIA.xlsx"
 
 Opzioni utili:
-    --dry-run       mostra cosa verrebbe creato senza scrivere nulla
-    --ricarico 50   imposta il prezzo di vendita = listino + 50%
-    --scorta 2      scorta minima per il riordino automatico (predefinita 1)
-    --solo-nuovi    non aggiorna gli articoli già presenti
+    --dry-run          mostra cosa verrebbe creato senza scrivere nulla
+    --ricarico 50      imposta il prezzo di vendita = listino + 50%
+    --scorta 2         scorta minima per il riordino automatico (predefinita 1)
+    --solo-nuovi       non aggiorna gli articoli già presenti
+    --valido-dal DATA  inizio validità del listino (AAAA-MM-GG, es. 2027-01-01)
+    --valido-al DATA   fine validità del listino (AAAA-MM-GG)
 """
 import re
 from dataclasses import dataclass, field
@@ -247,6 +251,18 @@ def numero(valore):
         return Decimal("0")
 
 
+def data_opzione(testo, nome_opzione):
+    """Converte «AAAA-MM-GG» in data; errore chiaro se il formato è sbagliato."""
+    if not testo:
+        return None
+    from datetime import date
+
+    try:
+        return date.fromisoformat(testo.strip())
+    except ValueError as exc:
+        raise CommandError(f"{nome_opzione}: usa il formato AAAA-MM-GG (esempio 2027-01-01).") from exc
+
+
 # ------------------------------------------------------------------ lettori
 
 
@@ -307,6 +323,97 @@ def leggi_axa(percorso):
             barcode=normalizza_spazi(riga[3]),
             gruppo=normalizza_spazi(riga[0]),
             note=normalizza_spazi(riga[5]),
+        )
+    libro.close()
+
+
+# Categorie AXOR (Hansgrohe): i gruppi del listino sono in inglese, qui si
+# traducono nelle categorie usate dal gestionale.
+GRUPPI_AXOR = {
+    "sanitary taps": "Rubinetteria",
+    "sanitary showers": "Docce",
+    "sanitary accessories/fittings": "Accessori bagno",
+    "drainage and sewage systems": "Scarichi",
+    "inlet and outlet fittings": "Raccordi idraulici",
+    "wastewater reception devices": "Scarichi a pavimento",
+    "sanitary acessibility facilities": "Accessibilità bagno",
+    "sanitary accessibility facilities": "Accessibilità bagno",
+}
+
+
+def categoria_axor(gruppo):
+    """Traduce il gruppo AXOR in una categoria; se sconosciuto lo titola."""
+    nome = normalizza_spazi(gruppo)
+    if not nome:
+        return ""
+    return GRUPPI_AXOR.get(nome.lower(), nome.title())
+
+
+def _voce_axor(codice, descrizione, prezzo, ean, gruppo, classe, prefissa_brand=False):
+    """Costruisce una voce AXOR con nome leggibile e descrizione di gruppo/classe."""
+    nome = normalizza_spazi(descrizione)
+    if prefissa_brand and not nome.upper().startswith("AXOR"):
+        nome = f"AXOR {nome}"
+    dettagli = " – ".join(parte for parte in (normalizza_spazi(gruppo), normalizza_spazi(classe)) if parte)
+    return Voce(
+        codice=codice,
+        nome=nome,
+        prezzo=prezzo,
+        barcode=ean,
+        gruppo=categoria_axor(gruppo),
+        descrizione=dettagli,
+    )
+
+
+def leggi_axor(percorso):
+    """AXOR / Hansgrohe — listino generale 2027: codice, descrizione, EAN, prezzo.
+
+    Le descrizioni non citano la collezione, quindi si antepone «AXOR» per
+    ritrovarle facilmente in ricerca.
+    """
+    import openpyxl
+
+    libro = openpyxl.load_workbook(percorso, read_only=True, data_only=True)
+    foglio = libro.worksheets[0]
+    for riga in foglio.iter_rows(min_row=6, values_only=True):
+        codice = normalizza_spazi(riga[1])
+        descrizione = normalizza_spazi(riga[2])
+        if not codice or not descrizione:
+            continue
+        yield _voce_axor(
+            codice=codice,
+            descrizione=descrizione,
+            prezzo=numero(riga[5]),
+            ean=normalizza_spazi(riga[4]),
+            gruppo=riga[8],
+            classe=riga[10],
+            prefissa_brand=True,
+        )
+    libro.close()
+
+
+def leggi_axor_finiture(percorso):
+    """AXOR / Hansgrohe — listino finiture 2027: ogni codice è una finitura.
+
+    Le descrizioni citano già la collezione («AXOR Starck - …»), quindi non
+    serve anteporre nulla.
+    """
+    import openpyxl
+
+    libro = openpyxl.load_workbook(percorso, read_only=True, data_only=True)
+    foglio = libro.worksheets[0]
+    for riga in foglio.iter_rows(min_row=6, values_only=True):
+        codice = normalizza_spazi(riga[1])
+        descrizione = normalizza_spazi(riga[2])
+        if not codice or not descrizione:
+            continue
+        yield _voce_axor(
+            codice=codice,
+            descrizione=descrizione,
+            prezzo=numero(riga[6]),
+            ean=normalizza_spazi(riga[5]),
+            gruppo=riga[8],
+            classe=riga[10],
         )
     libro.close()
 
@@ -473,6 +580,8 @@ def leggi_forma_aquae(percorso):
 LETTORI = {
     "colavene": (leggi_colavene, "Colavene srl", "Listino generale Colavene"),
     "axa": (leggi_axa, "Colavene srl", "AXA / Alchimie"),
+    "axor": (leggi_axor, "Hansgrohe srl", "AXOR 2027"),
+    "axor-finiture": (leggi_axor_finiture, "Hansgrohe srl", "AXOR Finiture 2027"),
     "lacus": (leggi_lacus, "Lacus srl", "Listino 2026"),
     "duplach": (leggi_duplach, "Duplach", "Listino prezzi"),
     "forma-aquae": (leggi_forma_aquae, "Forma Aquae", "Listino Italia 2025"),
@@ -490,6 +599,8 @@ class Command(BaseCommand):
         parser.add_argument("--ricarico", type=float, default=0, help="Ricarico %% sul prezzo di vendita (0 = da definire).")
         parser.add_argument("--solo-nuovi", action="store_true", help="Non aggiorna gli articoli già presenti.")
         parser.add_argument("--dry-run", action="store_true", help="Mostra il risultato senza salvare.")
+        parser.add_argument("--valido-dal", default="", help="Inizio validità del listino (AAAA-MM-GG, es. 2027-01-01).")
+        parser.add_argument("--valido-al", default="", help="Fine validità del listino (AAAA-MM-GG).")
 
     def handle(self, *args, **options):
         chiave = options["fornitore"]
@@ -499,8 +610,12 @@ class Command(BaseCommand):
             raise CommandError(f"File non trovato: {percorso}")
 
         nome_listino = options["nome_listino"] or listino_predefinito
+        valido_dal = data_opzione(options["valido_dal"], "--valido-dal")
+        valido_al = data_opzione(options["valido_al"], "--valido-al")
         voci = list(lettore(percorso))
         self.stdout.write(f"  listino «{nome_listino}» di {fornitore_predefinito}: {len(voci)} voci lette")
+        if valido_dal or valido_al:
+            self.stdout.write(f"  validità: dal {valido_dal or '—'} al {valido_al or '—'}")
 
         if options["dry_run"]:
             self.stdout.write("\n  (prova senza salvare) prime 12 voci:")
@@ -530,11 +645,24 @@ class Command(BaseCommand):
             fornitore.save(update_fields=["is_supplier"])
 
         categoria_padre, _ = Category.objects.get_or_create(name=fornitore_predefinito)
+        dati_listino = {"notes": f"Importato da {percorso.name}."}
+        if valido_dal:
+            dati_listino["valid_from"] = valido_dal
+        if valido_al:
+            dati_listino["valid_to"] = valido_al
         listino, _ = SupplierPriceList.objects.get_or_create(
-            supplier=fornitore,
-            name=nome_listino,
-            defaults={"notes": f"Importato da {percorso.name}."},
+            supplier=fornitore, name=nome_listino, defaults=dati_listino
         )
+        # un listino già presente viene aggiornato con le date indicate
+        campi_listino = {}
+        if valido_dal and listino.valid_from != valido_dal:
+            campi_listino["valid_from"] = valido_dal
+        if valido_al and listino.valid_to != valido_al:
+            campi_listino["valid_to"] = valido_al
+        if campi_listino:
+            for campo, valore in campi_listino.items():
+                setattr(listino, campo, valore)
+            listino.save(update_fields=list(campi_listino))
 
         # il capofamiglia delle varianti può essere già stato creato (Forma Aquae):
         # qui si tiene traccia di quelli letti, per non ricercarli ogni volta
