@@ -95,3 +95,27 @@ class ImportaListiniAxorTest(TestCase):
     def test_data_non_valida(self):
         with self.assertRaises(CommandError):
             call_command("importa_listini", "axor", file=str(_file_axor()), valido_dal="01/01/2027", stdout=StringIO())
+
+    def test_reimport_riusa_articolo_con_codice_di_altro_fornitore(self):
+        """Se il codice è di un altro fornitore si crea un articolo interno: al
+        secondo import si deve riusare quello, senza creare doppioni."""
+        from apps.core.models import UnitOfMeasure, VatRate
+
+        pz = UnitOfMeasure.objects.get(code="PZ")
+        iva = VatRate.objects.get(code="22")
+        altro = Contact.objects.create(name="Altro fornitore", is_supplier=True)
+        Product.objects.create(
+            code="10303180", name="Articolo di un altro fornitore",
+            uom=pz, sale_vat=iva, purchase_vat=iva, main_supplier=altro,
+        )
+
+        percorso = str(_file_axor())
+        for _ in range(2):
+            call_command("importa_listini", "axor", file=percorso, stdout=StringIO())
+
+        self.assertEqual(Product.objects.count(), 3, "nessun articolo duplicato al secondo import")
+        listino = SupplierPriceList.objects.get(name="AXOR 2027")
+        self.assertEqual(listino.items.count(), 2)
+        voce = listino.items.get(supplier_code="10303180")
+        self.assertNotEqual(voce.product.code, "10303180")
+        self.assertEqual(voce.product.main_supplier.name, "Hansgrohe srl")

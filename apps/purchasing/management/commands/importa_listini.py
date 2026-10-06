@@ -701,9 +701,22 @@ class Command(BaseCommand):
                     esistente = Product.objects.filter(code=voce.codice).first() if voce.codice else None
                     codice_forzato = voce.codice
                 if esistente is not None and esistente.main_supplier_id not in (None, fornitore.pk):
-                    # codice già usato da un altro fornitore: si crea un articolo
-                    # nuovo, il codice del fornitore resta nella voce di listino
-                    esistente = None
+                    # Codice già usato da un articolo di un altro fornitore: non si
+                    # tocca. Se però questo fornitore aveva già importato lo stesso
+                    # codice in passato, il suo articolo ha un codice interno: lo si
+                    # ritrova dalla voce di listino, così il reimport non crea doppioni.
+                    collegato = None
+                    if occorrenza == 1 and voce.codice:
+                        collegato = (
+                            PriceListItem.objects.filter(
+                                pricelist__supplier=fornitore,
+                                supplier_code=voce.codice,
+                                product__main_supplier=fornitore,
+                            )
+                            .select_related("product")
+                            .first()
+                        )
+                    esistente = collegato.product if collegato else None
 
                 if esistente is not None:
                     prodotto = esistente
