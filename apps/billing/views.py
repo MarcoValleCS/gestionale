@@ -9,7 +9,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 ZERO = Decimal("0")
 
@@ -392,6 +392,9 @@ class SalesInvoiceListView(RoleRequiredMixin, ListView):
             queryset = queryset.filter(status__in=[SalesInvoice.STATUS_ISSUED, SalesInvoice.STATUS_SENT])
         elif status:
             queryset = queryset.filter(status=status)
+        kind = self.request.GET.get("tipo", "")
+        if kind:
+            queryset = queryset.filter(kind=kind)
         customer_id = self.request.GET.get("cliente", "")
         if customer_id:
             queryset = queryset.filter(customer_id=customer_id)
@@ -404,8 +407,10 @@ class SalesInvoiceListView(RoleRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["page_title"] = "Fatture emesse"
         context["statuses"] = SalesInvoice.STATUS_CHOICES
+        context["kinds"] = SalesInvoice.KIND_CHOICES
         context["customers"] = Contact.objects.filter(is_customer=True, active=True).order_by("name")
         context["status"] = self.request.GET.get("stato", "")
+        context["kind"] = self.request.GET.get("tipo", "")
         context["customer_id"] = self.request.GET.get("cliente", "")
         context["search"] = self.request.GET.get("q", "")
         open_invoices = SalesInvoice.objects.filter(status__in=[SalesInvoice.STATUS_ISSUED, SalesInvoice.STATUS_SENT])
@@ -525,25 +530,9 @@ class SalesInvoicePrintView(RoleRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        invoice = self.object
-        context.update(
-            build_print_context(
-                invoice,
-                title="Fattura",
-                counterparty=invoice.customer,
-                counterparty_label="Spett.le cliente",
-                meta_rows=[
-                    ("Data", fdate(invoice.date)),
-                    ("Scadenza", fdate(invoice.due_date)),
-                    ("Pagamento", invoice.payment_term.name if invoice.payment_term else ""),
-                    ("Vostro riferimento", invoice.reference),
-                    ("Cantiere", str(invoice.job) if invoice.job_id else ""),
-                ],
-                back_url=reverse("billing:salesinvoice_detail", args=[invoice.pk]),
-                notes=invoice.notes,
-                show_prices=True,
-            )
-        )
+        from .printing import sales_invoice_print_context
+
+        context.update(sales_invoice_print_context(self.object))
         return context
 
 
@@ -562,6 +551,39 @@ def salesinvoice_create_from_order(request, pk):
         return redirect("sales:order_detail", pk=order.pk)
     messages.success(request, f"Creata la fattura {invoice.number} in bozza dall'ordine {order.number}.")
     return redirect("billing:salesinvoice_detail", pk=invoice.pk)
+
+
+def _numero_decimale(valore):
+    """Converte un importo/percentuale inserito a mano (virgola o punto)."""
+    if valore is None or str(valore).strip() == "":
+        return None
+    try:
+        return Decimal(str(valore).replace(",", "."))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+@role_required(*SALES_INVOICE_ROLES)
+def salesinvoice_create_from_job(request, pk):
+    """Crea in bozza un acconto, un SAL o il saldo di un cantiere."""
+    from apps.jobs.models import Job
+
+    job = get_object_or_404(Job, pk=pk)
+    if request.method != "POST":
+        return redirect("jobs:job_detail", pk=job.pk)
+    kind = request.POST.get("tipo", "")
+    percento = _numero_decimale(request.POST.get("percento"))
+    importo = _numero_decimale(request.POST.get("importo"))
+    try:
+        invoice = services.create_job_invoice(job, kind, percent=percento, amount=importo, user=request.user)
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return redirect("jobs:job_detail", pk=job.pk)
+    messages.success(
+        request,
+        f"Creata in bozza {invoice.kind_title} ({invoice.number}) per il cantiere {job.name}.",
+    )
+    return redirect("billing:salesinvoice_update", pk=invoice.pk)
 
 
 def _salesinvoice_action(request, pk, action, success_message):

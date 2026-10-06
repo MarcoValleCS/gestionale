@@ -7,10 +7,13 @@
 {% include "partials/back_link.html" with url=url_elenco label="Tutte le fatture emesse" %}
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
-    <h2 class="h4 mb-1">Fattura <span class="number-badge">{{ invoice.number }}</span></h2>
+    <h2 class="h4 mb-1">{{ invoice.kind_title }} <span class="number-badge">{{ invoice.number }}</span></h2>
     <div class="d-flex gap-2 align-items-center flex-wrap">
       <span class="badge text-bg-{{ invoice.status|badge_class }}">{{ invoice.get_status_display }}</span>
       {% if invoice.is_overdue %}<span class="badge text-bg-danger">Scaduta il {{ invoice.due_date|date:"d/m/Y" }}</span>{% endif %}
+      {% if invoice.kind != "invoice" %}<span class="badge text-bg-light border">{{ invoice.get_kind_display }}</span>{% endif %}
+      {% if invoice.sal_percent is not None %}<span class="text-muted small">avanzamento {{ invoice.sal_percent }}%</span>{% endif %}
+      {% if invoice.contract_amount is not None %}<span class="text-muted small">contratto {{ invoice.contract_amount|money }} €</span>{% endif %}
       <a class="text-decoration-none" href="{% url 'contacts:detail' invoice.customer.pk %}">{{ invoice.customer.name }}</a>
       {% if invoice.job %}<span class="text-muted small">cantiere <a href="{% url 'jobs:job_detail' invoice.job.pk %}">{{ invoice.job.code }}</a></span>{% endif %}
       {% if invoice.source_delivery_note %}<span class="text-muted small">da DDT <a href="{% url 'billing:deliverynote_detail' invoice.source_delivery_note.pk %}">{{ invoice.source_delivery_note.number }}</a></span>{% endif %}

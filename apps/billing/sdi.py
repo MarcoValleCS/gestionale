@@ -153,12 +153,22 @@ def build_fattura_xml(invoice):
     body = _sub(root, "FatturaElettronicaBody")
     generali = _sub(body, "DatiGenerali")
     documento = _sub(generali, "DatiGeneraliDocumento")
-    _sub(documento, "TipoDocumento", "TD01")
+    # Gli acconti si trasmettono come TD02 (acconto/anticipo su fattura); SAL e
+    # saldi sono fatture normali (TD01).
+    _sub(documento, "TipoDocumento", "TD02" if invoice.kind == SalesInvoice.KIND_ADVANCE else "TD01")
     _sub(documento, "Divisa", "EUR")
     _sub(documento, "Data", invoice.date.isoformat())
     _sub(documento, "Numero", invoice.number)
     _sub(documento, "ImportoTotaleDocumento", _money(invoice.grand_total))
-    causale = (invoice.reference or "Vendita").strip()[:200]
+    if invoice.is_job_document:
+        parti = [invoice.kind_title]
+        if invoice.job_id:
+            parti.append(str(invoice.job))
+        if invoice.reference:
+            parti.append(invoice.reference)
+        causale = " – ".join(parti)[:200]
+    else:
+        causale = (invoice.reference or "Vendita").strip()[:200]
     if causale:
         _sub(documento, "Causale", causale)
 

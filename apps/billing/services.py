@@ -205,6 +205,167 @@ def mark_sales_invoice_paid(invoice):
     invoice.save(update_fields=["status", "paid_at"])
 
 
+# ---------------------------------------------- SAL, acconti e saldi (cantieri)
+# Stato delle fatture che contano come «fatturato» (le bozze no, ma contano nei
+# calcoli dei residui: così non si emettono due SAL per lo stesso avanzamento).
+INVOICED_STATUSES = [SalesInvoice.STATUS_ISSUED, SalesInvoice.STATUS_SENT, SalesInvoice.STATUS_PAID]
+
+
+def contract_amount_for(job):
+    """Valore contratto del cantiere.
+
+    È la somma degli ordini cliente confermati (o consegnati); se il cantiere
+    non ha ancora ordini si usa la somma dei preventivi accettati.
+    """
+    totale = (
+        SalesOrder.objects.filter(job=job)
+        .exclude(status__in=[SalesOrder.STATUS_DRAFT, SalesOrder.STATUS_CANCELLED])
+        .aggregate(totale=models.Sum("subtotal"))["totale"]
+    )
+    if totale:
+        return Decimal(totale)
+    from apps.sales.models import Quote
+
+    return Decimal(
+        Quote.objects.filter(job=job, status=Quote.STATUS_ACCEPTED).aggregate(totale=models.Sum("subtotal"))["totale"] or 0
+    )
+
+
+def job_billing_summary(job):
+    """Situazione della fatturazione del cantiere: contratto, fatturato e residuo.
+
+    ``committed`` comprende anche le bozze: serve a non emettere due volte lo
+    stesso avanzamento. ``residual`` è quanto resta da fatturare.
+    """
+    documenti = list(
+        SalesInvoice.objects.filter(job=job).exclude(status=SalesInvoice.STATUS_CANCELLED).order_by("-date", "-pk")
+    )
+    per_tipo = {chiave: Decimal("0") for chiave, _ in SalesInvoice.KIND_CHOICES}
+    committed = Decimal("0")
+    for documento in documenti:
+        committed += Decimal(documento.subtotal or 0)
+        if documento.status in INVOICED_STATUSES:
+            per_tipo[documento.kind] += Decimal(documento.subtotal or 0)
+    contract = contract_amount_for(job)
+    ultimo_sal = max((d.sal_number or 0 for d in documenti if d.kind == SalesInvoice.KIND_SAL), default=0)
+    return {
+        "contract": contract,
+        "advances": per_tipo[SalesInvoice.KIND_ADVANCE],
+        "sal": per_tipo[SalesInvoice.KIND_SAL],
+        "balance": per_tipo[SalesInvoice.KIND_BALANCE],
+        "invoices": per_tipo[SalesInvoice.KIND_INVOICE],
+        "invoiced": sum(per_tipo.values(), Decimal("0")),
+        "committed": committed,
+        "residual": contract - committed,
+        "next_sal_number": ultimo_sal + 1,
+        "documents": documenti,
+        "drafts": sum(1 for d in documenti if d.status == SalesInvoice.STATUS_DRAFT),
+    }
+
+
+def _vat_rate_for_job(job):
+    """Aliquota IVA più usata nelle righe degli ordini del cantiere (o 22%)."""
+    from apps.core.models import VatRate
+    from apps.sales.models import SalesOrderLine
+
+    riga = (
+        SalesOrderLine.objects.filter(order__job=job)
+        .exclude(order__status__in=[SalesOrder.STATUS_DRAFT, SalesOrder.STATUS_CANCELLED])
+        .exclude(vat_rate__isnull=True)
+        .values("vat_rate")
+        .annotate(quante=models.Count("pk"))
+        .order_by("-quante")
+        .first()
+    )
+    if riga:
+        aliquota = VatRate.objects.filter(pk=riga["vat_rate"]).first()
+        if aliquota:
+            return aliquota
+    return VatRate.objects.filter(code="22").first() or VatRate.objects.first()
+
+
+def create_job_invoice(job, kind, *, percent=None, amount=None, user=None):
+    """Crea in bozza un acconto, un SAL o il saldo di un cantiere.
+
+    L'importo è sempre «al netto di quanto già fatturato» (bozze comprese): la
+    somma di acconti, SAL e saldi non supera il valore del contratto.
+    """
+    from apps.core.rounding import round2
+
+    if kind not in {SalesInvoice.KIND_ADVANCE, SalesInvoice.KIND_SAL, SalesInvoice.KIND_BALANCE}:
+        raise ValidationError("Tipo di documento non valido per un cantiere.")
+    if job.customer_id is None:
+        raise ValidationError("Il cantiere non ha un cliente.")
+
+    summary = job_billing_summary(job)
+    contract = summary["contract"]
+    residuo = contract - summary["committed"]
+    percentuale = Decimal(percent) if percent is not None else None
+
+    sal_number = None
+    if kind == SalesInvoice.KIND_ADVANCE:
+        importo = Decimal(amount) if amount is not None else None
+        if importo is None and percentuale:
+            importo = round2(contract * percentuale / 100)
+        if not importo or importo <= 0:
+            raise ValidationError("Indica l'importo o la percentuale dell'acconto.")
+        importo = round2(importo)
+        descrizione = f"Acconto su contratto – {job.name}"
+    elif kind == SalesInvoice.KIND_SAL:
+        if contract <= 0:
+            raise ValidationError("Il cantiere non ha un valore contratto: conferma un ordine prima di emettere un SAL.")
+        if percentuale is None or percentuale <= 0 or percentuale > 100:
+            raise ValidationError("Indica la percentuale di avanzamento (fra 0 e 100).")
+        sal_number = summary["next_sal_number"]
+        obiettivo = round2(contract * percentuale / 100)
+        importo = round2(obiettivo - summary["committed"])
+        if importo <= 0:
+            raise ValidationError(
+                f"L'avanzamento al {percentuale}% risulta già fatturato: non c'è nulla da emettere."
+            )
+        descrizione = (
+            f"SAL n. {sal_number} – avanzamento lavori al {percentuale}% (al netto di quanto già fatturato)"
+        )
+    else:
+        importo = round2(residuo)
+        if importo <= 0:
+            raise ValidationError("Non resta nulla da saldare: il contratto risulta già fatturato.")
+        descrizione = f"Saldo lavori – {job.name}"
+
+    iva = _vat_rate_for_job(job)
+    ordine = (
+        job.sales_orders.exclude(status__in=[SalesOrder.STATUS_DRAFT, SalesOrder.STATUS_CANCELLED])
+        .order_by("-date", "-pk")
+        .first()
+    )
+    pagamento = (ordine.payment_term if ordine else None) or job.customer.payment_term
+    oggi = timezone.localdate()
+
+    with transaction.atomic():
+        invoice = SalesInvoice.objects.create(
+            customer=job.customer,
+            job=job,
+            kind=kind,
+            source_order=ordine,
+            sal_number=sal_number,
+            sal_percent=percentuale if kind in {SalesInvoice.KIND_ADVANCE, SalesInvoice.KIND_SAL} else None,
+            contract_amount=contract,
+            payment_term=pagamento,
+            due_date=_due_date(oggi, pagamento),
+            created_by=user,
+        )
+        SalesInvoiceLine.objects.create(
+            invoice=invoice,
+            position=1,
+            description=descrizione[:300],
+            qty=Decimal("1"),
+            unit_price=importo,
+            vat_rate=iva,
+        )
+        invoice.recalculate()
+    return invoice
+
+
 # --------------------------------------------------------- fatture ricevute
 def create_purchase_invoice_from_po(po, user=None, only_received=False):
     lines = list(po.lines.select_related("product"))

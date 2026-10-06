@@ -20,6 +20,7 @@ urlpatterns = [
     path("fatture/emesse/", views.SalesInvoiceListView.as_view(), name="salesinvoice_list"),
     path("fatture/emesse/nuova/", views.SalesInvoiceCreateView.as_view(), name="salesinvoice_create"),
     path("fatture/emesse/da-ordine/<int:pk>/", views.salesinvoice_create_from_order, name="salesinvoice_from_order"),
+    path("fatture/emesse/da-cantiere/<int:pk>/", views.salesinvoice_create_from_job, name="salesinvoice_from_job"),
     path("fatture/emesse/<int:pk>/", views.SalesInvoiceDetailView.as_view(), name="salesinvoice_detail"),
     path("fatture/emesse/<int:pk>/modifica/", views.SalesInvoiceUpdateView.as_view(), name="salesinvoice_update"),
     path("fatture/emesse/<int:pk>/stampa/", views.SalesInvoicePrintView.as_view(), name="salesinvoice_print"),

@@ -71,6 +71,9 @@ class JobDetailView(DetailView):
         context["purchase_orders"] = job.purchase_orders.select_related("supplier").order_by("-date", "-pk")[:30]
         context["plans"] = job.maintenance_plans.order_by("next_date")[:20]
         context["attachments"] = job.attachments.select_related("uploaded_by")[:20]
+        from apps.billing.services import job_billing_summary
+
+        context["billing"] = job_billing_summary(job)
         return context
 
 

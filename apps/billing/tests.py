@@ -366,3 +366,99 @@ class BillingPagesSmokeTest(BillingTestBase):
         ]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class SalAccontiTest(BillingTestBase):
+    """Fatturazione lavori: acconti, SAL e saldo su un cantiere."""
+
+    def setUp(self):
+        from apps.jobs.models import Job
+
+        self.job = Job.objects.create(name="Piscina Via Verdi", customer=self.customer)
+        self.order = SalesOrder.objects.create(customer=self.customer, job=self.job)
+        self.order.lines.create(
+            product=self.product, description="Lavori piscina", qty=Decimal("100"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+        )
+        self.order.recalculate()
+        sales_services.confirm_sales_order(self.order, user=self.user)
+
+    def test_valore_contratto(self):
+        self.assertEqual(services.contract_amount_for(self.job), Decimal("1000.00"))
+
+    def test_acconto_sal_saldo(self):
+        acconto = services.create_job_invoice(self.job, SalesInvoice.KIND_ADVANCE, percent=Decimal("30"), user=self.user)
+        self.assertEqual(acconto.subtotal, Decimal("300.00"))
+        self.assertEqual(acconto.kind, SalesInvoice.KIND_ADVANCE)
+
+        sal = services.create_job_invoice(self.job, SalesInvoice.KIND_SAL, percent=Decimal("50"), user=self.user)
+        self.assertEqual(sal.sal_number, 1)
+        self.assertEqual(sal.subtotal, Decimal("200.00"), "50% del contratto meno l'acconto già fatturato")
+
+        saldo = services.create_job_invoice(self.job, SalesInvoice.KIND_BALANCE, user=self.user)
+        self.assertEqual(saldo.subtotal, Decimal("500.00"))
+
+        riepilogo = services.job_billing_summary(self.job)
+        self.assertEqual(riepilogo["committed"], Decimal("1000.00"))
+        self.assertEqual(riepilogo["residual"], Decimal("0"))
+
+    def test_avanzamento_gia_fatturato(self):
+        services.create_job_invoice(self.job, SalesInvoice.KIND_SAL, percent=Decimal("100"), user=self.user)
+        with self.assertRaises(ValidationError):
+            services.create_job_invoice(self.job, SalesInvoice.KIND_SAL, percent=Decimal("100"), user=self.user)
+
+    def test_vista_crea_sal_dal_cantiere(self):
+        self.login()
+        risposta = self.client.post(
+            reverse("billing:salesinvoice_from_job", args=[self.job.pk]), {"tipo": "sal", "percento": "30"}
+        )
+        self.assertEqual(risposta.status_code, 302)
+        fattura = SalesInvoice.objects.get(job=self.job, kind=SalesInvoice.KIND_SAL)
+        self.assertEqual(fattura.subtotal, Decimal("300.00"))
+        self.assertEqual(fattura.sal_number, 1)
+
+    def test_scheda_cantiere_mostra_fatturazione(self):
+        self.login()
+        risposta = self.client.get(reverse("jobs:job_detail", args=[self.job.pk]))
+        self.assertEqual(risposta.status_code, 200)
+        self.assertContains(risposta, "Fatturazione")
+
+
+class SalSdiTest(EmailAndSdiTest):
+    """Tipo documento SDI: TD02 per gli acconti, TD01 per SAL e saldi."""
+
+    def setUp(self):
+        from apps.jobs.models import Job
+
+        self.job = Job.objects.create(name="Piscina SDI", customer=self.customer)
+        self.order = SalesOrder.objects.create(customer=self.customer, job=self.job)
+        self.order.lines.create(
+            product=self.product, description="Lavori", qty=Decimal("100"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+        )
+        self.order.recalculate()
+        sales_services.confirm_sales_order(self.order, user=self.user)
+        self.customer.sdi_code = "ABC1234"
+        self.customer.save(update_fields=["sdi_code"])
+
+    def _tipo_documento(self, invoice):
+        root = ET.fromstring(sdi.build_fattura_xml(invoice))
+        return root.findtext(
+            "f:FatturaElettronicaBody/f:DatiGenerali/f:DatiGeneraliDocumento/f:TipoDocumento",
+            namespaces={"f": sdi.NS},
+        )
+
+    def test_tipi_documento(self):
+        acconto = services.create_job_invoice(self.job, SalesInvoice.KIND_ADVANCE, percent=Decimal("30"), user=self.user)
+        services.issue_sales_invoice(acconto)
+        self.assertEqual(self._tipo_documento(acconto), "TD02")
+
+        sal = services.create_job_invoice(self.job, SalesInvoice.KIND_SAL, percent=Decimal("50"), user=self.user)
+        services.issue_sales_invoice(sal)
+        self.assertEqual(self._tipo_documento(sal), "TD01")
+
+        root = ET.fromstring(sdi.build_fattura_xml(sal))
+        causale = root.findtext(
+            "f:FatturaElettronicaBody/f:DatiGenerali/f:DatiGeneraliDocumento/f:Causale", namespaces={"f": sdi.NS}
+        )
+        self.assertIn("SAL n. 1", causale)

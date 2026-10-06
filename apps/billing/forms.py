@@ -75,12 +75,14 @@ class DeliveryNoteLineForm(BaseBootstrapModelForm):
 class SalesInvoiceForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = SalesInvoice
-        fields = ["customer", "job", "date", "due_date", "payment_term", "reference", "notes"]
+        fields = ["customer", "job", "kind", "date", "due_date", "payment_term", "reference", "notes"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_customer_queryset()
         self.apply_job_queryset()
+        self.fields["kind"].label = "Tipo documento"
+        self.fields["kind"].help_text = "Acconto, SAL e saldo si possono creare anche dalla scheda del cantiere."
 
 
 class SalesInvoiceLineForm(LineFormMixin, BaseBootstrapModelForm):

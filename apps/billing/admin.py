@@ -35,8 +35,8 @@ class DeliveryNoteAdmin(admin.ModelAdmin):
 
 @admin.register(SalesInvoice)
 class SalesInvoiceAdmin(admin.ModelAdmin):
-    list_display = ("number", "date", "customer", "status", "grand_total", "paid_at")
-    list_filter = ("status", "date")
+    list_display = ("number", "date", "kind", "customer", "job", "status", "grand_total", "paid_at")
+    list_filter = ("status", "kind", "date")
     search_fields = ("number", "customer__name")
     inlines = [SalesInvoiceLineInline]
     readonly_fields = ("subtotal", "vat_total", "grand_total")

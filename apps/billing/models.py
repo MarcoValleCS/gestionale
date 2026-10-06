@@ -119,6 +119,24 @@ class SalesInvoice(TotalsDocument, TimeStampedModel):
     source_delivery_note = models.ForeignKey(
         DeliveryNote, on_delete=models.SET_NULL, null=True, blank=True, related_name="sales_invoices", verbose_name="Da DDT"
     )
+    # Tipo di documento: fattura normale, acconto, SAL o saldo (lavori su cantiere)
+    KIND_INVOICE = "invoice"
+    KIND_ADVANCE = "advance"
+    KIND_SAL = "sal"
+    KIND_BALANCE = "balance"
+    KIND_CHOICES = [
+        (KIND_INVOICE, "Fattura"),
+        (KIND_ADVANCE, "Acconto"),
+        (KIND_SAL, "SAL (avanzamento lavori)"),
+        (KIND_BALANCE, "Saldo"),
+    ]
+    kind = models.CharField("Tipo", max_length=10, choices=KIND_CHOICES, default=KIND_INVOICE)
+    sal_number = models.PositiveIntegerField("Numero SAL", null=True, blank=True)
+    sal_percent = models.DecimalField("Avanzamento %", max_digits=5, decimal_places=2, null=True, blank=True)
+    contract_amount = models.DecimalField(
+        "Valore contratto", max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Valore del cantiere al momento dell'emissione (per SAL, acconti e saldi).",
+    )
     payment_term = models.ForeignKey(
         PaymentTerm, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Condizione di pagamento"
     )
@@ -185,6 +203,17 @@ class SalesInvoice(TotalsDocument, TimeStampedModel):
     @property
     def is_overdue(self):
         return bool(self.is_open and self.due_date and self.due_date < timezone.localdate())
+
+    @property
+    def kind_title(self):
+        """Titolo leggibile del documento (stampe, causali, schede)."""
+        if self.kind == self.KIND_SAL and self.sal_number:
+            return f"SAL n. {self.sal_number}"
+        return self.get_kind_display()
+
+    @property
+    def is_job_document(self):
+        return self.kind in {self.KIND_ADVANCE, self.KIND_SAL, self.KIND_BALANCE}
 
 
 class SalesInvoiceLine(DocumentLine):

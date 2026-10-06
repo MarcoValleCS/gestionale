@@ -58,6 +58,70 @@
   </div>
 
   <div class="col-lg-8">
+    {% if roles.is_admin or roles.is_sales %}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cash-coin me-1"></i> Fatturazione</span>
+        <span class="small text-muted">Contratto: <b>{{ billing.contract|money }} €</b></span>
+      </div>
+      <div class="card-body">
+        <div class="row row-cols-2 row-cols-md-5 g-2 text-center small mb-3">
+          <div class="col"><div class="text-muted">Acconti</div><div class="fw-semibold">{{ billing.advances|money }} €</div></div>
+          <div class="col"><div class="text-muted">SAL</div><div class="fw-semibold">{{ billing.sal|money }} €</div></div>
+          <div class="col"><div class="text-muted">Saldi</div><div class="fw-semibold">{{ billing.balance|money }} €</div></div>
+          <div class="col"><div class="text-muted">Fatturato</div><div class="fw-semibold">{{ billing.invoiced|money }} €</div></div>
+          <div class="col"><div class="text-muted">Da fatturare</div><div class="fw-semibold {% if billing.residual > 0 %}text-danger{% else %}text-success{% endif %}">{{ billing.residual|money }} €</div></div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap no-print">
+          <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#form-acconto"><i class="bi bi-wallet2"></i> Nuovo acconto</button>
+          <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#form-sal"><i class="bi bi-graph-up-arrow"></i> Nuovo SAL</button>
+          <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#form-saldo"><i class="bi bi-flag"></i> Saldo</button>
+        </div>
+        <div class="collapse mt-2" id="form-acconto">
+          <form method="post" action="{% url 'billing:salesinvoice_from_job' job.pk %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="tipo" value="advance">
+            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="acconto-importo">Importo €</label><input class="form-control form-control-sm" id="acconto-importo" name="importo" inputmode="decimal" placeholder="es. 5000"></div>
+            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="acconto-percento">oppure %</label><input class="form-control form-control-sm" id="acconto-percento" name="percento" inputmode="decimal" placeholder="es. 30"></div>
+            <div class="col-12 col-md-3"><button class="btn btn-primary btn-sm" type="submit">Crea acconto</button></div>
+          </form>
+        </div>
+        <div class="collapse mt-2" id="form-sal">
+          <form method="post" action="{% url 'billing:salesinvoice_from_job' job.pk %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="tipo" value="sal">
+            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="sal-percento">Avanzamento %</label><input class="form-control form-control-sm" id="sal-percento" name="percento" inputmode="decimal" placeholder="es. 30" required></div>
+            <div class="col-12 col-md-4"><button class="btn btn-primary btn-sm" type="submit">Crea SAL {{ billing.next_sal_number }}</button></div>
+          </form>
+        </div>
+        <div class="collapse mt-2" id="form-saldo">
+          <form method="post" action="{% url 'billing:salesinvoice_from_job' job.pk %}" class="d-flex align-items-center gap-2 flex-wrap">
+            {% csrf_token %}
+            <input type="hidden" name="tipo" value="balance">
+            <span class="small text-muted">Verrà creato il saldo di {{ billing.residual|money }} € (contratto meno quanto già fatturato).</span>
+            <button class="btn btn-primary btn-sm" type="submit">Crea saldo</button>
+          </form>
+        </div>
+      </div>
+      {% if billing.documents %}
+      <div class="table-responsive border-top">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Documento</th><th>Data</th><th class="text-end">Imponibile</th><th class="text-center">Stato</th></tr></thead>
+          <tbody>
+            {% for doc in billing.documents %}
+            <tr>
+              <td><a class="number-badge text-decoration-none" href="{% url 'billing:salesinvoice_detail' doc.pk %}">{{ doc.number }}</a> <span class="badge text-bg-light border">{{ doc.kind_title }}</span></td>
+              <td>{{ doc.date|date:"d/m/Y" }}</td>
+              <td class="text-end">{{ doc.subtotal|money }} €</td>
+              <td class="text-center"><span class="badge text-bg-{{ doc.status|badge_class }}">{{ doc.get_status_display }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
     <div class="card">
       <div class="card-header p-0 border-0">
         <ul class="nav nav-tabs card-header-tabs m-0 px-2 pt-2" role="tablist">

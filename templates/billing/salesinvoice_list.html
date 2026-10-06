@@ -20,7 +20,16 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
+        <label class="form-label mb-1" for="tipo">Tipo</label>
+        <select class="form-select form-select-sm" id="tipo" name="tipo">
+          <option value="">Tutti</option>
+          {% for value, label in kinds %}
+          <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
         <label class="form-label mb-1" for="cliente">Cliente</label>
         <select class="form-select form-select-sm" id="cliente" name="cliente">
           <option value="">Tutti</option>
@@ -29,7 +38,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4 d-flex gap-2 justify-content-end align-items-center">
+      <div class="col-md-3 d-flex gap-2 justify-content-end align-items-center flex-wrap">
         {% if open_count %}<span class="badge text-bg-warning">{{ open_count }} da incassare · {{ open_total|money }} €</span>{% endif %}
         <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
         {% if roles.is_admin or roles.is_sales %}
@@ -54,7 +63,9 @@
       <tbody>
         {% for invoice in invoices %}
         <tr>
-          <td><a class="fw-semibold text-decoration-none number-badge" href="{% url 'billing:salesinvoice_detail' invoice.pk %}">{{ invoice.number }}</a></td>
+          <td><a class="fw-semibold text-decoration-none number-badge" href="{% url 'billing:salesinvoice_detail' invoice.pk %}">{{ invoice.number }}</a>
+            {% if invoice.kind != "invoice" %}<span class="badge text-bg-light border">{{ invoice.kind_title }}</span>{% endif %}
+          </td>
           <td>{{ invoice.date|date:"d/m/Y" }}</td>
           <td>{{ invoice.customer.name }}</td>
           <td class="{% if invoice.is_overdue %}text-danger fw-semibold{% endif %}">
