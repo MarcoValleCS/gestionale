@@ -333,6 +333,7 @@ GRUPPI_AXOR = {
     "sanitary taps": "Rubinetteria",
     "sanitary showers": "Docce",
     "sanitary accessories/fittings": "Accessori bagno",
+    "sanitary components and accessories": "Componenti sanitari",
     "drainage and sewage systems": "Scarichi",
     "inlet and outlet fittings": "Raccordi idraulici",
     "wastewater reception devices": "Scarichi a pavimento",
@@ -340,11 +341,14 @@ GRUPPI_AXOR = {
     "sanitary accessibility facilities": "Accessibilità bagno",
 }
 
+# Valori segnaposto usati dai file AXOR: non sono categorie vere
+GRUPPI_AXOR_VUOTI = {"", "_missing", "missing", "none", "n/a", "nd"}
+
 
 def categoria_axor(gruppo):
     """Traduce il gruppo AXOR in una categoria; se sconosciuto lo titola."""
     nome = normalizza_spazi(gruppo)
-    if not nome:
+    if not nome or nome.lower() in GRUPPI_AXOR_VUOTI:
         return ""
     return GRUPPI_AXOR.get(nome.lower(), nome.title())
 

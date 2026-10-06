@@ -35,6 +35,9 @@ def _file_axor(finiture=False):
                        "Codice Gruppo", "Nome Gruppo", "Codice Classe", "Nome Classe", "Karton", "Pallet"])
         foglio.append(["", "10303180", "Corpo incasso", "AX", "4011097342597", 294.8, "3091",
                        "EG017610", "Sanitary taps", "EC011327", "Built-in mixing tap", 14, 162])
+        # gruppo segnaposto: non deve creare una categoria
+        foglio.append(["", "10823000", "Valvola d'arresto cucina", "AX", "4011097693712", 186.7, "3099",
+                       "EG017610", "_missing", "", "", 0, 0])
     percorso = Path(tempfile.mkdtemp()) / ("finiture.xlsx" if finiture else "generale.xlsx")
     libro.save(percorso)
     libro.close()
@@ -62,6 +65,10 @@ class ImportaListiniAxorTest(TestCase):
         self.assertEqual(voce.supplier_code, "10303180")
         self.assertEqual(str(voce.price), "294.8000")
 
+        # il gruppo «_missing» non deve creare una categoria
+        segnaposto = Product.objects.get(code="10823000")
+        self.assertIsNone(segnaposto.category)
+
     def test_importa_listino_finiture(self):
         call_command(
             "importa_listini", "axor-finiture", file=str(_file_axor(finiture=True)),
@@ -83,7 +90,7 @@ class ImportaListiniAxorTest(TestCase):
         self.assertEqual(Product.objects.filter(code="10303180").count(), 1)
         self.assertEqual(SupplierPriceList.objects.filter(name="AXOR 2027").count(), 1)
         self.assertEqual(Contact.objects.filter(name="Hansgrohe srl").count(), 1)
-        self.assertEqual(PriceListItem.objects.count(), 1)
+        self.assertEqual(PriceListItem.objects.count(), 2)
 
     def test_data_non_valida(self):
         with self.assertRaises(CommandError):
