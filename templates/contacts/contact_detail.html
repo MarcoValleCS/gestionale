@@ -45,6 +45,9 @@
           <dd class="col-7">{{ contact.sdi_code|default:"—" }}{% if contact.pec %}<br>{{ contact.pec }}{% endif %}</dd>
           <dt class="col-5 text-muted">Cond. pagamento</dt><dd class="col-7">{{ contact.payment_term.name|default:"—" }}</dd>
           <dt class="col-5 text-muted">Sconto abituale</dt><dd class="col-7">{% if contact.sale_discount_pct %}{{ contact.sale_discount_pct|qty }}%{% else %}—{% endif %}</dd>
+          {% if contact.is_supplier %}
+          <dt class="col-5 text-muted">Sconto acquisto base</dt><dd class="col-7">{% if contact.purchase_discount_pct %}{{ contact.purchase_discount_pct|qty }}%{% else %}—{% endif %}</dd>
+          {% endif %}
         </dl>
       </div>
     </div>

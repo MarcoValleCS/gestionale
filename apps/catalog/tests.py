@@ -165,15 +165,16 @@ class QuickCreateTest(TestCase):
         self.client.force_login(self.user)
 
     def test_crea_rapida_articolo(self):
+        fornitore = Contact.objects.create(name="Fornitore Rapido", is_customer=False, is_supplier=True)
         response = self.client.post(
             reverse("catalog:quick_create"),
             {
                 "name": "Articolo al volo",
                 "uom": self.uom.pk,
+                "main_supplier": fornitore.pk,
+                "min_stock": "3",
                 "sale_price": "7.50",
-                "sale_vat": self.vat.pk,
                 "purchase_price": "4",
-                "purchase_vat": self.vat.pk,
                 "context": "sale",
             },
         )
@@ -183,7 +184,28 @@ class QuickCreateTest(TestCase):
         self.assertIn("Articolo al volo", payload["label"])
         product = Product.objects.get(pk=payload["id"])
         self.assertEqual(product.sale_price, Decimal("7.50"))
+        self.assertEqual(product.main_supplier, fornitore, "il fornitore si sceglie dalla creazione rapida")
+        self.assertEqual(product.min_stock, Decimal("3"), "la scorta per il riordino si imposta dalla creazione rapida")
+        self.assertEqual(product.sale_vat.code, "22", "IVA vendita standard al 22%")
+        self.assertEqual(product.purchase_vat.code, "22", "IVA acquisto standard al 22%")
         self.assertTrue(product.code.startswith("ART"))
+
+    def test_sconto_acquisto_base_del_fornitore(self):
+        fornitore = Contact.objects.create(
+            name="Fornitore Scontato", is_customer=False, is_supplier=True, purchase_discount_pct=Decimal("20")
+        )
+        prodotto = Product.objects.create(
+            name="Articolo scontato", uom=self.uom, sale_vat=self.vat, purchase_vat=self.vat,
+            purchase_price=Decimal("10.00"), main_supplier=fornitore,
+        )
+        self.assertEqual(prodotto.purchase_unit_price(fornitore), Decimal("8.0000"), "sconto base del 20%")
+
+        # Con un listino dedicato lo sconto base NON si applica
+        from apps.purchasing.models import PriceListItem, SupplierPriceList
+
+        listino = SupplierPriceList.objects.create(supplier=fornitore, name="Listino test")
+        PriceListItem.objects.create(pricelist=listino, product=prodotto, price=Decimal("7.00"))
+        self.assertEqual(prodotto.purchase_unit_price(fornitore), Decimal("7.0000"))
 
     def test_crea_rapida_articolo_senza_nome(self):
         response = self.client.post(reverse("catalog:quick_create"), {"uom": self.uom.pk})

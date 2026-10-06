@@ -27,6 +27,7 @@ class ContactForm(BaseBootstrapModelForm):
             "country",
             "payment_term",
             "sale_discount_pct",
+            "purchase_discount_pct",
             "tags",
             "notes",
             "active",

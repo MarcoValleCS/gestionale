@@ -295,6 +295,7 @@ def with_vat_rates(context, documento=None):
     context["vat_rates_json"] = {str(v.pk): str(v.rate) for v in VatRate.objects.filter(is_active=True)}
     context["quick_uoms"] = active_units()
     context["quick_vats"] = active_vat_rates()
+    context["quick_suppliers"] = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
     context["customer_discounts_json"] = {
         str(contact.pk): str(contact.sale_discount_pct)
         for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)

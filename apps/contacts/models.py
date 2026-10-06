@@ -44,6 +44,14 @@ class Contact(TimeStampedModel):
         default=Decimal("0"),
         help_text="Proposto automaticamente nelle righe dei preventivi e degli ordini.",
     )
+    purchase_discount_pct = models.DecimalField(
+        "Sconto acquisto base %",
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0"),
+        blank=True,
+        help_text="Applicato ai prezzi di acquisto degli articoli del fornitore che non hanno un listino dedicato.",
+    )
     tags = models.ManyToManyField(Tag, blank=True, related_name="contacts", verbose_name="Etichette")
     notes = models.TextField("Note", blank=True)
     active = models.BooleanField("Attivo", default=True)

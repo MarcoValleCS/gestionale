@@ -84,6 +84,16 @@
             </select>
             <div class="invalid-feedback d-block" data-error-for="uom"></div>
           </div>
+          <div class="mb-3">
+            <label class="form-label" for="qp-supplier">Fornitore</label>
+            <select class="form-select" id="qp-supplier" name="main_supplier">
+              <option value="">—</option>
+              {% for supplier in quick_suppliers %}
+              <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="invalid-feedback d-block" data-error-for="main_supplier"></div>
+          </div>
           <div class="row">
             <div class="col-md-6 mb-3">
               <label class="form-label" for="qp-sale-price">Prezzo vendita</label>
@@ -91,27 +101,15 @@
               <div class="invalid-feedback d-block" data-error-for="sale_price"></div>
             </div>
             <div class="col-md-6 mb-3">
-              <label class="form-label" for="qp-sale-vat">IVA vendita</label>
-              <select class="form-select" id="qp-sale-vat" name="sale_vat" required>
-                {% for vat in quick_vats %}
-                <option value="{{ vat.pk }}">{{ vat }}</option>
-                {% endfor %}
-              </select>
-              <div class="invalid-feedback d-block" data-error-for="sale_vat"></div>
-            </div>
-            <div class="col-md-6 mb-3">
               <label class="form-label" for="qp-purchase-price">Prezzo acquisto</label>
               <input class="form-control" type="number" step="any" min="0" id="qp-purchase-price" name="purchase_price" value="0">
               <div class="invalid-feedback d-block" data-error-for="purchase_price"></div>
             </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label" for="qp-purchase-vat">IVA acquisto</label>
-              <select class="form-select" id="qp-purchase-vat" name="purchase_vat" required>
-                {% for vat in quick_vats %}
-                <option value="{{ vat.pk }}">{{ vat }}</option>
-                {% endfor %}
-              </select>
-              <div class="invalid-feedback d-block" data-error-for="purchase_vat"></div>
+            <div class="col-md-12 mb-3">
+              <label class="form-label" for="qp-min-stock">Riordino automatico (scorta minima)</label>
+              <input class="form-control" type="number" step="any" min="0" id="qp-min-stock" name="min_stock" value="0">
+              <div class="small text-muted">Se la giacenza scende sotto questo valore l'articolo viene segnalato da riordinare.</div>
+              <div class="invalid-feedback d-block" data-error-for="min_stock"></div>
             </div>
           </div>
         </div>

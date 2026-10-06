@@ -34,11 +34,13 @@ PO_RECEIVE_ROLES = (ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUSE)
 
 
 def with_vat_rates(context):
+    from apps.contacts.models import Contact
     from apps.core.forms import active_units, active_vat_rates
 
     context["vat_rates_json"] = {str(v.pk): str(v.rate) for v in VatRate.objects.filter(is_active=True)}
     context["quick_uoms"] = active_units()
     context["quick_vats"] = active_vat_rates()
+    context["quick_suppliers"] = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
     return context
 
 
