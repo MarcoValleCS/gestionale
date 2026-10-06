@@ -16,7 +16,8 @@ Uso:
 Opzioni utili:
     --dry-run          mostra cosa verrebbe creato senza scrivere nulla
     --ricarico 50      imposta il prezzo di vendita = listino + 50%
-    --scorta 2         scorta minima per il riordino automatico (predefinita 1)
+    --scorta 2         scorta minima per il riordino automatico (predefinita 0:
+                       gli articoli importati non sono a scorta finché non lo decidi)
     --solo-nuovi       non aggiorna gli articoli già presenti
     --valido-dal DATA  inizio validità del listino (AAAA-MM-GG, es. 2027-01-01)
     --valido-al DATA   fine validità del listino (AAAA-MM-GG)
@@ -599,7 +600,7 @@ class Command(BaseCommand):
         parser.add_argument("fornitore", choices=sorted(LETTORI), help="Quale listino importare.")
         parser.add_argument("--file", required=True, help="Percorso del file del listino.")
         parser.add_argument("--nome-listino", default="", help="Nome da dare al listino nel gestionale.")
-        parser.add_argument("--scorta", type=float, default=1, help="Scorta minima per il riordino automatico (0 per non impostarla).")
+        parser.add_argument("--scorta", type=float, default=0, help="Scorta minima per il riordino automatico (0, predefinito, = nessuna scorta minima).")
         parser.add_argument("--ricarico", type=float, default=0, help="Ricarico %% sul prezzo di vendita (0 = da definire).")
         parser.add_argument("--solo-nuovi", action="store_true", help="Non aggiorna gli articoli già presenti.")
         parser.add_argument("--dry-run", action="store_true", help="Mostra il risultato senza salvare.")

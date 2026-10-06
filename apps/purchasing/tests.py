@@ -1,5 +1,6 @@
 """Test dell'importazione dei listini fornitori."""
 import tempfile
+from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 
@@ -60,6 +61,7 @@ class ImportaListiniAxorTest(TestCase):
         self.assertEqual(prodotto.barcode, "4011097342597")
         self.assertEqual(prodotto.category.name, "Rubinetteria")
         self.assertEqual(prodotto.main_supplier, listino.supplier)
+        self.assertEqual(prodotto.min_stock, Decimal("0"), "l'import non imposta scorte minime")
 
         voce = PriceListItem.objects.get(pricelist=listino, product=prodotto)
         self.assertEqual(voce.supplier_code, "10303180")
