@@ -52,7 +52,7 @@
               <th class="text-end">Prezzo</th>
               <th class="text-end">Sc. %</th>
               <th class="text-end">IVA</th>
-              <th class="text-end">Totale</th>
+              <th class="text-end">Importo</th>
             </tr>
           </thead>
           <tbody>
@@ -62,7 +62,18 @@
               <td colspan="8" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
             </tr>
             {% endif %}
-            {% for line in group.lines %}
+            {% for block in group.blocks %}
+            {% if block.subsection %}
+            <tr class="table-light">
+              <td colspan="8" class="fw-semibold small ps-4">{{ block.subsection }}</td>
+            </tr>
+            {% endif %}
+            {% for line in block.lines %}
+            {% if line.line_type == "note" %}
+            <tr>
+              <td colspan="8" class="fst-italic text-muted small ps-4">{{ line.description }}</td>
+            </tr>
+            {% else %}
             <tr>
               <td class="text-muted">{{ line.row_number }}</td>
               <td>
@@ -74,9 +85,23 @@
               <td class="text-end">{{ line.unit_price|money }} €</td>
               <td class="text-end">{{ line.discount_pct|qty }}%</td>
               <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
-              <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+              <td class="text-end fw-semibold">{{ line.line_subtotal|money }} €</td>
             </tr>
+            {% endif %}
             {% endfor %}
+            {% if block.subsection and block.lines %}
+            <tr class="table-light">
+              <td colspan="7" class="text-end small text-muted">Totale {{ block.subsection }}</td>
+              <td class="text-end fw-semibold">{{ block.subtotal|money }} €</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            {% if group.section and group.lines %}
+            <tr class="table-light">
+              <td colspan="7" class="text-end small text-muted">Totale {{ group.section }}</td>
+              <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>
+            </tr>
+            {% endif %}
             {% empty %}
             <tr><td colspan="8" class="text-center text-muted py-3">Nessuna riga</td></tr>
             {% endfor %}

@@ -43,7 +43,7 @@
                 <th class="col-prezzo">Prezzo</th>
                 <th class="col-sconto">Sc. %</th>
                 <th class="col-iva">IVA</th>
-                <th class="col-totale text-end">Totale</th>
+                <th class="col-totale text-end" title="Imponibile di riga (q.tà × prezzo scontato, IVA esclusa)">Importo</th>
                 <th class="col-margine text-end">Margine</th>
                 <th class="col-azioni"></th>
               </tr>
@@ -55,6 +55,7 @@
             </tbody>
           </table>
         </div>
+        <div id="lines-feedback" class="alert alert-danger py-2 small m-3 d-none"></div>
         {% if line_formset.non_form_errors %}
         <div class="card-body py-2 text-danger small">{% for error in line_formset.non_form_errors %}{{ error }}<br>{% endfor %}</div>
         {% endif %}

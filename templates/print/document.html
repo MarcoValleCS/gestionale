@@ -319,7 +319,7 @@
         </tr>
         {% endif %}
         {% endfor %}
-        {% if group.section and show_prices %}
+        {% if group.section and group.lines and show_prices %}
         <tr class="section-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ group.section }}</td>
           <td class="num">{{ group.subtotal|money }} €</td>

@@ -79,6 +79,18 @@ class LineFormMixin:
     service_fields = {"position", "line_type"}
 
     def has_changed(self):
+        # Una riga di testo (sezione/sottosezione/nota) scelta dall'utente
+        # è sempre una modifica, anche se il titolo è ancora vuoto: così
+        # una sottosezione vuota viene validata (errore «Scrivi il testo…»)
+        # invece di sparire in silenzio al salvataggio. La riga articolo
+        # vuota in fondo al modulo resta invece ignorata come prima.
+        if self.is_bound:
+            try:
+                tipo_inviato = (self.data.get(self.add_prefix("line_type"), "") or "").strip()
+            except Exception:
+                tipo_inviato = ""
+            if tipo_inviato in DISPLAY_LINE_TYPES:
+                return True
         if not super().has_changed():
             return False
         ignorati = set(self.service_fields)

@@ -434,6 +434,17 @@ a:hover {
   padding-left: 1.6rem;
 }
 
+/* Riga con titolo mancante: evidenziata finché non si compila o elimina. */
+.doc-lines tr.line-invalid td { background: #fef2f2; }
+.doc-lines tr.line-invalid .cell-descrizione input {
+  border-color: #dc3545;
+  background: #fff;
+}
+.doc-lines tr.line-invalid .cell-descrizione input:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+}
+
 /* ----------------------------------------------------- posta ricevuta */
 .email-body {
   font-size: 0.9rem;

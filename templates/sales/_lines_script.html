@@ -129,7 +129,10 @@
       const lineVat = lineSubtotal * rate / 100;
       subtotal += lineSubtotal;
       const cell = row.querySelector(".line-total");
-      if (cell) cell.textContent = currency.format(lineSubtotal + lineVat) + " €";
+      // Importo di riga = imponibile (q.tà × prezzo scontato): deve quadrare
+      // con i subtotali di sezione/sottosezione e con la stampa, dove l'IVA
+      // esce solo nel riepilogo. Prima mostrava l'IVA inclusa e i conti non tornavano.
+      if (cell) cell.textContent = currency.format(lineSubtotal) + " €";
 
       // margine della riga: prezzo netto meno costo di acquisto
       const cost = rowCost(row);
@@ -227,6 +230,10 @@
         if (price) price.value = data.price;
         const vat = row.querySelector('[name$="-vat_rate"]');
         if (vat && data.vat_id) vat.value = data.vat_id;
+        // Quantità e sconto non arrivano dall'articolo: se la riga è vuota
+        // (tipico dopo un salvataggio fallito) si ripristinano i default,
+        // altrimenti resterebbero a mano a 0/vuoto.
+        ensureQtyAndDiscount(row);
         // il costo dell'articolo serve al calcolo del margine
         if (data.cost !== undefined && data.cost !== null) {
           row.dataset.cost = data.cost;
@@ -288,14 +295,12 @@
     const removeButton = row.querySelector(".remove-line");
     if (removeButton) {
       removeButton.addEventListener("click", function () {
-        const idField = row.querySelector('input[name$="-id"]');
+        // Si nasconde sempre invece di rimuovere dal DOM: gli indici del
+        // formset (lines-0, lines-1…) devono restare contigui, altrimenti al
+        // salvataggio successivo Django riceve buchi e ricrea righe spurie.
         const checkbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
-        if (idField && idField.value && checkbox) {
-          checkbox.checked = true;
-          row.classList.add("d-none");
-        } else {
-          row.remove();
-        }
+        if (checkbox) checkbox.checked = true;
+        row.classList.add("d-none");
         renumber();
         recalc();
       });
@@ -329,6 +334,10 @@
     }
     setFieldValue(row, '[name$="-description"]', values.description);
     setFieldValue(row, '[name$="-line_type"]', values.lineType);
+    // Quantità di default: i componenti kit la passano, le righe nuove no.
+    if (values.qty === undefined || values.qty === null || String(values.qty).trim() === "") {
+      values.qty = "1";
+    }
     setFieldValue(row, '[name$="-qty"]', values.qty);
     setSelectValue(row.querySelector('[name$="-uom"]'), values.uom);
     setFieldValue(row, '[name$="-unit_price"]', values.unitPrice);
@@ -365,6 +374,29 @@
   const customerDiscountsEl = document.getElementById("customer-discounts");
   const customerDiscounts = customerDiscountsEl ? JSON.parse(customerDiscountsEl.textContent) : {};
   const customerDiscountSelect = document.getElementById("id_customer");
+
+  function currentCustomerDiscount() {
+    if (!customerDiscountSelect) return 0;
+    const raw = customerDiscounts[customerDiscountSelect.value];
+    const numero = parseNumber(raw);
+    return isNaN(numero) ? 0 : numero;
+  }
+
+  function ensureQtyAndDiscount(row) {
+    if (isDisplay(row) || isDeleted(row)) return;
+    const qtyField = row.querySelector('[name$="-qty"]');
+    if (qtyField && (String(qtyField.value || "").trim() === "" || parseNumber(qtyField.value) === 0)) {
+      qtyField.value = "1";
+    }
+    const discountField = row.querySelector('[name$="-discount_pct"]');
+    const scontoCliente = currentCustomerDiscount();
+    if (discountField && scontoCliente) {
+      const current = parseFloat(String(discountField.value || "").replace(",", "."));
+      if (String(discountField.value || "").trim() === "" || isNaN(current) || current === 0) {
+        discountField.value = String(scontoCliente).replace(".", ",");
+      }
+    }
+  }
 
   function applyCustomerDiscount(row) {
     if (!customerDiscountSelect) return;
@@ -409,7 +441,69 @@
   /* API usata dagli altri script (modelli di preventivo, creazioni rapide) */
   window.GestionaleLines = { addRow: addRow, recalc: recalc, renumber: renumber };
 
-  tableBody.querySelectorAll("tr.line-row").forEach(bindRow);
+  function linesFeedback(message) {
+    let box = document.getElementById("lines-feedback");
+    if (!box) return;
+    if (!message) {
+      box.classList.add("d-none");
+      box.textContent = "";
+      return;
+    }
+    box.classList.remove("d-none");
+    box.innerHTML = "<i class='bi bi-exclamation-triangle me-1'></i>" + message;
+  }
+
+  function validateLines() {
+    let primoErrore = null;
+    tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
+      if (row.classList.contains("d-none") || isDeleted(row)) {
+        row.classList.remove("line-invalid");
+        return;
+      }
+      const desc = row.querySelector('[name$="-description"]');
+      if (isDisplay(row) && desc && desc.value.trim() === "") {
+        row.classList.add("line-invalid");
+        desc.classList.add("is-invalid");
+        if (!primoErrore) primoErrore = desc;
+      } else {
+        row.classList.remove("line-invalid");
+        if (desc) desc.classList.remove("is-invalid");
+      }
+    });
+    if (primoErrore) {
+      const tipo = lineType(primoErrore.closest("tr")) || "article";
+      const nomi = { section: "della sezione", subsection: "della sottosezione", note: "della nota" };
+      linesFeedback("Scrivi il titolo " + (nomi[tipo] || "della riga") + " evidenziata prima di salvare (le righe vuote vanno compilate o eliminate con il cestino).");
+      primoErrore.focus();
+      primoErrore.scrollIntoView({ block: "center", behavior: "smooth" });
+      return false;
+    }
+    linesFeedback(null);
+    return true;
+  }
+
+  tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
+    bindRow(row);
+    // Dopo un salvataggio fallito il server rimanda le righe marcate DELETE:
+    // restano nascoste invece di riapparire.
+    if (isDeleted(row)) row.classList.add("d-none");
+    else ensureQtyAndDiscount(row);
+    const desc = row.querySelector('[name$="-description"]');
+    if (desc) {
+      desc.addEventListener("input", function () {
+        if (desc.value.trim() !== "") {
+          desc.classList.remove("is-invalid");
+          desc.closest("tr").classList.remove("line-invalid");
+        }
+      });
+    }
+  });
+  const documentForm = document.getElementById("document-form");
+  if (documentForm) {
+    documentForm.addEventListener("submit", function (event) {
+      if (!validateLines()) event.preventDefault();
+    });
+  }
   renumber();
   recalc();
 })();

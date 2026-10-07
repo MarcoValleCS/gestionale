@@ -71,7 +71,7 @@
               <th class="text-end">Prezzo</th>
               <th class="text-end">Sc. %</th>
               <th class="text-end">IVA</th>
-              <th class="text-end">Totale</th>
+              <th class="text-end">Importo</th>
             </tr>
           </thead>
           <tbody>
@@ -104,7 +104,7 @@
               <td class="text-end">{{ line.unit_price|money }} €</td>
               <td class="text-end">{{ line.discount_pct|qty }}%</td>
               <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
-              <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+              <td class="text-end fw-semibold">{{ line.line_subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% endfor %}
@@ -115,7 +115,7 @@
             </tr>
             {% endif %}
             {% endfor %}
-            {% if group.section %}
+            {% if group.section and group.lines %}
             <tr class="table-light">
               <td colspan="7" class="text-end small text-muted">Totale {{ group.section }}</td>
               <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>

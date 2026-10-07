@@ -159,10 +159,19 @@ def group_lines_by_section(lines):
             corrente = nuovo_gruppo((line.description or "").strip(), line)
             blocco = nuovo_blocco(corrente)
             continue
-        sezione_legacy = line.section or ""
-        if sezione_legacy and (corrente is None or corrente["section"] != sezione_legacy):
-            corrente = nuovo_gruppo(sezione_legacy)
-            blocco = nuovo_blocco(corrente)
+        # Vecchio campo «section» per riga: vale solo per gli articoli dei
+        # documenti storici (fatture/DDT/ordini fornitore lo usano ancora).
+        # Se il documento usa già sezioni esplicite (riga «sezione»), il campo
+        # legacy va ignorato: altrimenti un testo residuo spezzerebbe la
+        # sezione esplicita creando gruppi spuri.
+        sezione_legacy = getattr(line, "section", "") or ""
+        if tipo != LINE_ARTICLE:
+            sezione_legacy = ""
+        if sezione_legacy:
+            esplicita_attiva = corrente is not None and corrente.get("section_line") is not None
+            if not esplicita_attiva and (corrente is None or corrente["section"] != sezione_legacy):
+                corrente = nuovo_gruppo(sezione_legacy)
+                blocco = nuovo_blocco(corrente)
         if corrente is None:
             corrente = nuovo_gruppo("")
         if blocco is None:

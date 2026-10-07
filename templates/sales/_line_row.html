@@ -1,4 +1,4 @@
-<tr class="line-row" data-cost="{{ lineform.instance.unit_cost|default:'' }}">
+<tr class="line-row{% if lineform.errors %} line-invalid{% endif %}" data-cost="{{ lineform.instance.unit_cost|default:'' }}">
   <td class="d-none">
     {{ lineform.id }}{{ lineform.position }}{{ lineform.line_type }}
     {% if lineform.section.is_hidden %}{{ lineform.section }}{% endif %}
@@ -22,7 +22,10 @@
       {{ lineform.product }}
     </div>
   </td>
-  <td class="cell-descrizione">{{ lineform.description }}</td>
+  <td class="cell-descrizione">{{ lineform.description }}
+    {% if lineform.description.errors %}<div class="invalid-feedback d-block">{{ lineform.description.errors|striptags }}</div>{% endif %}
+    {% if lineform.non_field_errors %}<div class="invalid-feedback d-block">{{ lineform.non_field_errors|striptags }}</div>{% endif %}
+  </td>
   {% if not lineform.section.is_hidden %}<td class="cell-sezione">{{ lineform.section }}</td>{% endif %}
   <td class="cell-qta">{{ lineform.qty }}</td>
   <td class="cell-um">{{ lineform.uom }}</td>

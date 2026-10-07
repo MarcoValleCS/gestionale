@@ -1386,6 +1386,59 @@ class RigheStileOdooTest(FlowTestBase):
         self.assertEqual(sezione.position, 1)
         self.assertEqual(quote.lines.get(line_type="article").position, 2)
 
+    def test_sottosezione_vuota_blocca_il_salvataggio(self):
+        """Una sottosezione senza titolo deve fallire (non sparire in silenzio):
+        il form rimanda i valori inseriti così l'utente corregge senza reinserire tutto."""
+        prima = Quote.objects.count()
+        response = self.client.post(
+            reverse("sales:quote_create"),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "3",
+                "lines-INITIAL_FORMS": "0",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-line_type": "section",
+                "lines-0-position": "1",
+                "lines-0-description": "Bagno",
+                "lines-0-qty": "1",
+                "lines-0-unit_price": "0",
+                "lines-0-discount_pct": "0",
+                # sottosezione vuota: deve bloccare, non essere scartata
+                "lines-1-line_type": "subsection",
+                "lines-1-position": "2",
+                "lines-1-description": "",
+                "lines-1-qty": "1",
+                "lines-1-unit_price": "0",
+                "lines-1-discount_pct": "0",
+                "lines-2-line_type": "article",
+                "lines-2-position": "3",
+                "lines-2-product": self.product.pk,
+                "lines-2-description": "Mobile",
+                "lines-2-qty": "2",
+                "lines-2-uom": self.uom.pk,
+                "lines-2-unit_price": "100",
+                "lines-2-discount_pct": "5",
+                "lines-2-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200, "la sottosezione vuota deve bloccare il salvataggio")
+        self.assertEqual(Quote.objects.count(), prima, "nessun preventivo creato con sottosezione vuota")
+        pagina = response.content.decode("utf-8")
+        self.assertIn("Scrivi il testo della sezione", pagina)
+        # i valori buoni restano nel form: q.tà e sconto non vanno reinseriti a mano
+        self.assertIn('value="2"', pagina)
+        self.assertInHTML('<input type="number" name="lines-2-qty" value="2" step="0.001" class="form-control" id="id_lines-2-qty">', pagina)
+
+
     def test_spostare_le_righe_cambia_l_ordine(self):
         quote = Quote.objects.create(customer=self.customer)
         prima = quote.lines.create(
