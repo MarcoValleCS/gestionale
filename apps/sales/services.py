@@ -30,6 +30,8 @@ def duplicate_quote(quote, user=None):
             QuoteLine.objects.create(
                 quote=new,
                 position=line.position,
+                line_type=line.line_type,
+                section=line.section,
                 product=line.product,
                 description=line.description,
                 qty=line.qty,
@@ -116,6 +118,8 @@ def convert_quote_to_order(quote, user=None):
             SalesOrderLine.objects.create(
                 order=order,
                 position=line.position,
+                line_type=line.line_type,
+                section=line.section,
                 product=line.product,
                 description=line.description,
                 qty=line.qty,
@@ -241,6 +245,8 @@ def deliver_sales_order(order, user=None, warehouse=None):
 
     errors = []
     for line in order.lines.select_related("product"):
+        if line.is_display:
+            continue
         remaining = line.qty_remaining
         if remaining <= 0:
             continue

@@ -9,7 +9,15 @@ from apps.contacts.models import Contact
 from apps.core.forms import AutocompleteSelect, BaseBootstrapModelForm, menu_aliquote, menu_unita, usa_autocomplete
 from apps.core.models import CompanySettings
 
-from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine
+from .models import (
+    DISPLAY_LINE_TYPES,
+    Quote,
+    QuoteLine,
+    QuoteTemplate,
+    QuoteTemplateLine,
+    SalesOrder,
+    SalesOrderLine,
+)
 
 
 class CustomerChoiceFormMixin:
@@ -90,15 +98,30 @@ class LineFormMixin:
         self.fields["vat_rate"].choices = menu_aliquote()
         self.fields["description"].required = False
         self.fields["description"].label = "Descrizione"
-        # Le sezioni raggruppano le righe per ambiente (es. «Bagno 1») e fanno
-        # uscire il subtotale in scheda e in stampa: il segnaposto serve a far
-        # capire a cosa serve la colonna.
-        self.fields["section"].required = False
-        self.fields["section"].widget.attrs["placeholder"] = "es. Bagno 1"
+        if "line_type" in self.fields:
+            # Preventivi, ordini e modelli: posizione e tipo riga viaggiano
+            # nascosti (l'ordine lo decide l'utente con le frecce su/giù) e la
+            # vecchia sezione per riga lascia il posto alle righe «Sezione».
+            self.fields["position"].required = False
+            self.fields["position"].widget = forms.HiddenInput()
+            self.fields["line_type"].required = False
+            self.fields["line_type"].widget = forms.HiddenInput()
+            self.fields["section"].required = False
+            self.fields["section"].widget = forms.HiddenInput()
+        else:
+            # Fatture e DDT: la sezione resta il campo di testo per riga
+            self.fields["section"].required = False
+            self.fields["section"].widget.attrs["placeholder"] = "es. Bagno 1"
 
     def clean(self):
         data = super().clean()
         if not self.has_changed():
+            return data
+        if data.get("line_type") in DISPLAY_LINE_TYPES:
+            # sezione, sottosezione o nota: serve solo il testo
+            if not (data.get("description") or "").strip():
+                raise forms.ValidationError("Scrivi il testo della sezione, della sottosezione o della nota.")
+            data["product"] = None
             return data
         product = data.get("product")
         description = (data.get("description") or "").strip()
@@ -176,7 +199,7 @@ class QuoteTemplateLineForm(LineFormMixin, BaseBootstrapModelForm):
 
     class Meta:
         model = QuoteTemplateLine
-        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["position", "line_type", "section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -186,7 +209,7 @@ class QuoteTemplateLineForm(LineFormMixin, BaseBootstrapModelForm):
 class QuoteLineForm(LineFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = QuoteLine
-        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["position", "line_type", "section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -196,7 +219,7 @@ class QuoteLineForm(LineFormMixin, BaseBootstrapModelForm):
 class SalesOrderLineForm(LineFormMixin, BaseBootstrapModelForm):
     class Meta:
         model = SalesOrderLine
-        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["position", "line_type", "section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

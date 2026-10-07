@@ -44,6 +44,7 @@
             product: line.product,
             productLabel: line.product_label,
             description: line.description,
+            lineType: line.line_type,
             qty: line.qty,
             uom: line.uom,
             unitPrice: line.unit_price,

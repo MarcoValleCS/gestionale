@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from .models import SalesOrder, SalesOrderLine, round2
+from .models import DISPLAY_LINE_TYPES, SalesOrder, SalesOrderLine, round2
 
 ZERO = Decimal("0")
 
@@ -50,11 +50,15 @@ def line_cost(line):
 
 def delivered_lines(period):
     start, end = period_bounds(period)
-    return SalesOrderLine.objects.filter(
-        order__status=SalesOrder.STATUS_DELIVERED,
-        order__delivered_at__date__gte=start,
-        order__delivered_at__date__lte=end,
-    ).select_related("product", "product__main_supplier", "order", "order__customer", "order__job")
+    return (
+        SalesOrderLine.objects.filter(
+            order__status=SalesOrder.STATUS_DELIVERED,
+            order__delivered_at__date__gte=start,
+            order__delivered_at__date__lte=end,
+        )
+        .exclude(line_type__in=DISPLAY_LINE_TYPES)
+        .select_related("product", "product__main_supplier", "order", "order__customer", "order__job")
+    )
 
 
 def lines_with_shares(period):
@@ -395,11 +399,15 @@ def monthly_series(months=12, end_offset=0):
     else:
         end = date(end_year, end_month, calendar.monthrange(end_year, end_month)[1])
 
-    lines = SalesOrderLine.objects.filter(
-        order__status=SalesOrder.STATUS_DELIVERED,
-        order__delivered_at__date__gte=start,
-        order__delivered_at__date__lte=end,
-    ).select_related("product", "order")
+    lines = (
+        SalesOrderLine.objects.filter(
+            order__status=SalesOrder.STATUS_DELIVERED,
+            order__delivered_at__date__gte=start,
+            order__delivered_at__date__lte=end,
+        )
+        .exclude(line_type__in=DISPLAY_LINE_TYPES)
+        .select_related("product", "order")
+    )
 
     buckets = {}
     commission_by_order = {}

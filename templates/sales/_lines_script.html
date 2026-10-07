@@ -40,6 +40,68 @@
     return checkbox && checkbox.checked;
   }
 
+  /* Tipo riga: «article» è la riga normale, gli altri sono righe di testo
+     (sezione, sottosezione, nota) senza prezzo né quantità. */
+  function lineType(row) {
+    const field = row.querySelector('[name$="-line_type"]');
+    return field && field.value ? field.value : "article";
+  }
+
+  function isDisplay(row) {
+    return lineType(row) !== "article";
+  }
+
+  const DISPLAY_PLACEHOLDERS = {
+    section: "Titolo della sezione (es. Bagno padronale)",
+    subsection: "Titolo della sottosezione",
+    note: "Nota o descrizione libera",
+  };
+
+  /* Sezione, sottosezione e nota occupano l'intera riga: si nascondono le
+     colonne di prezzo e la descrizione si allarga (come in Odoo). */
+  function applyLineType(row) {
+    const tipo = lineType(row);
+    const display = tipo !== "article";
+    row.classList.toggle("line-display", display);
+    row.classList.remove("line-type-section", "line-type-subsection", "line-type-note");
+    if (display) row.classList.add("line-type-" + tipo);
+    row.querySelectorAll(".cell-articolo, .cell-qta, .cell-um, .cell-prezzo, .cell-sconto, .cell-iva, .cell-totale, .cell-margine")
+      .forEach(function (cell) { cell.style.display = display ? "none" : ""; });
+    const descCell = row.querySelector(".cell-descrizione");
+    if (descCell) descCell.colSpan = display ? 9 : 1;
+    const desc = row.querySelector('[name$="-description"]');
+    if (desc) desc.placeholder = display ? (DISPLAY_PLACEHOLDERS[tipo] || "") : "";
+  }
+
+  /* La posizione salvata segue l'ordine visibile delle righe (frecce su/giù). */
+  function renumber() {
+    let posizione = 1;
+    tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
+      if (row.classList.contains("d-none") || isDeleted(row)) return;
+      const field = row.querySelector('[name$="-position"]');
+      if (field) field.value = posizione;
+      posizione += 1;
+    });
+  }
+
+  function rigaVisibile(row, direzione) {
+    let fratello = direzione < 0 ? row.previousElementSibling : row.nextElementSibling;
+    while (fratello) {
+      if (!fratello.classList.contains("d-none") && !isDeleted(fratello)) return fratello;
+      fratello = direzione < 0 ? fratello.previousElementSibling : fratello.nextElementSibling;
+    }
+    return null;
+  }
+
+  function moveLine(row, direzione) {
+    const altra = rigaVisibile(row, direzione);
+    if (!altra) return;
+    if (direzione < 0) tableBody.insertBefore(row, altra);
+    else tableBody.insertBefore(altra, row);
+    renumber();
+    recalc();
+  }
+
   /* Il pulsante «apri scheda articolo» si attiva solo quando la riga ha un articolo. */
   function aggiornaPulsanteArticolo(row) {
     const pulsante = row.querySelector("[data-open-product]");
@@ -53,7 +115,7 @@
     let costoTotale = 0;
     const vatMap = {};
     tableBody.querySelectorAll("tr.line-row").forEach(function (row) {
-      if (isDeleted(row)) return;
+      if (isDeleted(row) || isDisplay(row)) return;
       const qtyField = row.querySelector('[name$="-qty"]');
       const priceField = row.querySelector('[name$="-unit_price"]');
       const discountField = row.querySelector('[name$="-discount_pct"]');
@@ -201,6 +263,13 @@
       field.addEventListener("input", recalc);
       field.addEventListener("change", recalc);
     });
+    // frecce su/giù: spostano la riga dentro la tabella
+    row.querySelectorAll(".move-line").forEach(function (button) {
+      button.addEventListener("click", function () {
+        moveLine(row, parseInt(button.dataset.dir, 10) || 0);
+      });
+    });
+    applyLineType(row);
     // pulsante «apri la scheda articolo»: attivo solo se c'è un articolo scelto
     const apriArticolo = row.querySelector("[data-open-product]");
     if (apriArticolo) {
@@ -227,6 +296,7 @@
         } else {
           row.remove();
         }
+        renumber();
         recalc();
       });
     }
@@ -258,12 +328,14 @@
       searchInput.value = option && option.value ? option.text : "";
     }
     setFieldValue(row, '[name$="-description"]', values.description);
+    setFieldValue(row, '[name$="-line_type"]', values.lineType);
     setFieldValue(row, '[name$="-qty"]', values.qty);
     setSelectValue(row.querySelector('[name$="-uom"]'), values.uom);
     setFieldValue(row, '[name$="-unit_price"]', values.unitPrice);
     setFieldValue(row, '[name$="-discount_pct"]', values.discount);
     setSelectValue(row.querySelector('[name$="-vat_rate"]'), values.vat);
     aggiornaPulsanteArticolo(row);
+    applyLineType(row);
   }
 
   function addRow(values) {
@@ -277,8 +349,15 @@
     totalFormsInput.value = index + 1;
     bindRow(row);
     if (values) fillRow(row, values);
+    applyLineType(row);
     applyCustomerDiscount(row);
+    renumber();
     recalc();
+    // se è una riga di testo, il cursore va subito sul titolo
+    if (values && values.lineType && values.lineType !== "article") {
+      const desc = row.querySelector('[name$="-description"]');
+      if (desc) desc.focus();
+    }
     return row;
   }
 
@@ -289,6 +368,7 @@
 
   function applyCustomerDiscount(row) {
     if (!customerDiscountSelect) return;
+    if (isDisplay(row)) return;
     const discount = customerDiscounts[customerDiscountSelect.value];
     if (!discount) return;
     const field = row.querySelector('[name$="-discount_pct"]');
@@ -308,15 +388,29 @@
     });
   }
 
+  /* Pulsanti «Aggiungi»: riga normale, sezione, sottosezione, nota. */
+  document.querySelectorAll("[data-add-line-type]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      const tipo = button.dataset.addLineType || "article";
+      if (tipo === "article") {
+        addRow();
+      } else {
+        addRow({ lineType: tipo, qty: "1", unitPrice: "0", discount: "0" });
+      }
+    });
+  });
+
+  /* Compatibilità: i moduli senza sezioni usano ancora il solo «Aggiungi riga». */
   const addButton = document.getElementById("add-line");
-  if (addButton) {
+  if (addButton && !addButton.dataset.addLineType) {
     addButton.addEventListener("click", function () { addRow(); });
   }
 
   /* API usata dagli altri script (modelli di preventivo, creazioni rapide) */
-  window.GestionaleLines = { addRow: addRow, recalc: recalc };
+  window.GestionaleLines = { addRow: addRow, recalc: recalc, renumber: renumber };
 
   tableBody.querySelectorAll("tr.line-row").forEach(bindRow);
+  renumber();
   recalc();
 })();
 </script>

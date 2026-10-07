@@ -26,7 +26,16 @@ from .forms import (
     SalesOrderForm,
     SalesOrderLineForm,
 )
-from .models import Quote, QuoteLine, QuoteTemplate, QuoteTemplateLine, SalesOrder, SalesOrderLine, group_lines_by_section
+from .models import (
+    LINE_ARTICLE,
+    Quote,
+    QuoteLine,
+    QuoteTemplate,
+    QuoteTemplateLine,
+    SalesOrder,
+    SalesOrderLine,
+    group_lines_by_section,
+)
 
 QuoteLineFormSet = modelformset_factory(QuoteLine, form=QuoteLineForm, extra=1, can_delete=True)
 SalesOrderLineFormSet = modelformset_factory(SalesOrderLine, form=SalesOrderLineForm, extra=1, can_delete=True)
@@ -323,10 +332,25 @@ def save_document_lines(document, formset, fk_field):
     lines = formset.save(commit=False)
     for line in lines:
         setattr(line, fk_field, document)
+        # i moduli che non inviano posizione e tipo (fatture, ordini fornitore)
+        # ricadono sui valori di default
+        if line.position is None:
+            line.position = 0
+        if not line.line_type:
+            line.line_type = LINE_ARTICLE
         line.save()
+    eliminati = {obj.pk for obj in formset.deleted_objects}
     for line in formset.deleted_objects:
         line.delete()
-    for position, line in enumerate(document.lines.order_by("pk"), start=1):
+    # L'ordine delle righe lo decide l'utente con le frecce su/giù: se il modulo
+    # invia la posizione (preventivi, ordini, modelli) si rispetta quella,
+    # altrimenti si ricade sull'ordine di creazione (comportamento storico).
+    if "position" in getattr(formset.form, "base_fields", {}):
+        righe = [f.instance for f in formset.forms if f.instance.pk and f.instance.pk not in eliminati]
+        righe.sort(key=lambda riga: (riga.position or 0, riga.pk))
+    else:
+        righe = list(document.lines.order_by("pk"))
+    for position, line in enumerate(righe, start=1):
         if line.position != position:
             line.position = position
             line.save(update_fields=["position"])
@@ -929,6 +953,7 @@ def quote_template_data(request, pk):
                 "product": line.product_id,
                 "product_label": f"{line.product.code} – {line.product.name}" if line.product_id else "",
                 "description": line.description or (line.product.name if line.product_id else ""),
+                "line_type": line.line_type,
                 "qty": plain_number(line.qty),
                 "uom": line.uom_id,
                 "unit_price": plain_number(line.unit_price),

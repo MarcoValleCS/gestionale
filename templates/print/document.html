@@ -115,6 +115,19 @@
       font-size: 10.5px;
       border-bottom: 2px solid var(--doc-color);
     }
+    table.lines tr.subsection-row td {
+      background: #f7f9fc;
+      font-weight: 600;
+      font-size: 10.5px;
+      padding-left: 8mm;
+    }
+    table.lines tr.note-row td {
+      background: transparent;
+      color: #6b7280;
+      font-style: italic;
+      font-size: 10.5px;
+      padding-left: 8mm;
+    }
     .num { text-align: right; white-space: nowrap; }
     .item-code { color: #6b7280; font-size: 10.5px; }
     .item-desc { font-weight: 600; color: #111827; }
@@ -268,6 +281,15 @@
         </tr>
         {% endif %}
         {% for line in group.lines %}
+        {% if line.line_type == "subsection" %}
+        <tr class="subsection-row">
+          <td colspan="{{ table_columns }}">{{ line.description }}</td>
+        </tr>
+        {% elif line.line_type == "note" %}
+        <tr class="note-row">
+          <td colspan="{{ table_columns }}">{{ line.description }}</td>
+        </tr>
+        {% else %}
         <tr>
           <td>{{ line.row_number }}</td>
           <td>
@@ -283,6 +305,7 @@
           <td class="num">{{ line.line_subtotal|money }} €</td>
           {% endif %}
         </tr>
+        {% endif %}
         {% endfor %}
         {% if group.section and show_prices %}
         <tr class="section-total">

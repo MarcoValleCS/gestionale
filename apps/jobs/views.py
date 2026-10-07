@@ -287,6 +287,7 @@ def maintenance_create_quote(request, pk):
             QuoteLine.objects.create(
                 quote=quote,
                 position=line.position,
+                line_type=line.line_type,
                 section=line.section,
                 product=line.product,
                 description=line.description,

@@ -403,7 +403,36 @@ a:hover {
 .doc-lines .col-iva { min-width: 100px; }
 .doc-lines .col-totale { min-width: 120px; }
 .doc-lines .col-margine { min-width: 110px; }
-.doc-lines .col-azioni { min-width: 56px; }
+.doc-lines .col-azioni { min-width: 148px; }
+
+/* Righe di testo stile Odoo: sezione, sottosezione e nota. Non hanno prezzo
+   né quantità: la descrizione occupa tutta la riga e il testo è in evidenza. */
+.doc-lines tr.line-display .cell-descrizione input {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.doc-lines tr.line-display .cell-descrizione input:focus {
+  border-color: #86b7fe;
+  background: #fff;
+}
+.doc-lines tr.line-type-section td { background: #eef2f7; }
+.doc-lines tr.line-type-section .cell-descrizione input {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.doc-lines tr.line-type-subsection td { background: #f6f8fb; }
+.doc-lines tr.line-type-subsection .cell-descrizione input {
+  font-weight: 600;
+  padding-left: 1.6rem;
+}
+.doc-lines tr.line-type-note td { background: #fcfcfd; }
+.doc-lines tr.line-type-note .cell-descrizione input {
+  font-style: italic;
+  color: #6b7280;
+  padding-left: 1.6rem;
+}
 
 /* ----------------------------------------------------- posta ricevuta */
 .email-body {

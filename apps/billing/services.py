@@ -31,7 +31,7 @@ def create_delivery_note_from_order(order, user=None):
     """Crea una bozza di DDT con le quantità non ancora consegnate dell'ordine."""
     if order.status == SalesOrder.STATUS_CANCELLED:
         raise ValidationError("L'ordine è annullato.")
-    lines = [line for line in order.lines.select_related("product") if line.qty_remaining > 0]
+    lines = [line for line in order.lines.select_related("product") if not line.is_display and line.qty_remaining > 0]
     if not lines:
         raise ValidationError("Niente da consegnare: tutte le righe risultano già consegnate.")
 
@@ -118,6 +118,8 @@ def cancel_delivery_note(note):
 def _invoice_lines_from(quantity_getter, lines):
     payload = []
     for line in lines:
+        if line.is_display:
+            continue
         payload.append(
             {
                 "position": line.position,
@@ -395,6 +397,8 @@ def _order_lines_scaled(order, ratio):
 
     payload = []
     for line in order.lines.select_related("product"):
+        if line.is_display:
+            continue
         qty = Decimal(line.qty or 0)
         prezzo = Decimal(line.unit_price or 0)
         if qty == 0:
@@ -488,6 +492,8 @@ def create_purchase_invoice_from_po(po, user=None, only_received=False):
     lines = list(po.lines.select_related("product"))
     rows = []
     for line in lines:
+        if line.is_display:
+            continue
         qty = line.qty_received if (only_received and line.qty_received > 0) else line.qty
         if qty <= 0:
             continue

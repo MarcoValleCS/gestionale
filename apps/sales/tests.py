@@ -1079,9 +1079,9 @@ class BugVariTest(FlowTestBase):
         self.assertNotIn("{#", contenuto)
         self.assertNotIn("#}", contenuto)
 
-    # ------------------------------------------ descrizione e sezione allineate
-    def test_descrizione_viene_prima_della_sezione_come_nell_intestazione(self):
-        """Le celle della riga devono seguire l'ordine delle intestazioni."""
+    # ------------------------------------------- righe stile Odoo (sezioni)
+    def test_intestazioni_e_pulsanti_delle_righe(self):
+        """Le sezioni sono righe dedicate: niente più colonna «Sezione»."""
         response = self.client.get(reverse("sales:quote_create"))
         pagina = response.content.decode("utf-8")
 
@@ -1089,19 +1089,26 @@ class BugVariTest(FlowTestBase):
         intestazioni = [m.group(1) for m in re.finditer(r"<th[^>]*>(.*?)</th>", pagina, re.DOTALL)]
         testi = [re.sub(r"<[^>]+>", "", t).strip() for t in intestazioni]
         self.assertIn("Descrizione", testi)
-        self.assertIn("Sezione", testi)
-        self.assertLess(
-            testi.index("Descrizione"), testi.index("Sezione"),
-            "l'intestazione deve elencare prima Descrizione e poi Sezione",
-        )
+        self.assertNotIn("Sezione", testi, "la colonna «Sezione» è sostituita dalle righe dedicate")
+
+        # pulsanti per aggiungere riga, sezione, sottosezione e nota
+        for tipo in ("article", "section", "subsection", "note"):
+            self.assertIn(f'data-add-line-type="{tipo}"', pagina)
 
         # ordine effettivo dei campi nella prima riga (nomi completi, per non
         # confondersi con «nav-section» della barra laterale)
         posizione_descrizione = pagina.index('name="lines-0-description"')
-        posizione_sezione = pagina.index('name="lines-0-section"')
+        posizione_qta = pagina.index('name="lines-0-qty"')
         self.assertLess(
-            posizione_descrizione, posizione_sezione,
-            "il campo descrizione deve venire prima di quello della sezione, come nell'intestazione",
+            posizione_descrizione, posizione_qta,
+            "il campo descrizione deve venire prima di quello della quantità",
+        )
+        # posizione e tipo viaggiano nascosti: l'ordine lo decide l'utente
+        self.assertIn('name="lines-0-position"', pagina)
+        self.assertIn('name="lines-0-line_type"', pagina)
+        self.assertIn(
+            'class="btn btn-outline-secondary btn-sm move-line"', pagina,
+            "le frecce su/giù devono comparire nelle righe del preventivo",
         )
 
     # ------------------------------------------------ sconto non in stampa
@@ -1183,3 +1190,171 @@ class BugVariTest(FlowTestBase):
         self.assertEqual(riga.net_unit_price, Decimal("80.0000"))
         riga.discount_pct = Decimal("0")
         self.assertEqual(riga.net_unit_price, Decimal("100.0000"))
+
+
+class RigheStileOdooTest(FlowTestBase):
+    """Sezioni, sottosezioni e note (righe di testo) e spostamento delle righe."""
+
+    def setUp(self):
+        self.login()
+
+    def test_sezioni_e_note_non_entrano_nei_totali(self):
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(line_type="section", description="Bagno padronale")
+        quote.lines.create(line_type="subsection", description="Mobile lavabo")
+        quote.lines.create(line_type="note", description="modello: MODO PROJECT")
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.lines.create(line_type="section", description="Cucina")
+        quote.lines.create(
+            product=self.product, description="b", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("100"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        quote.refresh_from_db()
+
+        self.assertEqual(quote.subtotal, Decimal("120.00"), "le righe di testo non devono pesare nei totali")
+
+        gruppi = group_lines_by_section(quote.lines.order_by("position", "pk"))
+        self.assertEqual([g["section"] for g in gruppi], ["Bagno padronale", "Cucina"])
+        self.assertEqual(gruppi[0]["subtotal"], Decimal("20.00"))
+        self.assertEqual(gruppi[1]["subtotal"], Decimal("100.00"))
+
+        marcatori = [l for l in gruppi[0]["lines"] if l.line_type in ("subsection", "note")]
+        self.assertEqual(len(marcatori), 2)
+        self.assertTrue(all(l.row_number is None for l in marcatori))
+        articoli = [l for l in gruppi[0]["lines"] if l.line_type == "article"]
+        self.assertEqual(articoli[0].row_number, 1)
+
+    def test_crea_preventivo_con_sezione_dal_modulo(self):
+        response = self.client.post(
+            reverse("sales:quote_create"),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "2",
+                "lines-INITIAL_FORMS": "0",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-line_type": "section",
+                "lines-0-position": "1",
+                "lines-0-description": "Bagno padronale",
+                "lines-0-qty": "1",
+                "lines-0-unit_price": "0",
+                "lines-0-discount_pct": "0",
+                "lines-1-line_type": "article",
+                "lines-1-position": "2",
+                "lines-1-product": self.product.pk,
+                "lines-1-description": "Mobile lavabo",
+                "lines-1-qty": "1",
+                "lines-1-uom": self.uom.pk,
+                "lines-1-unit_price": "100",
+                "lines-1-discount_pct": "0",
+                "lines-1-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        quote = Quote.objects.latest("pk")
+        self.assertEqual(quote.lines.count(), 2)
+        self.assertEqual(quote.subtotal, Decimal("100.00"))
+        sezione = quote.lines.get(line_type="section")
+        self.assertEqual(sezione.description, "Bagno padronale")
+        self.assertEqual(sezione.position, 1)
+        self.assertEqual(quote.lines.get(line_type="article").position, 2)
+
+    def test_spostare_le_righe_cambia_l_ordine(self):
+        quote = Quote.objects.create(customer=self.customer)
+        prima = quote.lines.create(
+            product=self.product, description="prima", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22, position=1,
+        )
+        seconda = quote.lines.create(
+            product=self.product, description="seconda", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("5"), vat_rate=self.vat22, position=2,
+        )
+        quote.recalculate()
+
+        # le frecce su/giù rimettono la posizione nei campi nascosti: al salvataggio
+        # l'ordine visibile è quello che resta
+        response = self.client.post(
+            reverse("sales:quote_update", args=[quote.pk]),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "2",
+                "lines-INITIAL_FORMS": "2",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-id": prima.pk,
+                "lines-0-position": "2",
+                "lines-0-line_type": "article",
+                "lines-0-description": "prima",
+                "lines-0-qty": "1",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "10",
+                "lines-0-discount_pct": "0",
+                "lines-0-vat_rate": self.vat22.pk,
+                "lines-1-id": seconda.pk,
+                "lines-1-position": "1",
+                "lines-1-line_type": "article",
+                "lines-1-description": "seconda",
+                "lines-1-qty": "1",
+                "lines-1-uom": self.uom.pk,
+                "lines-1-unit_price": "5",
+                "lines-1-discount_pct": "0",
+                "lines-1-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        prima.refresh_from_db()
+        seconda.refresh_from_db()
+        self.assertEqual((prima.position, seconda.position), (2, 1))
+        ordine = list(quote.lines.order_by("position", "pk").values_list("description", flat=True))
+        self.assertEqual(ordine, ["seconda", "prima"])
+
+    def test_convertire_in_ordine_mantiene_le_sezioni(self):
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(line_type="section", description="Bagno padronale")
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        order = services.convert_quote_to_order(quote, user=self.user)
+        self.assertEqual(order.lines.get(line_type="section").description, "Bagno padronale")
+        self.assertEqual(order.subtotal, Decimal("10.00"))
+
+    def test_niente_frecce_nei_documenti_che_non_le_usano(self):
+        """Gli ordini fornitore non inviano la posizione: niente frecce (e niente promesse)."""
+        response = self.client.get(reverse("purchasing:po_create"))
+        pagina = response.content.decode("utf-8")
+        self.assertIn("lines-0-product", pagina)
+        self.assertNotIn('class="btn btn-outline-secondary btn-sm move-line"', pagina)
+
+    def test_il_modello_riporta_il_tipo_riga(self):
+        template = QuoteTemplate.objects.create(name="Bagno tipo")
+        template.lines.create(line_type="section", description="Bagno")
+        template.lines.create(
+            product=self.product, description="a", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        response = self.client.get(reverse("sales:quote_template_data", args=[template.pk]))
+        dati = response.json()
+        self.assertEqual(dati["lines"][0]["line_type"], "section")
+        self.assertEqual(dati["lines"][1]["line_type"], "article")

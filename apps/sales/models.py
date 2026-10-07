@@ -15,11 +15,35 @@ ZERO = Decimal("0")
 # come prima (apps.sales.models.round2 / round3) per non rompere i chiamanti.
 from apps.core.rounding import round2, round3, round4  # noqa: E402  (dopo ZERO per chiarezza)
 
+# Tipi di riga (stile Odoo): le righe di testo non hanno prezzo e non entrano
+# nei totali, servono solo a ordinare il documento. Una riga «sezione» apre un
+# gruppo: tutto ciò che sta sotto le appartiene finché non arriva un'altra
+# sezione, come in Odoo.
+LINE_ARTICLE = "article"
+LINE_SECTION = "section"
+LINE_SUBSECTION = "subsection"
+LINE_NOTE = "note"
+LINE_TYPE_CHOICES = [
+    (LINE_ARTICLE, "Articolo"),
+    (LINE_SECTION, "Sezione"),
+    (LINE_SUBSECTION, "Sottosezione"),
+    (LINE_NOTE, "Nota"),
+]
+# Tipi che non hanno prodotto, quantità né prezzo (non toccano i totali)
+DISPLAY_LINE_TYPES = {LINE_SECTION, LINE_SUBSECTION, LINE_NOTE}
+
 
 class DocumentLine(TimeStampedModel):
     """Riga di documento (preventivo o ordine)."""
 
     position = models.PositiveIntegerField("Posizione", default=0)
+    line_type = models.CharField(
+        "Tipo riga",
+        max_length=12,
+        choices=LINE_TYPE_CHOICES,
+        default=LINE_ARTICLE,
+        help_text="Sezione, sottosezione e nota sono righe di testo: non hanno prezzo e non entrano nei totali.",
+    )
     section = models.CharField(
         "Sezione",
         max_length=80,
@@ -45,7 +69,14 @@ class DocumentLine(TimeStampedModel):
         ordering = ["position", "pk"]
 
     @property
+    def is_display(self):
+        """Vero per le righe di testo (sezione, sottosezione, nota)."""
+        return self.line_type in DISPLAY_LINE_TYPES
+
+    @property
     def line_subtotal(self):
+        if self.is_display:
+            return ZERO
         qty = Decimal(self.qty or 0)
         price = Decimal(self.unit_price or 0)
         discount = Decimal(self.discount_pct or 0)
@@ -79,6 +110,8 @@ class DocumentLine(TimeStampedModel):
         Lo sconto di riga NON si applica al costo: lo sconto fatto al cliente
         non riduce quanto si paga il fornitore.
         """
+        if self.is_display:
+            return ZERO
         cost = self.unit_cost
         if cost is None:
             cost = self.product.purchase_price if self.product_id else ZERO
@@ -86,21 +119,52 @@ class DocumentLine(TimeStampedModel):
 
     @property
     def label(self):
+        if self.is_display:
+            return self.description or "—"
         if self.product_id and self.description:
             return f"{self.product.code} – {self.description}" if self.product.code not in self.description else self.description
         return self.description or (str(self.product) if self.product_id else "—")
 
 
 def group_lines_by_section(lines):
-    """Raggruppa righe consecutive con la stessa sezione, con subtotale per gruppo."""
+    """Raggruppa le righe sotto le sezioni, con subtotale per gruppo.
+
+    Una riga di tipo «sezione» apre il gruppo e ne diventa il titolo: tutte le
+    righe che seguono appartengono a quella sezione finché non ne compare
+    un'altra (come in Odoo). Sottosezioni e note restano nel gruppo come righe
+    di commento, senza numerazione né peso nei totali.
+
+    Restano supportate anche le vecchie sezioni scritte riga per riga (campo
+    ``section``): righe consecutive con lo stesso testo formano un gruppo.
+    """
     groups = []
-    for number, line in enumerate(lines, start=1):
-        line.row_number = number
-        section = line.section or ""
-        if not groups or groups[-1]["section"] != section:
-            groups.append({"section": section, "lines": [], "subtotal": ZERO})
-        groups[-1]["lines"].append(line)
-        groups[-1]["subtotal"] += line.line_subtotal
+    corrente = None
+    numero = 0
+
+    def nuovo_gruppo(titolo, riga_sezione=None):
+        gruppo = {"section": titolo, "lines": [], "subtotal": ZERO, "section_line": riga_sezione}
+        groups.append(gruppo)
+        return gruppo
+
+    for line in lines:
+        tipo = getattr(line, "line_type", LINE_ARTICLE) or LINE_ARTICLE
+        if tipo == LINE_SECTION:
+            corrente = nuovo_gruppo((line.description or "").strip(), line)
+            continue
+        sezione_legacy = line.section or ""
+        if sezione_legacy and (corrente is None or corrente["section"] != sezione_legacy):
+            corrente = nuovo_gruppo(sezione_legacy)
+        if corrente is None:
+            corrente = nuovo_gruppo("")
+        if tipo == LINE_ARTICLE:
+            numero += 1
+            line.row_number = numero
+            corrente["lines"].append(line)
+            corrente["subtotal"] += line.line_subtotal
+        else:
+            # sottosezione o nota: si mostra ma non conta
+            line.row_number = None
+            corrente["lines"].append(line)
     for group in groups:
         group["subtotal"] = round2(group["subtotal"])
     return groups
@@ -318,7 +382,7 @@ class SalesOrder(CommissionedDocument, TotalsDocument, TimeStampedModel):
 
     @property
     def all_delivered(self):
-        lines = list(self.lines.all())
+        lines = [line for line in self.lines.all() if not line.is_display]
         if not lines:
             return False
         return all(line.qty_delivered >= line.qty for line in lines)
@@ -327,7 +391,7 @@ class SalesOrder(CommissionedDocument, TotalsDocument, TimeStampedModel):
     def delivery_state(self):
         if self.status == self.STATUS_DELIVERED:
             return "delivered"
-        lines = list(self.lines.all())
+        lines = [line for line in self.lines.all() if not line.is_display]
         if lines and any(line.qty_delivered > 0 for line in lines) and not self.all_delivered:
             return "partially"
         return self.status

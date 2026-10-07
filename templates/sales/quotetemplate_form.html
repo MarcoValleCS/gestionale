@@ -21,24 +21,31 @@
       </div>
 
       <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Righe del modello</span>
-          <button type="button" class="btn btn-outline-primary btn-sm" id="add-line"><i class="bi bi-plus-lg"></i> Aggiungi riga</button>
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>Righe del modello
+            <small class="text-muted fw-normal d-none d-lg-inline ms-2">Sezioni, sottosezioni e note raggruppano e commentano le righe. Usa le frecce per spostare le righe.</small>
+          </span>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary btn-sm" data-add-line-type="article"><i class="bi bi-plus-lg"></i> Riga</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-add-line-type="section"><i class="bi bi-bookmark"></i> Sezione</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-add-line-type="subsection">Sottosezione</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-add-line-type="note">Nota</button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-sm doc-lines mb-0" id="lines-table">
             <thead>
               <tr>
-                <th style="width:15%">Articolo</th>
-                <th>Descrizione</th>
-                <th style="width:10%">Sezione</th>
-                <th style="width:6%">Q.tà</th>
-                <th style="width:8%">U.d.M.</th>
-                <th style="width:9%">Prezzo</th>
-                <th style="width:6%">Sc. %</th>
-                <th style="width:9%">IVA</th>
-                <th style="width:8%" class="text-end">Totale</th>
-                <th style="width:40px"></th>
+                <th class="col-articolo">Articolo</th>
+                <th class="col-descrizione">Descrizione</th>
+                <th class="col-qta">Q.tà</th>
+                <th class="col-um">U.d.M.</th>
+                <th class="col-prezzo">Prezzo</th>
+                <th class="col-sconto">Sc. %</th>
+                <th class="col-iva">IVA</th>
+                <th class="col-totale text-end">Totale</th>
+                <th class="col-margine text-end">Margine</th>
+                <th class="col-azioni"></th>
               </tr>
             </thead>
             <tbody id="lines-body">
