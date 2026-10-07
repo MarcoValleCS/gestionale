@@ -170,14 +170,20 @@ def quote_reminder(request, pk):
         return redirect("sales:follow_up")
 
     giorni = (timezone.localdate() - preventivo.date).days
-    oggetto = f"Preventivo {preventivo.number} – siamo a disposizione"
-    corpo = (
-        f"Gentile {preventivo.customer.name},\n\n"
-        f"torniamo sul preventivo {preventivo.number} del {preventivo.date:%d/%m/%Y} "
-        f"({preventivo.grand_total:.2f} € IVA inclusa), inviato {giorni} giorni fa.\n\n"
-        "Restiamo a disposizione per chiarimenti, modifiche o per fissare un appuntamento.\n"
-        "Se il preventivo non è più di interesse, ce lo faccia sapere: ci aiuta a non disturbarla.\n\n"
-        "Cordiali saluti"
+    from apps.core.email_templates import contenuto
+    from apps.core.models import CompanySettings, EmailTemplate
+    from apps.core.utils import format_money
+
+    oggetto, corpo = contenuto(
+        EmailTemplate.KIND_QUOTE_REMINDER,
+        {
+            "cliente": preventivo.customer.name,
+            "numero": preventivo.number,
+            "data": f"{preventivo.date:%d/%m/%Y}",
+            "totale": format_money(preventivo.grand_total),
+            "giorni": giorni,
+            "azienda": CompanySettings.load().name,
+        },
     )
     try:
         emailing.send_quote_email(preventivo, to_email=preventivo.customer.email, subject=oggetto, message=corpo)
@@ -400,6 +406,26 @@ class QuoteDetailView(RoleRequiredMixin, DetailView):
         context["generated_order"] = self.object.generated_order
         context["email_configured"] = emailing.email_configured()
         context["pdf_available"] = pdf_available()
+
+        from apps.core.email_templates import contenuto
+        from apps.core.models import CompanySettings, EmailTemplate
+        from apps.core.utils import format_money
+
+        contesto = {
+            "cliente": self.object.customer.name,
+            "numero": self.object.number,
+            "data": f"{self.object.date:%d/%m/%Y}",
+            "totale": format_money(self.object.grand_total),
+            "azienda": CompanySettings.load().name,
+            "cantiere": str(self.object.job) if self.object.job_id else "",
+            "riferimento": self.object.reference or "",
+            "validita": (
+                f"Il preventivo è valido fino al {self.object.valid_until:%d/%m/%Y}.\n"
+                if self.object.valid_until
+                else ""
+            ),
+        }
+        context["email_subject"], context["email_body"] = contenuto(EmailTemplate.KIND_QUOTE, contesto)
         return context
 
 

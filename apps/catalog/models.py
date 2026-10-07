@@ -158,18 +158,14 @@ class Product(TimeStampedModel):
     def purchase_unit_price(self, supplier=None):
         """Prezzo di acquisto da usare per gli ordini fornitore.
 
-        Con un listino attivo del fornitore vale il prezzo di listino. Se invece
-        l'articolo non è a listino, si applica lo sconto di acquisto base del
-        fornitore (se indicato) al prezzo di acquisto in anagrafica.
+        Vale il prezzo di listino del fornitore, se presente; altrimenti il
+        prezzo di acquisto dell'articolo (che è già al netto dello sconto base
+        del fornitore, applicato quando l'articolo viene creato).
         """
         if supplier is not None:
             price = self.supplier_price(supplier)
             if price is not None:
                 return price
-            discount = Decimal(getattr(supplier, "purchase_discount_pct", 0) or 0)
-            if discount:
-                base = Decimal(self.purchase_price or 0)
-                return (base * (1 - discount / 100)).quantize(Decimal("0.0001"))
         return self.purchase_price
 
 

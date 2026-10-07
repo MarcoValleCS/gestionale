@@ -138,15 +138,21 @@ def salesinvoice_reminder(request, pk):
         return redirect("billing:scadenzario")
 
     oggetto = f"Sollecito fattura {invoice.number}"
-    corpo = (
-        f"Gentile {invoice.customer.name},\n\n"
-        f"ci risulta ancora da saldare la fattura {invoice.number} del {invoice.date:%d/%m/%Y}, "
-        f"scaduta il {scadenza:%d/%m/%Y}"
-        + (f" ({giorni} giorni fa)" if giorni > 0 else "")
-        + f", di importo {invoice.grand_total:.2f} €.\n\n"
-        "Se il pagamento è già stato effettuato, la preghiamo di ignorare questo messaggio.\n"
-        "Restiamo a disposizione per qualsiasi chiarimento.\n\n"
-        "Cordiali saluti"
+    from apps.core.email_templates import contenuto
+    from apps.core.models import CompanySettings, EmailTemplate
+    from apps.core.utils import format_money
+
+    oggetto, corpo = contenuto(
+        EmailTemplate.KIND_INVOICE_REMINDER,
+        {
+            "cliente": invoice.customer.name,
+            "numero": invoice.number,
+            "data": f"{invoice.date:%d/%m/%Y}",
+            "scadenza": f"{scadenza:%d/%m/%Y}",
+            "totale": format_money(invoice.grand_total),
+            "ritardo": f" ({giorni} giorni fa)" if giorni > 0 else "",
+            "azienda": CompanySettings.load().name,
+        },
     )
     try:
         emailing.send_invoice_email(invoice, to_email=invoice.customer.email, subject=oggetto, message=corpo)
@@ -442,6 +448,22 @@ class SalesInvoiceDetailView(RoleRequiredMixin, DetailView):
         context["pdf_available"] = pdf.pdf_available()
         context["sdi_statuses"] = SalesInvoice.SDI_STATUS_CHOICES
         context["sdi_pec_address"] = django_settings.SDI_PEC_ADDRESS
+
+        from apps.core.email_templates import contenuto
+        from apps.core.models import CompanySettings, EmailTemplate
+        from apps.core.utils import format_money
+
+        contesto = {
+            "cliente": self.object.customer.name,
+            "numero": self.object.number,
+            "data": f"{self.object.date:%d/%m/%Y}",
+            "totale": format_money(self.object.grand_total),
+            "scadenza": f"{self.object.due_date:%d/%m/%Y}" if self.object.due_date else "",
+            "azienda": CompanySettings.load().name,
+            "cantiere": str(self.object.job) if self.object.job_id else "",
+            "riferimento": self.object.reference or "",
+        }
+        context["email_subject"], context["email_body"] = contenuto(EmailTemplate.KIND_INVOICE, contesto)
         return context
 
 

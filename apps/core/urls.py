@@ -19,6 +19,7 @@ urlpatterns = [
     path("impostazioni/", views.settings_home, name="settings"),
     path("impostazioni/azienda/", views.CompanyUpdateView.as_view(), name="company_update"),
     path("impostazioni/email/", views.email_settings, name="email_settings"),
+    path("impostazioni/email/modelli/", views.email_templates_view, name="email_templates"),
     path("impostazioni/attivita/", views.activity_log, name="activity_log"),
     path("impostazioni/backup/", views.backup, name="backup"),
     path("impostazioni/backup/<str:nome>/", views.backup_download, name="backup_download"),

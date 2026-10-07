@@ -88,7 +88,7 @@ class ProductQuickForm(BaseBootstrapModelForm):
             "name": "Descrizione",
             "uom": "Unità di misura",
             "sale_price": "Prezzo vendita",
-            "purchase_price": "Prezzo acquisto",
+            "purchase_price": "Prezzo acquisto (listino fornitore)",
         }
 
     def __init__(self, *args, **kwargs):
@@ -98,11 +98,20 @@ class ProductQuickForm(BaseBootstrapModelForm):
         self.fields["main_supplier"].queryset = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
         self.fields["sale_price"].required = False
         self.fields["purchase_price"].required = False
+        self.fields["purchase_price"].help_text = (
+            "Indica il prezzo di listino del fornitore: se il fornitore ha uno sconto base, "
+            "il prezzo di acquisto viene salvato automaticamente al netto."
+        )
         if context_type == "purchase":
             self.fields["sale_price"].widget.attrs["placeholder"] = "—"
 
     def save(self, commit=True):
         prodotto = super().save(commit=False)
+        fornitore = prodotto.main_supplier
+        sconto = Decimal(getattr(fornitore, "purchase_discount_pct", 0) or 0) if fornitore else Decimal("0")
+        if sconto and prodotto.purchase_price:
+            base = Decimal(prodotto.purchase_price)
+            prodotto.purchase_price = (base * (1 - sconto / 100)).quantize(Decimal("0.0001"))
         iva_standard = (
             active_vat_rates().filter(code="22").first()
             or active_vat_rates().first()

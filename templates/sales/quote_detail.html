@@ -15,7 +15,7 @@
     </div>
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_print' quote.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_print' quote.pk %}"><i class="bi bi-printer"></i> Stampa</a>
     <form method="post" action="{% url 'sales:quote_duplicate' quote.pk %}">{% csrf_token %}
       <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-copy"></i> Duplica</button>
     </form>
@@ -177,18 +177,11 @@
           </div>
           <div class="mb-2">
             <label class="form-label" for="email-subject">Oggetto</label>
-            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="Preventivo {{ quote.number }} – {{ company.name }}">
+            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="{{ email_subject }}">
           </div>
           <div class="mb-2">
             <label class="form-label" for="email-message">Messaggio</label>
-            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="6">Buongiorno,
-in allegato il preventivo {{ quote.number }} del {{ quote.date|date:"d/m/Y" }} di {{ quote.grand_total|money }} €.
-{% if quote.valid_until %}Il preventivo è valido fino al {{ quote.valid_until|date:"d/m/Y" }}.
-{% endif %}
-Restiamo a disposizione per qualsiasi chiarimento.
-
-Cordiali saluti
-{{ company.name }}</textarea>
+            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="6">{{ email_body }}</textarea>
           </div>
           <button class="btn btn-outline-primary btn-sm w-100" type="submit">
             <i class="bi bi-send"></i> Invia il preventivo

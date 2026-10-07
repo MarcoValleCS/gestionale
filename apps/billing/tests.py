@@ -183,6 +183,18 @@ class EmailAndSdiTest(BillingTestBase):
         services.issue_sales_invoice(invoice)
         return invoice
 
+    def test_email_precompilata_dal_modello(self):
+        from apps.core.models import EmailTemplate
+
+        invoice = self.issued_invoice()
+        EmailTemplate.objects.create(
+            kind=EmailTemplate.KIND_INVOICE, subject="Fattura personalizzata {numero}", body="Corpo per {cliente}"
+        )
+        self.login()
+        risposta = self.client.get(reverse("billing:salesinvoice_detail", args=[invoice.pk]))
+        self.assertContains(risposta, "Fattura personalizzata")
+        self.assertContains(risposta, "Corpo per")
+
     def test_composizione_xml_fatturapa(self):
         invoice = self.issued_invoice()
         self.customer.sdi_code = "ABC1234"

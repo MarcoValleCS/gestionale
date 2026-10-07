@@ -190,17 +190,26 @@ class QuickCreateTest(TestCase):
         self.assertEqual(product.purchase_vat.code, "22", "IVA acquisto standard al 22%")
         self.assertTrue(product.code.startswith("ART"))
 
-    def test_sconto_acquisto_base_del_fornitore(self):
+    def test_sconto_acquisto_base_applicato_alla_creazione(self):
         fornitore = Contact.objects.create(
             name="Fornitore Scontato", is_customer=False, is_supplier=True, purchase_discount_pct=Decimal("20")
         )
-        prodotto = Product.objects.create(
-            name="Articolo scontato", uom=self.uom, sale_vat=self.vat, purchase_vat=self.vat,
-            purchase_price=Decimal("10.00"), main_supplier=fornitore,
+        risposta = self.client.post(
+            reverse("catalog:quick_create"),
+            {
+                "name": "Articolo scontato",
+                "uom": self.uom.pk,
+                "main_supplier": fornitore.pk,
+                "purchase_price": "10",
+                "sale_price": "15",
+                "context": "sale",
+            },
         )
-        self.assertEqual(prodotto.purchase_unit_price(fornitore), Decimal("8.0000"), "sconto base del 20%")
+        self.assertEqual(risposta.status_code, 200)
+        prodotto = Product.objects.get(pk=risposta.json()["id"])
+        self.assertEqual(prodotto.purchase_price, Decimal("8.0000"), "sconto base del 20% applicato alla creazione")
 
-        # Con un listino dedicato lo sconto base NON si applica
+        # Con un listino dedicato vince il prezzo di listino
         from apps.purchasing.models import PriceListItem, SupplierPriceList
 
         listino = SupplierPriceList.objects.create(supplier=fornitore, name="Listino test")

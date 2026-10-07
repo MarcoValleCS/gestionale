@@ -97,6 +97,25 @@
     const productModal = function () { return bootstrap.Modal.getOrCreateInstance(productModalEl); };
     let currentSelect = null;
 
+    const supplierSelect = productForm.querySelector('select[name="main_supplier"]');
+    const priceInput = productForm.querySelector('input[name="purchase_price"]');
+    const priceHint = productForm.querySelector("#qp-purchase-hint");
+
+    function aggiornaPrezzoNetto() {
+      if (!priceHint || !priceInput) return;
+      priceHint.textContent = "";
+      const option = supplierSelect ? supplierSelect.options[supplierSelect.selectedIndex] : null;
+      const sconto = option ? parseFloat((option.dataset.sconto || "0").replace(",", ".")) : 0;
+      const prezzo = parseFloat((priceInput.value || "0").replace(",", "."));
+      if (sconto > 0 && prezzo > 0) {
+        const netto = prezzo * (1 - sconto / 100);
+        priceHint.textContent = "Sconto fornitore " + sconto + "% → prezzo di acquisto netto: " +
+          netto.toFixed(2).replace(".", ",") + " €";
+      }
+    }
+    if (priceInput) priceInput.addEventListener("input", aggiornaPrezzoNetto);
+    if (supplierSelect) supplierSelect.addEventListener("change", aggiornaPrezzoNetto);
+
     document.addEventListener("click", function (event) {
       const button = event.target.closest("[data-quick-product]");
       if (!button) return;
@@ -105,6 +124,7 @@
       if (!currentSelect) return;
       clearErrors(productForm);
       productForm.reset();
+      aggiornaPrezzoNetto();
       productForm.dataset.context = currentSelect.dataset.context || "sale";
       productModal().show();
       window.setTimeout(function () {

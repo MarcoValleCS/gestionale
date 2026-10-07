@@ -642,6 +642,38 @@ class WikiPage(TimeStampedModel):
         return super().save(*args, **kwargs)
 
 
+class EmailTemplate(models.Model):
+    """Testo precompilato delle email inviate dal gestionale (modificabile).
+
+    I segnaposto disponibili vengono sostituiti al momento dell'uso: {cliente},
+    {numero}, {data}, {totale}, {scadenza}, {giorni}, {ritardo}, {cantiere},
+    {riferimento}, {azienda}, {validita}.
+    """
+
+    KIND_QUOTE = "quote"
+    KIND_INVOICE = "invoice"
+    KIND_QUOTE_REMINDER = "quote_reminder"
+    KIND_INVOICE_REMINDER = "invoice_reminder"
+    KIND_CHOICES = [
+        (KIND_QUOTE, "Invio preventivo"),
+        (KIND_INVOICE, "Invio fattura"),
+        (KIND_QUOTE_REMINDER, "Sollecito preventivo"),
+        (KIND_INVOICE_REMINDER, "Sollecito fattura"),
+    ]
+
+    kind = models.CharField("Tipo", max_length=20, unique=True, choices=KIND_CHOICES)
+    subject = models.CharField("Oggetto", max_length=200)
+    body = models.TextField("Testo")
+
+    class Meta:
+        verbose_name = "Modello email"
+        verbose_name_plural = "Modelli email"
+        ordering = ["kind"]
+
+    def __str__(self):
+        return self.get_kind_display()
+
+
 # ------------------------------------------------- menu condivisi in cache
 # I menu di unità di misura e aliquote IVA sono uguali in tutte le righe di un
 # documento: si tengono in cache (vedi ``menu_unita`` e ``menu_aliquote``) e si

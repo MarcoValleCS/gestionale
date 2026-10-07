@@ -216,6 +216,48 @@ def email_settings(request):
 
 
 @role_required(ROLE_ADMIN)
+def email_templates_view(request):
+    """Editor dei modelli delle email (oggetto e testo) inviati dal gestionale."""
+    from .email_templates import DEFAULTS, SEGNAPOSTO
+    from .models import EmailTemplate
+
+    if request.method == "POST":
+        valori = {}
+        mancanti = []
+        for kind, etichetta in EmailTemplate.KIND_CHOICES:
+            oggetto = (request.POST.get(f"subject_{kind}") or "").strip()
+            corpo = (request.POST.get(f"body_{kind}") or "").strip()
+            if not oggetto:
+                mancanti.append(etichetta)
+            valori[kind] = (oggetto, corpo)
+        if mancanti:
+            messages.error(request, "Oggetto mancante per: " + ", ".join(mancanti) + ".")
+        else:
+            for kind, (oggetto, corpo) in valori.items():
+                EmailTemplate.objects.update_or_create(kind=kind, defaults={"subject": oggetto, "body": corpo})
+            messages.success(request, "Modelli email aggiornati.")
+        return redirect("core:email_templates")
+
+    modelli = []
+    for kind, etichetta in EmailTemplate.KIND_CHOICES:
+        modello = EmailTemplate.objects.filter(kind=kind).first()
+        default = DEFAULTS.get(kind, {"subject": "", "body": ""})
+        modelli.append(
+            {
+                "kind": kind,
+                "label": etichetta,
+                "subject": modello.subject if modello else default["subject"],
+                "body": modello.body if modello else default["body"],
+            }
+        )
+    return render(
+        request,
+        "core/email_templates.html",
+        {"page_title": "Modelli email", "modelli": modelli, "segna_posto": SEGNAPOSTO},
+    )
+
+
+@role_required(ROLE_ADMIN)
 def activity_log(request):
     """Registro delle modifiche: chi ha toccato cosa."""
     from .models import ActivityLog

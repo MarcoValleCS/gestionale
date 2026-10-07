@@ -89,7 +89,7 @@
             <select class="form-select" id="qp-supplier" name="main_supplier">
               <option value="">—</option>
               {% for supplier in quick_suppliers %}
-              <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
+              <option value="{{ supplier.pk }}" data-sconto="{{ supplier.purchase_discount_pct }}">{{ supplier.name }}</option>
               {% endfor %}
             </select>
             <div class="invalid-feedback d-block" data-error-for="main_supplier"></div>
@@ -101,8 +101,9 @@
               <div class="invalid-feedback d-block" data-error-for="sale_price"></div>
             </div>
             <div class="col-md-6 mb-3">
-              <label class="form-label" for="qp-purchase-price">Prezzo acquisto</label>
+              <label class="form-label" for="qp-purchase-price">Prezzo acquisto (listino fornitore)</label>
               <input class="form-control" type="number" step="any" min="0" id="qp-purchase-price" name="purchase_price" value="0">
+              <div class="small text-muted" id="qp-purchase-hint"></div>
               <div class="invalid-feedback d-block" data-error-for="purchase_price"></div>
             </div>
             <div class="col-md-12 mb-3">

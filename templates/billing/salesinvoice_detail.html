@@ -21,7 +21,7 @@
     </div>
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_print' invoice.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa / PDF</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_print' invoice.pk %}"><i class="bi bi-printer"></i> Stampa / PDF</a>
     {% if invoice.is_editable and roles.is_admin or invoice.is_editable and roles.is_sales %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:salesinvoice_update' invoice.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
     <form method="post" action="{% url 'billing:salesinvoice_issue' invoice.pk %}">
@@ -161,15 +161,11 @@
           </div>
           <div class="mb-2">
             <label class="form-label" for="email-subject">Oggetto</label>
-            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="Fattura {{ invoice.number }} – {{ company.name }}">
+            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="{{ email_subject }}">
           </div>
           <div class="mb-2">
             <label class="form-label" for="email-message">Messaggio</label>
-            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="5">Buongiorno,
-in allegato la fattura {{ invoice.number }} del {{ invoice.date|date:"d/m/Y" }} di {{ invoice.grand_total|money }} €.
-
-Cordiali saluti
-{{ company.name }}</textarea>
+            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="5">{{ email_body }}</textarea>
           </div>
           <button class="btn btn-outline-primary btn-sm w-100" type="submit" {% if invoice.status == "draft" %}disabled title="Emetti prima la fattura"{% endif %}>
             <i class="bi bi-send"></i> Invia la fattura

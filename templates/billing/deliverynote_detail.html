@@ -16,7 +16,7 @@
     </div>
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:deliverynote_print' note.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:deliverynote_print' note.pk %}"><i class="bi bi-printer"></i> Stampa</a>
     {% if note.is_editable and roles.is_admin or note.is_editable and roles.is_sales or note.is_editable and roles.is_warehouse %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:deliverynote_update' note.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
     <form method="post" action="{% url 'billing:deliverynote_issue' note.pk %}" onsubmit="return confirm('Emettere il DDT e scaricare il magazzino?');">
