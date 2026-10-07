@@ -403,7 +403,7 @@ a:hover {
 .doc-lines .col-iva { min-width: 100px; }
 .doc-lines .col-totale { min-width: 120px; }
 .doc-lines .col-margine { min-width: 110px; }
-.doc-lines .col-azioni { min-width: 148px; }
+.doc-lines .col-azioni { min-width: 64px; }
 
 /* Righe di testo stile Odoo: sezione, sottosezione e nota. Non hanno prezzo
    né quantità: la descrizione occupa tutta la riga e il testo è in evidenza. */
@@ -443,6 +443,17 @@ a:hover {
 .doc-lines tr.line-invalid .cell-descrizione input:focus {
   border-color: #dc3545;
   box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+}
+
+.doc-lines .col-sposta { min-width: 74px; }
+.doc-lines .cell-sposta { vertical-align: middle; }
+
+/* Banner modifiche non salvate: resta visibile in alto durante la compilazione. */
+#unsaved-banner {
+  position: sticky;
+  top: 70px;
+  z-index: 30;
+  box-shadow: 0 4px 14px rgba(146, 64, 14, 0.18);
 }
 
 /* ----------------------------------------------------- posta ricevuta */

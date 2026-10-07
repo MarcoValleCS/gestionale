@@ -68,7 +68,7 @@
     row.querySelectorAll(".cell-articolo, .cell-qta, .cell-um, .cell-prezzo, .cell-sconto, .cell-iva, .cell-totale, .cell-margine")
       .forEach(function (cell) { cell.style.display = display ? "none" : ""; });
     const descCell = row.querySelector(".cell-descrizione");
-    if (descCell) descCell.colSpan = display ? 9 : 1;
+    if (descCell) descCell.colSpan = display ? 10 : 1;
     const desc = row.querySelector('[name$="-description"]');
     if (desc) desc.placeholder = display ? (DISPLAY_PLACEHOLDERS[tipo] || "") : "";
   }
@@ -499,9 +499,67 @@
     }
   });
   const documentForm = document.getElementById("document-form");
+
+  /* Avviso modifiche non salvate: banner + conferma prima di uscire.
+     Le impostazioni programmate all'avvio (rinumerazione, default q.tà e
+     sconto) non sparano eventi, quindi non sporcano lo stato iniziale. */
+  let formSubmitting = false;
+  let bypassNavigate = false;
+  let formDirty = false;
+  let unsavedBanner = null;
+  function showUnsavedBanner() {
+    if (!unsavedBanner) return;
+    unsavedBanner.classList.remove("d-none");
+    unsavedBanner.classList.add("d-flex");
+  }
+  function markFormDirty() {
+    if (formDirty) return;
+    formDirty = true;
+    showUnsavedBanner();
+  }
   if (documentForm) {
+    unsavedBanner = document.createElement("div");
+    unsavedBanner.id = "unsaved-banner";
+    unsavedBanner.className = "alert alert-warning d-none align-items-center justify-content-between gap-3 flex-wrap py-2 px-3 mb-3";
+    unsavedBanner.setAttribute("role", "alert");
+    const testo = document.createElement("div");
+    testo.innerHTML = "<i class='bi bi-exclamation-triangle-fill me-2'></i><strong>Modifiche non salvate.</strong> Salva prima di tornare indietro o le perderai.";
+    const salvaBtn = document.createElement("button");
+    salvaBtn.type = "button";
+    salvaBtn.className = "btn btn-warning btn-sm";
+    salvaBtn.innerHTML = "<i class='bi bi-check-lg me-1'></i>Salva ora";
+    salvaBtn.addEventListener("click", function () {
+      documentForm.requestSubmit();
+    });
+    unsavedBanner.appendChild(testo);
+    unsavedBanner.appendChild(salvaBtn);
+    documentForm.prepend(unsavedBanner);
+    documentForm.addEventListener("input", markFormDirty);
+    documentForm.addEventListener("change", markFormDirty);
     documentForm.addEventListener("submit", function (event) {
-      if (!validateLines()) event.preventDefault();
+      if (!validateLines()) {
+        event.preventDefault();
+        return;
+      }
+      formSubmitting = true;
+    });
+    document.addEventListener("click", function (event) {
+      if (!formDirty || formSubmitting || bypassNavigate) return;
+      const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!anchor || anchor.target === "_blank") return;
+      const href = anchor.getAttribute("href") || "";
+      if (!href || href.charAt(0) === "#" || href.indexOf("javascript:") === 0) return;
+      if (anchor.closest(".autocomplete-menu")) return;
+      event.preventDefault();
+      if (window.confirm("Hai modifiche non salvate. Tornare indietro senza salvare? Le modifiche andranno perse.")) {
+        bypassNavigate = true;
+        window.location.href = anchor.href;
+      }
+    });
+    window.addEventListener("beforeunload", function (event) {
+      if (formSubmitting || bypassNavigate || !formDirty) return;
+      event.preventDefault();
+      event.returnValue = "";
     });
   }
   renumber();

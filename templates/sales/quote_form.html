@@ -109,7 +109,7 @@
   <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
       <span>Righe del preventivo
-        <small class="text-muted fw-normal d-none d-lg-inline ms-2">Sezioni e sottosezioni raggruppano le righe con subtotali in scheda e stampa (Importo = imponibile). Le righe di testo vuote bloccano il salvataggio: compilale o eliminale.</small>
+        <small class="text-muted fw-normal d-none d-lg-inline ms-2">Sezioni e sottosezioni raggruppano le righe con subtotali in scheda e stampa (Importo = imponibile). Sposta le righe con le frecce a sinistra. Le righe di testo vuote bloccano il salvataggio: compilale o eliminale.</small>
       </span>
       <div class="d-flex gap-2 flex-wrap">
         <button type="button" class="btn btn-primary btn-sm" data-add-line-type="article"><i class="bi bi-plus-lg"></i> Riga</button>
@@ -122,6 +122,7 @@
       <table class="table table-sm doc-lines mb-0" id="lines-table">
         <thead>
           <tr>
+            <th class="col-sposta"></th>
             <th class="col-articolo">Articolo</th>
             <th class="col-descrizione">Descrizione</th>
             <th class="col-qta">Q.tà</th>

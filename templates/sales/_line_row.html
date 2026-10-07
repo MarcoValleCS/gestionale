@@ -3,6 +3,16 @@
     {{ lineform.id }}{{ lineform.position }}{{ lineform.line_type }}
     {% if lineform.section.is_hidden %}{{ lineform.section }}{% endif %}
   </td>
+  <td class="text-center text-nowrap cell-sposta">
+    {% if lineform.position %}
+    <button type="button" class="btn btn-outline-secondary btn-sm move-line" data-dir="-1" title="Sposta la riga su">
+      <i class="bi bi-arrow-up"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm move-line" data-dir="1" title="Sposta la riga giù">
+      <i class="bi bi-arrow-down"></i>
+    </button>
+    {% endif %}
+  </td>
   <td class="cell-articolo">
     <div class="autocomplete-wrap">
       <div class="input-group input-group-sm flex-nowrap">
@@ -38,14 +48,6 @@
     <div class="small line-margin-pct text-muted"></div>
   </td>
   <td class="text-center text-nowrap cell-azioni">
-    {% if lineform.position %}
-    <button type="button" class="btn btn-outline-secondary btn-sm move-line" data-dir="-1" title="Sposta la riga su">
-      <i class="bi bi-arrow-up"></i>
-    </button>
-    <button type="button" class="btn btn-outline-secondary btn-sm move-line" data-dir="1" title="Sposta la riga giù">
-      <i class="bi bi-arrow-down"></i>
-    </button>
-    {% endif %}
     <button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Rimuovi riga">
       <i class="bi bi-trash"></i>
     </button>
