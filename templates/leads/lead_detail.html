@@ -15,6 +15,14 @@
     </div>
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
+    {% if lead.quote %}
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'sales:quote_detail' lead.quote.pk %}"><i class="bi bi-file-earmark-text"></i> Apri preventivo {{ lead.quote.number }}</a>
+    {% else %}
+    <form method="post" action="{% url 'leads:lead_create_quote' lead.pk %}">
+      {% csrf_token %}
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-file-earmark-plus"></i> Crea preventivo</button>
+    </form>
+    {% endif %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'leads:lead_update' lead.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
     <form method="post" action="{% url 'leads:lead_delete' lead.pk %}" onsubmit="return confirm('Eliminare il lead «{{ lead.name }}»?');">
       {% csrf_token %}

@@ -51,4 +51,4 @@ class LeadForm(BaseBootstrapModelForm):
 class LeadStageForm(BaseBootstrapModelForm):
     class Meta:
         model = LeadStage
-        fields = ["name", "order", "color", "kind"]
+        fields = ["name", "order", "color", "kind", "on_quote_created"]

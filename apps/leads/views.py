@@ -152,6 +152,53 @@ def lead_stage(request, pk):
 
 
 @role_required(*LEAD_ROLES)
+def lead_create_quote(request, pk):
+    """Crea il preventivo in bozza dal lead e avanza la fase «Preventivo mandato»."""
+    lead = get_object_or_404(Lead.objects.select_related("contact", "stage"), pk=pk)
+    if request.method != "POST":
+        return redirect("leads:lead_detail", pk=lead.pk)
+    if lead.quote_id:
+        messages.info(request, f"Questo lead ha già il preventivo {lead.quote.number}.")
+        return redirect("sales:quote_detail", pk=lead.quote_id)
+
+    from apps.contacts.models import Contact
+    from apps.sales.models import Quote
+
+    cliente = lead.contact
+    if cliente is None:
+        # il lead non ha ancora una scheda contatto: la creiamo dai suoi dati
+        cliente = Contact.objects.create(
+            name=lead.name[:200],
+            is_customer=True,
+            phone=lead.phone,
+            email=lead.email,
+            city=lead.city,
+        )
+        lead.contact = cliente
+
+    preventivo = Quote.objects.create(
+        customer=cliente,
+        job=lead.job,
+        reference=lead.name[:100],
+        created_by=request.user,
+    )
+    lead.quote = preventivo
+
+    fase_preventivo = LeadStage.objects.filter(on_quote_created=True).order_by("order").first()
+    if fase_preventivo and lead.is_open and fase_preventivo.order > lead.stage.order:
+        lead.stage = fase_preventivo
+        lead.save(update_fields=["stage", "quote", "contact", "updated_at"])
+        messages.success(
+            request,
+            f"Preventivo {preventivo.number} creato in bozza: il lead è passato a «{fase_preventivo.name}».",
+        )
+    else:
+        lead.save(update_fields=["quote", "contact", "updated_at"])
+        messages.success(request, f"Preventivo {preventivo.number} creato in bozza.")
+    return redirect("sales:quote_update", pk=preventivo.pk)
+
+
+@role_required(*LEAD_ROLES)
 def lead_delete(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
     if request.method == "POST":

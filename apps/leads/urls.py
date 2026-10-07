@@ -12,6 +12,7 @@ urlpatterns = [
     path("fasi/<int:pk>/", views.StageUpdateView.as_view(), name="stage_update"),
     path("<int:pk>/", views.LeadDetailView.as_view(), name="lead_detail"),
     path("<int:pk>/modifica/", views.LeadUpdateView.as_view(), name="lead_update"),
+    path("<int:pk>/preventivo/", views.lead_create_quote, name="lead_create_quote"),
     path("<int:pk>/fase/", views.lead_stage, name="lead_stage"),
     path("<int:pk>/elimina/", views.lead_delete, name="lead_delete"),
 ]

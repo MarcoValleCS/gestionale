@@ -9,7 +9,7 @@
 <div class="card">
   <div class="table-responsive">
     <table class="table table-sm table-hover mb-0">
-      <thead><tr><th>Ordine</th><th>Nome</th><th>Esito</th><th>Colore</th><th></th></tr></thead>
+      <thead><tr><th>Ordine</th><th>Nome</th><th>Esito</th><th>Colore</th><th class="text-center">Preventivo</th><th></th></tr></thead>
       <tbody>
         {% for stage in objects %}
         <tr>
@@ -17,10 +17,13 @@
           <td><span class="badge text-bg-{{ stage.color }}">{{ stage.name }}</span></td>
           <td>{{ stage.get_kind_display }}</td>
           <td>{{ stage.get_color_display }}</td>
+          <td class="text-center">
+            {% if stage.on_quote_created %}<i class="bi bi-check-circle text-success" title="Il lead passa qui quando crei un preventivo"></i>{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
           <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="{% url 'leads:stage_update' stage.pk %}"><i class="bi bi-pencil"></i></a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-center text-muted py-3">Nessuna fase</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-3">Nessuna fase</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -24,6 +24,11 @@ class LeadStage(models.Model):
     order = models.PositiveIntegerField("Ordine", default=0)
     color = models.CharField("Colore", max_length=20, choices=Tag.COLOR_CHOICES, default="secondary")
     kind = models.CharField("Esito", max_length=10, choices=KIND_CHOICES, default=KIND_OPEN)
+    on_quote_created = models.BooleanField(
+        "Fase «Preventivo mandato»",
+        default=False,
+        help_text="Quando si crea un preventivo dal lead, la trattativa passa in questa fase.",
+    )
 
     class Meta:
         verbose_name = "Fase lead"
