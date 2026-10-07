@@ -25,7 +25,17 @@
           <div class="row">
             {% include "partials/field.html" with field=form.sale_price col=3 %}
             {% include "partials/field.html" with field=form.sale_vat col=3 %}
-            {% include "partials/field.html" with field=form.purchase_price col=3 %}
+            <div class="col-md-3">
+              <div class="mb-3">
+                <div class="small text-muted mb-1" id="prezzo-consigliato"></div>
+                <label class="form-label" for="{{ form.purchase_price.id_for_label }}">
+                  {{ form.purchase_price.label }}{% if form.purchase_price.field.required %} <span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.purchase_price }}
+                {% if form.purchase_price.help_text %}<div class="form-text">{{ form.purchase_price.help_text }}</div>{% endif %}
+                {% for error in form.purchase_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
             {% include "partials/field.html" with field=form.purchase_vat col=3 %}
             {% include "partials/field.html" with field=form.main_supplier col=6 %}
             {% include "partials/field.html" with field=form.supplier_lead_days col=6 %}
@@ -66,4 +76,31 @@
     </div>
   </div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const fornitore = document.querySelector('[name="main_supplier"]');
+  const prezzo = document.querySelector('[name="purchase_price"]');
+  const consigliato = document.getElementById("prezzo-consigliato");
+  if (!fornitore || !prezzo || !consigliato) return;
+  const sconti = JSON.parse(fornitore.dataset.scontiFornitore || "{}");
+
+  function aggiorna() {
+    const sconto = parseFloat((sconti[fornitore.value] || "0").replace(",", "."));
+    let testo = "";
+    if (sconto > 0) {
+      const valore = parseFloat((prezzo.value || "0").replace(",", "."));
+      const netto = valore > 0 ? (valore * (1 - sconto / 100)).toFixed(2).replace(".", ",") + " €" : "—";
+      testo = "Prezzo consigliato in base allo sconto abituale: " + netto;
+    }
+    consigliato.textContent = testo;
+  }
+
+  fornitore.addEventListener("change", aggiorna);
+  prezzo.addEventListener("input", aggiorna);
+  aggiorna();
+})();
+</script>
 {% endblock %}

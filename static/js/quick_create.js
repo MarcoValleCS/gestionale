@@ -106,11 +106,10 @@
       priceHint.textContent = "";
       const option = supplierSelect ? supplierSelect.options[supplierSelect.selectedIndex] : null;
       const sconto = option ? parseFloat((option.dataset.sconto || "0").replace(",", ".")) : 0;
-      const prezzo = parseFloat((priceInput.value || "0").replace(",", "."));
-      if (sconto > 0 && prezzo > 0) {
-        const netto = prezzo * (1 - sconto / 100);
-        priceHint.textContent = "Sconto fornitore " + sconto + "% → prezzo di acquisto netto: " +
-          netto.toFixed(2).replace(".", ",") + " €";
+      if (sconto > 0) {
+        const prezzo = parseFloat((priceInput.value || "0").replace(",", "."));
+        const netto = prezzo > 0 ? (prezzo * (1 - sconto / 100)).toFixed(2).replace(".", ",") + " €" : "—";
+        priceHint.textContent = "Prezzo consigliato in base allo sconto abituale: " + netto;
       }
     }
     if (priceInput) priceInput.addEventListener("input", aggiornaPrezzoNetto);

@@ -216,6 +216,38 @@ class QuickCreateTest(TestCase):
         PriceListItem.objects.create(pricelist=listino, product=prodotto, price=Decimal("7.00"))
         self.assertEqual(prodotto.purchase_unit_price(fornitore), Decimal("7.0000"))
 
+    def test_scheda_articolo_applica_e_non_riapplica_lo_sconto(self):
+        fornitore = Contact.objects.create(
+            name="Fornitore Scheda", is_customer=False, is_supplier=True, purchase_discount_pct=Decimal("20")
+        )
+        dati = {
+            "name": "Articolo da scheda",
+            "uom": self.uom.pk,
+            "sale_price": "20",
+            "sale_vat": self.vat.pk,
+            "purchase_price": "10",
+            "purchase_vat": self.vat.pk,
+            "main_supplier": fornitore.pk,
+            "supplier_lead_days": "0",
+            "min_stock": "0",
+            "is_stock_tracked": "on",
+            "active": "on",
+        }
+        risposta = self.client.post(reverse("catalog:product_create"), dati)
+        self.assertEqual(risposta.status_code, 302)
+        prodotto = Product.objects.get(name="Articolo da scheda")
+        self.assertEqual(prodotto.purchase_price, Decimal("8.0000"), "sconto applicato alla creazione")
+
+        # Salvataggio senza cambiare il prezzo: non si riapplica (niente doppio sconto)
+        self.client.post(reverse("catalog:product_update", args=[prodotto.pk]), dict(dati, purchase_price="8"))
+        prodotto.refresh_from_db()
+        self.assertEqual(prodotto.purchase_price, Decimal("8.0000"))
+
+        # Nuovo prezzo di listino: lo sconto si applica di nuovo
+        self.client.post(reverse("catalog:product_update", args=[prodotto.pk]), dict(dati, purchase_price="20"))
+        prodotto.refresh_from_db()
+        self.assertEqual(prodotto.purchase_price, Decimal("16.0000"))
+
     def test_crea_rapida_articolo_senza_nome(self):
         response = self.client.post(reverse("catalog:quick_create"), {"uom": self.uom.pk})
         self.assertEqual(response.status_code, 400)

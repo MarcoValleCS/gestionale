@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django import forms
@@ -44,6 +45,15 @@ class ProductForm(BaseBootstrapModelForm):
         self.fields["main_supplier"].label_from_instance = lambda obj: f"{obj.name} ({obj.code})"
         self.fields["code"].help_text = "Lasciare vuoto per generarlo automaticamente."
         self.fields["tags"].help_text = "Tieni premuto Ctrl per selezionare più etichette."
+        # Sconti base dei fornitori: servono alla pagina per mostrare il
+        # «Prezzo consigliato in base allo sconto abituale» sotto il campo.
+        sconti = {
+            str(pk): str(sconto)
+            for pk, sconto in Contact.objects.filter(is_supplier=True, purchase_discount_pct__gt=0).values_list(
+                "pk", "purchase_discount_pct"
+            )
+        }
+        self.fields["main_supplier"].widget.attrs["data-sconti-fornitore"] = json.dumps(sconti)
         if not self.instance.pk:
             default_sale = active_vat_rates().filter(is_default_sales=True).first()
             default_purchase = active_vat_rates().filter(is_default_purchase=True).first()
@@ -51,6 +61,20 @@ class ProductForm(BaseBootstrapModelForm):
                 self.fields["sale_vat"].initial = default_sale
             if default_purchase:
                 self.fields["purchase_vat"].initial = default_purchase
+
+    def save(self, commit=True):
+        prodotto = super().save(commit=False)
+        fornitore = prodotto.main_supplier
+        sconto = Decimal(getattr(fornitore, "purchase_discount_pct", 0) or 0) if fornitore else Decimal("0")
+        prezzo = self.cleaned_data.get("purchase_price")
+        da_creare = self.instance.pk is None
+        prezzo_modificato = "purchase_price" in getattr(self, "changed_data", [])
+        if sconto and prezzo and (da_creare or prezzo_modificato):
+            prodotto.purchase_price = (Decimal(prezzo) * (1 - sconto / 100)).quantize(Decimal("0.0001"))
+        if commit:
+            prodotto.save()
+            self.save_m2m()
+        return prodotto
 
 
 class CategoryForm(BaseBootstrapModelForm):
