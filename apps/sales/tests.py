@@ -1222,11 +1222,126 @@ class RigheStileOdooTest(FlowTestBase):
         self.assertEqual(gruppi[0]["subtotal"], Decimal("20.00"))
         self.assertEqual(gruppi[1]["subtotal"], Decimal("100.00"))
 
-        marcatori = [l for l in gruppi[0]["lines"] if l.line_type in ("subsection", "note")]
-        self.assertEqual(len(marcatori), 2)
-        self.assertTrue(all(l.row_number is None for l in marcatori))
-        articoli = [l for l in gruppi[0]["lines"] if l.line_type == "article"]
+        # la sottosezione apre un blocco con il subtotale delle sole righe sotto di lei
+        blocchi = gruppi[0]["blocks"]
+        self.assertEqual([b["subsection"] for b in blocchi], ["", "Mobile lavabo"])
+        self.assertEqual(blocchi[1]["subtotal"], Decimal("20.00"))
+
+        note = [l for l in blocchi[1]["lines"] if l.line_type == "note"]
+        self.assertEqual(len(note), 1)
+        self.assertIsNone(note[0].row_number)
+        articoli = [l for l in blocchi[1]["lines"] if l.line_type == "article"]
         self.assertEqual(articoli[0].row_number, 1)
+
+    def test_subtotale_per_sottosezione(self):
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(line_type="section", description="Bagno")
+        quote.lines.create(line_type="subsection", description="Mobile")
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.lines.create(line_type="subsection", description="Sanitari")
+        quote.lines.create(
+            product=self.product, description="b", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        gruppi = group_lines_by_section(quote.lines.order_by("position", "pk"))
+        self.assertEqual([g["section"] for g in gruppi], ["Bagno"])
+        blocchi = gruppi[0]["blocks"]
+        self.assertEqual([b["subsection"] for b in blocchi], ["", "Mobile", "Sanitari"])
+        self.assertEqual(blocchi[1]["subtotal"], Decimal("10.00"))
+        self.assertEqual(blocchi[2]["subtotal"], Decimal("20.00"))
+        self.assertEqual(gruppi[0]["subtotal"], Decimal("30.00"))
+
+    def test_la_stampa_mostra_i_subtotali_delle_sottosezioni(self):
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(line_type="section", description="Bagno")
+        quote.lines.create(line_type="subsection", description="Mobile")
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.lines.create(line_type="subsection", description="Sanitari")
+        quote.lines.create(
+            product=self.product, description="b", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        response = self.client.get(reverse("sales:quote_print", args=[quote.pk]))
+        pagina = response.content.decode("utf-8")
+        self.assertIn("Totale Mobile", pagina)
+        self.assertIn("Totale Sanitari", pagina)
+        self.assertIn("Totale Bagno", pagina)
+
+    def test_la_riga_vuota_di_servizio_non_blocca_il_salvataggio(self):
+        """Il modulo porta sempre una riga vuota in più: il JavaScript le assegna
+        una posizione, ma non deve diventare una riga da validare e salvare."""
+        response = self.client.post(
+            reverse("sales:quote_create"),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "6",
+                "lines-INITIAL_FORMS": "0",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-line_type": "section",
+                "lines-0-position": "1",
+                "lines-0-description": "Bagno padronale",
+                "lines-0-qty": "1",
+                "lines-0-unit_price": "0",
+                "lines-0-discount_pct": "0",
+                "lines-1-line_type": "subsection",
+                "lines-1-position": "2",
+                "lines-1-description": "Mobile lavabo",
+                "lines-1-qty": "1",
+                "lines-1-unit_price": "0",
+                "lines-1-discount_pct": "0",
+                "lines-2-line_type": "article",
+                "lines-2-position": "3",
+                "lines-2-product": self.product.pk,
+                "lines-2-description": "Mobile",
+                "lines-2-qty": "1",
+                "lines-2-uom": self.uom.pk,
+                "lines-2-unit_price": "100",
+                "lines-2-discount_pct": "0",
+                "lines-2-vat_rate": self.vat22.pk,
+                "lines-3-line_type": "subsection",
+                "lines-3-position": "4",
+                "lines-3-description": "Sanitari",
+                "lines-3-qty": "1",
+                "lines-3-unit_price": "0",
+                "lines-3-discount_pct": "0",
+                "lines-4-line_type": "article",
+                "lines-4-position": "5",
+                "lines-4-product": self.product.pk,
+                "lines-4-description": "Sanitari",
+                "lines-4-qty": "1",
+                "lines-4-uom": self.uom.pk,
+                "lines-4-unit_price": "50",
+                "lines-4-discount_pct": "0",
+                "lines-4-vat_rate": self.vat22.pk,
+                # riga vuota di servizio, rinumerata dal JavaScript
+                "lines-5-line_type": "article",
+                "lines-5-position": "6",
+                "lines-5-description": "",
+                "lines-5-qty": "1",
+                "lines-5-unit_price": "0",
+                "lines-5-discount_pct": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 302, "il preventivo con più sottosezioni deve salvarsi")
+        quote = Quote.objects.latest("pk")
+        self.assertEqual(quote.lines.count(), 5, "la riga vuota di servizio non va salvata")
+        self.assertEqual(quote.subtotal, Decimal("150.00"))
 
     def test_crea_preventivo_con_sezione_dal_modulo(self):
         response = self.client.post(

@@ -72,6 +72,21 @@ class PurchaseSupplierFormMixin:
 class LineFormMixin:
     defaults_context = "sale"
 
+    # Campi di servizio del modulo righe: cambiarli da soli non rende
+    # «compilata» la riga vuota in fondo al modulo, che il JavaScript rinumera
+    # comunque. Senza questo, il salvataggio del preventivo fallisce senza che
+    # l'utente veda nulla.
+    service_fields = {"position", "line_type"}
+
+    def has_changed(self):
+        if not super().has_changed():
+            return False
+        ignorati = set(self.service_fields)
+        if "line_type" in self.fields:
+            # Preventivi, ordini e modelli: anche la vecchia sezione è nascosta
+            ignorati.add("section")
+        return any(name not in ignorati for name in self.changed_data)
+
     def apply_line_fields(self):
         self.fields["product"].queryset = Product.objects.filter(active=True).select_related("uom").order_by("name")
         self.fields["product"].required = False

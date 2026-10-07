@@ -128,6 +128,9 @@
       font-size: 10.5px;
       padding-left: 8mm;
     }
+    table.lines tr.subsection-total td {
+      border-bottom: 1px solid #eef1f5;
+    }
     .num { text-align: right; white-space: nowrap; }
     .item-code { color: #6b7280; font-size: 10.5px; }
     .item-desc { font-weight: 600; color: #111827; }
@@ -280,12 +283,14 @@
           <td colspan="{{ table_columns }}">{{ group.section }}</td>
         </tr>
         {% endif %}
-        {% for line in group.lines %}
-        {% if line.line_type == "subsection" %}
+        {% for block in group.blocks %}
+        {% if block.subsection %}
         <tr class="subsection-row">
-          <td colspan="{{ table_columns }}">{{ line.description }}</td>
+          <td colspan="{{ table_columns }}">{{ block.subsection }}</td>
         </tr>
-        {% elif line.line_type == "note" %}
+        {% endif %}
+        {% for line in block.lines %}
+        {% if line.line_type == "note" %}
         <tr class="note-row">
           <td colspan="{{ table_columns }}">{{ line.description }}</td>
         </tr>
@@ -304,6 +309,13 @@
           <td class="num">{{ line.vat_rate.rate|qty }}%</td>
           <td class="num">{{ line.line_subtotal|money }} €</td>
           {% endif %}
+        </tr>
+        {% endif %}
+        {% endfor %}
+        {% if block.subsection and block.lines and show_prices %}
+        <tr class="section-total subsection-total">
+          <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ block.subsection }}</td>
+          <td class="num">{{ block.subtotal|money }} €</td>
         </tr>
         {% endif %}
         {% endfor %}

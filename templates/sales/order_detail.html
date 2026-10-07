@@ -153,12 +153,14 @@
               <td colspan="9" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
             </tr>
             {% endif %}
-            {% for line in group.lines %}
-            {% if line.line_type == "subsection" %}
-            <tr>
-              <td colspan="9" class="fw-semibold small ps-4">{{ line.description }}</td>
+            {% for block in group.blocks %}
+            {% if block.subsection %}
+            <tr class="table-light">
+              <td colspan="9" class="fw-semibold small ps-4">{{ block.subsection }}</td>
             </tr>
-            {% elif line.line_type == "note" %}
+            {% endif %}
+            {% for line in block.lines %}
+            {% if line.line_type == "note" %}
             <tr>
               <td colspan="9" class="fst-italic text-muted small ps-4">{{ line.description }}</td>
             </tr>
@@ -178,6 +180,13 @@
               <td class="text-end">{{ line.discount_pct|qty }}%</td>
               <td class="text-end">{{ line.vat_rate.rate|qty }}%</td>
               <td class="text-end fw-semibold">{{ line.line_total|money }} €</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            {% if block.subsection and block.lines %}
+            <tr class="table-light">
+              <td colspan="8" class="text-end small text-muted">Totale {{ block.subsection }}</td>
+              <td class="text-end fw-semibold">{{ block.subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% endfor %}

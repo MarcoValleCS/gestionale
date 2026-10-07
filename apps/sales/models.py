@@ -127,46 +127,64 @@ class DocumentLine(TimeStampedModel):
 
 
 def group_lines_by_section(lines):
-    """Raggruppa le righe sotto le sezioni, con subtotale per gruppo.
+    """Raggruppa le righe sotto le sezioni, con subtotali per sezione e sottosezione.
 
     Una riga di tipo «sezione» apre il gruppo e ne diventa il titolo: tutte le
     righe che seguono appartengono a quella sezione finché non ne compare
-    un'altra (come in Odoo). Sottosezioni e note restano nel gruppo come righe
-    di commento, senza numerazione né peso nei totali.
+    un'altra (come in Odoo). Allo stesso modo una «sottosezione» apre un blocco
+    interno alla sezione, con il subtotale delle sole righe che stanno sotto di
+    essa. Note e righe di testo non pesano nei totali.
 
     Restano supportate anche le vecchie sezioni scritte riga per riga (campo
     ``section``): righe consecutive con lo stesso testo formano un gruppo.
     """
     groups = []
     corrente = None
+    blocco = None
     numero = 0
 
     def nuovo_gruppo(titolo, riga_sezione=None):
-        gruppo = {"section": titolo, "lines": [], "subtotal": ZERO, "section_line": riga_sezione}
+        gruppo = {"section": titolo, "lines": [], "subtotal": ZERO, "section_line": riga_sezione, "blocks": []}
         groups.append(gruppo)
         return gruppo
+
+    def nuovo_blocco(gruppo, titolo=""):
+        blocco = {"subsection": titolo, "lines": [], "subtotal": ZERO}
+        gruppo["blocks"].append(blocco)
+        return blocco
 
     for line in lines:
         tipo = getattr(line, "line_type", LINE_ARTICLE) or LINE_ARTICLE
         if tipo == LINE_SECTION:
             corrente = nuovo_gruppo((line.description or "").strip(), line)
+            blocco = nuovo_blocco(corrente)
             continue
         sezione_legacy = line.section or ""
         if sezione_legacy and (corrente is None or corrente["section"] != sezione_legacy):
             corrente = nuovo_gruppo(sezione_legacy)
+            blocco = nuovo_blocco(corrente)
         if corrente is None:
             corrente = nuovo_gruppo("")
+        if blocco is None:
+            blocco = nuovo_blocco(corrente)
+        if tipo == LINE_SUBSECTION:
+            # apre un blocco con subtotale proprio: non è una riga di elenco
+            blocco = nuovo_blocco(corrente, (line.description or "").strip())
+            continue
         if tipo == LINE_ARTICLE:
             numero += 1
             line.row_number = numero
-            corrente["lines"].append(line)
+            blocco["subtotal"] += line.line_subtotal
             corrente["subtotal"] += line.line_subtotal
         else:
-            # sottosezione o nota: si mostra ma non conta
+            # nota: si mostra ma non conta
             line.row_number = None
-            corrente["lines"].append(line)
+        blocco["lines"].append(line)
+        corrente["lines"].append(line)
     for group in groups:
         group["subtotal"] = round2(group["subtotal"])
+        for block in group["blocks"]:
+            block["subtotal"] = round2(block["subtotal"])
     return groups
 
 

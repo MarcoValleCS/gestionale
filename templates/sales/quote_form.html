@@ -144,6 +144,13 @@
     {% if line_formset.non_form_errors %}
     <div class="card-body py-2 text-danger small">{% for error in line_formset.non_form_errors %}{{ error }}<br>{% endfor %}</div>
     {% endif %}
+    {% for lineform in line_formset %}
+    {% if lineform.errors %}
+    <div class="card-body py-2 text-danger small border-top">
+      <strong>Riga {{ forloop.counter }}</strong> — {{ lineform.errors|striptags }}
+    </div>
+    {% endif %}
+    {% endfor %}
   </div>
 
   <div class="card mt-3">
