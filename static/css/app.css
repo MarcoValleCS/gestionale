@@ -572,7 +572,7 @@ a:hover {
 
 .autocomplete-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
   width: 100%;
@@ -589,9 +589,9 @@ a:hover {
 .autocomplete-item .ac-label {
   flex: 1 1 auto;
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* la descrizione va a capo: si legge tutta, senza puntini di sospensione */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .autocomplete-item:hover,
@@ -604,6 +604,8 @@ a:hover {
   color: #98a2b3;
   font-size: 0.75rem;
   white-space: nowrap;
+  flex: 0 0 auto;
+  padding-top: 0.1rem;
 }
 
 .autocomplete-create {

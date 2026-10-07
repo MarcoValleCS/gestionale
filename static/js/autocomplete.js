@@ -34,7 +34,7 @@
       top = Math.max(8, rect.top - height - 4);
     }
     /* larghezza comoda per leggere i nomi, senza uscire dallo schermo */
-    const larghezza = Math.min(Math.max(rect.width, 340), window.innerWidth - 16);
+    const larghezza = Math.min(Math.max(rect.width, 560), window.innerWidth - 16);
     menu.style.top = top + "px";
     menu.style.left = Math.min(rect.left, window.innerWidth - larghezza - 8) + "px";
     menu.style.width = larghezza + "px";
