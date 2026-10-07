@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ lead.name }}{% endblock %}
+
+{% block content %}
+{% url 'leads:board' as url_elenco %}
+{% include "partials/back_link.html" with url=url_elenco label="Tutti i lead" %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">{{ lead.name }}</h2>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="badge text-bg-{{ lead.stage.color }}">{{ lead.stage.name }}</span>
+      {% if lead.owner %}<span class="text-muted small"><i class="bi bi-person"></i> {{ lead.owner }}</span>{% endif %}
+      {% if lead.source %}<span class="text-muted small"><i class="bi bi-megaphone"></i> {{ lead.source }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'leads:lead_update' lead.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    <form method="post" action="{% url 'leads:lead_delete' lead.pk %}" onsubmit="return confirm('Eliminare il lead «{{ lead.name }}»?');">
+      {% csrf_token %}
+      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Dati del lead</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4 text-muted">Contatto</dt>
+          <dd class="col-sm-8">{% if lead.contact %}<a href="{% url 'contacts:detail' lead.contact.pk %}">{{ lead.contact.name }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4 text-muted">Telefono</dt><dd class="col-sm-8">{{ lead.phone|default:"—" }}</dd>
+          <dt class="col-sm-4 text-muted">Email</dt><dd class="col-sm-8">{{ lead.email|default:"—" }}</dd>
+          <dt class="col-sm-4 text-muted">Città</dt><dd class="col-sm-8">{{ lead.city|default:"—" }}</dd>
+          <dt class="col-sm-4 text-muted">Valore stimato</dt><dd class="col-sm-8">{% if lead.estimated_value %}{{ lead.estimated_value|money }} €{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4 text-muted">Prossima azione</dt>
+          <dd class="col-sm-8{% if lead.next_action and lead.next_action < oggi %} text-danger fw-semibold{% endif %}">
+            {{ lead.next_action|date:"d/m/Y"|default:"—" }}
+          </dd>
+          <dt class="col-sm-4 text-muted">Preventivo</dt>
+          <dd class="col-sm-8">{% if lead.quote %}<a href="{% url 'sales:quote_detail' lead.quote.pk %}">{{ lead.quote.number }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4 text-muted">Cantiere</dt>
+          <dd class="col-sm-8">{% if lead.job %}<a href="{% url 'jobs:job_detail' lead.job.pk %}">{{ lead.job.code }} – {{ lead.job.name }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4 text-muted">Creato</dt>
+          <dd class="col-sm-8">{{ lead.created_at|date:"d/m/Y H:i" }}{% if lead.created_by %} da {{ lead.created_by }}{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+    {% if lead.notes %}
+    <div class="card">
+      <div class="card-header">Note</div>
+      <div class="card-body small" style="white-space: pre-line">{{ lead.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Fase della trattativa</div>
+      <div class="card-body">
+        {% if fase_successiva %}
+        <form method="post" action="{% url 'leads:lead_stage' lead.pk %}" class="mb-3">
+          {% csrf_token %}
+          <input type="hidden" name="stage" value="avanti">
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-arrow-right-circle"></i> Avanza a «{{ fase_successiva.name }}»
+          </button>
+        </form>
+        {% endif %}
+        <form method="post" action="{% url 'leads:lead_stage' lead.pk %}">
+          {% csrf_token %}
+          <label class="form-label small" for="lead-stage">Sposta in un'altra fase</label>
+          <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" id="lead-stage" name="stage">
+              {% for stage in stages %}
+              <option value="{{ stage.pk }}" {% if stage.pk == lead.stage_id %}selected{% endif %}>{{ stage.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-outline-primary btn-sm" type="submit">Sposta</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

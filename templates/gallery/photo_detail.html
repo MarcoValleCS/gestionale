@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ foto.title|default:"Foto" }}{% endblock %}
+
+{% block content %}
+{% url 'gallery:photo_list' as url_elenco %}
+{% include "partials/back_link.html" with url=url_elenco label="Torna alla galleria" %}
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div class="card">
+      <div class="card-body text-center">
+        <img src="{{ foto.image.url }}" class="img-fluid rounded" alt="{{ foto.title }}">
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5">{{ foto.title|default:"Senza titolo" }}</h2>
+        {% if foto.description %}<p class="text-muted small" style="white-space: pre-line">{{ foto.description }}</p>{% endif %}
+        <div class="d-flex flex-wrap gap-1 my-2">
+          {% for tag in foto.tags.all %}
+          <span class="badge text-bg-{{ tag.color }}">{{ tag.name }}</span>
+          {% empty %}
+          <span class="text-muted small">Senza etichette</span>
+          {% endfor %}
+        </div>
+        <dl class="row small text-muted mb-0">
+          {% if foto.job %}
+          <dt class="col-5">Cantiere</dt>
+          <dd class="col-7"><a href="{% url 'jobs:job_detail' foto.job.pk %}">{{ foto.job.code }} – {{ foto.job.name }}</a></dd>
+          {% endif %}
+          <dt class="col-5">Caricata il</dt><dd class="col-7">{{ foto.created_at|date:"d/m/Y H:i" }}</dd>
+          {% if foto.uploaded_by %}<dt class="col-5">Da</dt><dd class="col-7">{{ foto.uploaded_by }}</dd>{% endif %}
+          {% if foto.size_kb %}<dt class="col-5">Dimensione</dt><dd class="col-7">{{ foto.size_kb }} KB</dd>{% endif %}
+        </dl>
+        {% if not foto.active %}<div class="alert alert-warning py-1 small mt-2 mb-0">Foto nascosta dalla galleria</div>{% endif %}
+      </div>
+    </div>
+    {% if puo_gestire %}
+    <div class="d-flex gap-2 flex-wrap no-print">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'gallery:photo_update' foto.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+      <a class="btn btn-outline-primary btn-sm" href="{{ foto.image.url }}" download><i class="bi bi-download"></i> Scarica</a>
+      <form method="post" action="{% url 'gallery:photo_delete' foto.pk %}" onsubmit="return confirm('Eliminare questa foto?');">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

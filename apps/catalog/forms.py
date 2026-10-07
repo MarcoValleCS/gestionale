@@ -64,13 +64,17 @@ class ProductForm(BaseBootstrapModelForm):
 
     def save(self, commit=True):
         prodotto = super().save(commit=False)
+        if prodotto.sale_price is None:
+            prodotto.sale_price = Decimal("0")
+        if prodotto.purchase_price is None:
+            prodotto.purchase_price = Decimal("0")
         fornitore = prodotto.main_supplier
         sconto = Decimal(getattr(fornitore, "purchase_discount_pct", 0) or 0) if fornitore else Decimal("0")
-        prezzo = self.cleaned_data.get("purchase_price")
         da_creare = self.instance.pk is None
-        prezzo_modificato = "purchase_price" in getattr(self, "changed_data", [])
-        if sconto and prezzo and (da_creare or prezzo_modificato):
-            prodotto.purchase_price = (Decimal(prezzo) * (1 - sconto / 100)).quantize(Decimal("0.0001"))
+        prezzo_vendita_cambiato = "sale_price" in getattr(self, "changed_data", [])
+        if sconto and prodotto.sale_price and (da_creare or prezzo_vendita_cambiato):
+            # prezzo di acquisto consigliato = prezzo di vendita meno lo sconto base del fornitore
+            prodotto.purchase_price = (Decimal(prodotto.sale_price) * (1 - sconto / 100)).quantize(Decimal("0.0001"))
         if commit:
             prodotto.save()
             self.save_m2m()
@@ -131,11 +135,15 @@ class ProductQuickForm(BaseBootstrapModelForm):
 
     def save(self, commit=True):
         prodotto = super().save(commit=False)
+        if prodotto.sale_price is None:
+            prodotto.sale_price = Decimal("0")
+        if prodotto.purchase_price is None:
+            prodotto.purchase_price = Decimal("0")
         fornitore = prodotto.main_supplier
         sconto = Decimal(getattr(fornitore, "purchase_discount_pct", 0) or 0) if fornitore else Decimal("0")
-        if sconto and prodotto.purchase_price:
-            base = Decimal(prodotto.purchase_price)
-            prodotto.purchase_price = (base * (1 - sconto / 100)).quantize(Decimal("0.0001"))
+        if sconto and prodotto.sale_price:
+            # prezzo di acquisto consigliato = prezzo di vendita meno lo sconto base del fornitore
+            prodotto.purchase_price = (Decimal(prodotto.sale_price) * (1 - sconto / 100)).quantize(Decimal("0.0001"))
         iva_standard = (
             active_vat_rates().filter(code="22").first()
             or active_vat_rates().first()

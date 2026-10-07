@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <div class="card mb-3">
+        <div class="card-header">{{ page_title }}</div>
+        <div class="card-body">{% include "partials/form_fields.html" %}</div>
+      </div>
+      {% if foto and foto.image %}
+      <div class="card mb-3">
+        <div class="card-body text-center">
+          <img src="{{ foto.image.url }}" class="img-fluid rounded" alt="{{ foto }}" style="max-height:320px;">
+        </div>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2 mb-4">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Annulla</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

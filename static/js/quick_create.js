@@ -98,6 +98,7 @@
     let currentSelect = null;
 
     const supplierSelect = productForm.querySelector('select[name="main_supplier"]');
+    const saleInput = productForm.querySelector('input[name="sale_price"]');
     const priceInput = productForm.querySelector('input[name="purchase_price"]');
     const priceHint = productForm.querySelector("#qp-purchase-hint");
 
@@ -106,13 +107,18 @@
       priceHint.textContent = "";
       const option = supplierSelect ? supplierSelect.options[supplierSelect.selectedIndex] : null;
       const sconto = option ? parseFloat((option.dataset.sconto || "0").replace(",", ".")) : 0;
-      if (sconto > 0) {
-        const prezzo = parseFloat((priceInput.value || "0").replace(",", "."));
-        const netto = prezzo > 0 ? (prezzo * (1 - sconto / 100)).toFixed(2).replace(".", ",") + " €" : "—";
-        priceHint.textContent = "Prezzo consigliato in base allo sconto abituale: " + netto;
+      if (sconto <= 0) return;
+      const vendita = parseFloat(((saleInput && saleInput.value) || "0").replace(",", "."));
+      if (vendita > 0) {
+        const netto = vendita * (1 - sconto / 100);
+        priceInput.value = netto.toFixed(2);
+        priceHint.textContent = "Prezzo consigliato in base allo sconto abituale: " +
+          netto.toFixed(2).replace(".", ",") + " €";
+      } else {
+        priceHint.textContent = "Prezzo consigliato in base allo sconto abituale: —";
       }
     }
-    if (priceInput) priceInput.addEventListener("input", aggiornaPrezzoNetto);
+    if (saleInput) saleInput.addEventListener("input", aggiornaPrezzoNetto);
     if (supplierSelect) supplierSelect.addEventListener("change", aggiornaPrezzoNetto);
 
     document.addEventListener("click", function (event) {

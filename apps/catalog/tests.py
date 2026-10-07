@@ -207,7 +207,10 @@ class QuickCreateTest(TestCase):
         )
         self.assertEqual(risposta.status_code, 200)
         prodotto = Product.objects.get(pk=risposta.json()["id"])
-        self.assertEqual(prodotto.purchase_price, Decimal("8.0000"), "sconto base del 20% applicato alla creazione")
+        self.assertEqual(
+            prodotto.purchase_price, Decimal("12.0000"),
+            "prezzo di acquisto calcolato dal prezzo di vendita (15 − 20%)",
+        )
 
         # Con un listino dedicato vince il prezzo di listino
         from apps.purchasing.models import PriceListItem, SupplierPriceList
@@ -216,7 +219,7 @@ class QuickCreateTest(TestCase):
         PriceListItem.objects.create(pricelist=listino, product=prodotto, price=Decimal("7.00"))
         self.assertEqual(prodotto.purchase_unit_price(fornitore), Decimal("7.0000"))
 
-    def test_scheda_articolo_applica_e_non_riapplica_lo_sconto(self):
+    def test_scheda_articolo_calcola_dal_prezzo_di_vendita(self):
         fornitore = Contact.objects.create(
             name="Fornitore Scheda", is_customer=False, is_supplier=True, purchase_discount_pct=Decimal("20")
         )
@@ -236,17 +239,22 @@ class QuickCreateTest(TestCase):
         risposta = self.client.post(reverse("catalog:product_create"), dati)
         self.assertEqual(risposta.status_code, 302)
         prodotto = Product.objects.get(name="Articolo da scheda")
-        self.assertEqual(prodotto.purchase_price, Decimal("8.0000"), "sconto applicato alla creazione")
+        self.assertEqual(
+            prodotto.purchase_price, Decimal("16.0000"),
+            "prezzo di acquisto calcolato dal prezzo di vendita (20 − 20%)",
+        )
 
-        # Salvataggio senza cambiare il prezzo: non si riapplica (niente doppio sconto)
-        self.client.post(reverse("catalog:product_update", args=[prodotto.pk]), dict(dati, purchase_price="8"))
+        # Modifica del solo prezzo di acquisto: resta quello scritto
+        self.client.post(reverse("catalog:product_update", args=[prodotto.pk]), dict(dati, purchase_price="12"))
         prodotto.refresh_from_db()
-        self.assertEqual(prodotto.purchase_price, Decimal("8.0000"))
+        self.assertEqual(prodotto.purchase_price, Decimal("12.0000"))
 
-        # Nuovo prezzo di listino: lo sconto si applica di nuovo
-        self.client.post(reverse("catalog:product_update", args=[prodotto.pk]), dict(dati, purchase_price="20"))
+        # Cambio del prezzo di vendita: il prezzo di acquisto si ricalcola
+        self.client.post(
+            reverse("catalog:product_update", args=[prodotto.pk]), dict(dati, sale_price="30", purchase_price="12")
+        )
         prodotto.refresh_from_db()
-        self.assertEqual(prodotto.purchase_price, Decimal("16.0000"))
+        self.assertEqual(prodotto.purchase_price, Decimal("24.0000"))
 
     def test_crea_rapida_articolo_senza_nome(self):
         response = self.client.post(reverse("catalog:quick_create"), {"uom": self.uom.pk})

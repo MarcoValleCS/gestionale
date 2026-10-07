@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Lead{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
+  <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
+    <input class="form-control form-control-sm" type="search" name="q" value="{{ search }}"
+           placeholder="Cerca nome, contatto, telefono, città…" style="min-width:220px">
+    <div class="form-check form-check-inline mb-0">
+      <input class="form-check-input" type="checkbox" name="miei" value="1" id="miei" {% if solo_miei %}checked{% endif %}>
+      <label class="form-check-label small" for="miei">Solo i miei</label>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-search"></i> Filtra</button>
+    {% if search or solo_miei %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'leads:board' %}">Azzera</a>{% endif %}
+  </form>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="text-muted small">
+      {{ aperti|length }} aperti · {{ valore_aperto|money }} € stimati
+      {% if in_ritardo %}· <span class="text-danger">{{ in_ritardo|length }} in ritardo</span>{% endif %}
+    </span>
+    <a class="btn btn-primary btn-sm" href="{% url 'leads:lead_create' %}"><i class="bi bi-plus-lg"></i> Nuovo lead</a>
+  </div>
+</div>
+
+<div class="d-flex gap-3 overflow-auto pb-2">
+  {% for colonna in colonne %}
+  <div style="min-width:280px; max-width:280px;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="badge text-bg-{{ colonna.stage.color }}">{{ colonna.stage.name }}</span>
+      <span class="text-muted small">{{ colonna.leads|length }}</span>
+    </div>
+    {% for lead in colonna.leads %}
+    <div class="card mb-2">
+      <div class="card-body p-2 small">
+        <div class="fw-semibold"><a class="text-decoration-none" href="{% url 'leads:lead_detail' lead.pk %}">{{ lead.name }}</a></div>
+        {% if lead.contact %}<div class="text-muted text-truncate">{{ lead.contact.name }}</div>{% endif %}
+        {% if lead.phone or lead.city %}<div class="text-muted">{{ lead.phone }}{% if lead.phone and lead.city %} · {% endif %}{{ lead.city }}</div>{% endif %}
+        {% if lead.estimated_value %}<div>{{ lead.estimated_value|money }} €</div>{% endif %}
+        {% if lead.next_action %}
+        <div class="{% if lead.next_action < oggi %}text-danger fw-semibold{% endif %}">
+          <i class="bi bi-calendar-event"></i> {{ lead.next_action|date:"d/m/Y" }}
+        </div>
+        {% endif %}
+        {% if lead.owner %}<div class="text-muted text-truncate"><i class="bi bi-person"></i> {{ lead.owner }}</div>{% endif %}
+        <form method="post" action="{% url 'leads:lead_stage' lead.pk %}" class="mt-2">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <select class="form-select form-select-sm" name="stage" onchange="this.form.submit()" aria-label="Sposta il lead">
+            {% for stage in stages %}
+            <option value="{{ stage.pk }}" {% if stage.pk == lead.stage_id %}selected{% endif %}>{{ stage.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-muted small mb-2">Nessun lead in questa fase</div>
+    {% endfor %}
+  </div>
+  {% empty %}
+  <div class="text-muted">Nessuna fase configurata: aggiungile in Impostazioni → Fasi lead.</div>
+  {% endfor %}
+</div>
+{% endblock %}

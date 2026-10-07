@@ -82,24 +82,31 @@
 <script>
 (function () {
   const fornitore = document.querySelector('[name="main_supplier"]');
-  const prezzo = document.querySelector('[name="purchase_price"]');
+  const vendita = document.querySelector('[name="sale_price"]');
+  const acquisto = document.querySelector('[name="purchase_price"]');
   const consigliato = document.getElementById("prezzo-consigliato");
-  if (!fornitore || !prezzo || !consigliato) return;
+  if (!fornitore || !vendita || !acquisto || !consigliato) return;
   const sconti = JSON.parse(fornitore.dataset.scontiFornitore || "{}");
 
   function aggiorna() {
     const sconto = parseFloat((sconti[fornitore.value] || "0").replace(",", "."));
-    let testo = "";
-    if (sconto > 0) {
-      const valore = parseFloat((prezzo.value || "0").replace(",", "."));
-      const netto = valore > 0 ? (valore * (1 - sconto / 100)).toFixed(2).replace(".", ",") + " €" : "—";
-      testo = "Prezzo consigliato in base allo sconto abituale: " + netto;
+    if (!(sconto > 0)) {
+      consigliato.textContent = "";
+      return;
     }
-    consigliato.textContent = testo;
+    const valore = parseFloat((vendita.value || "0").replace(",", "."));
+    if (!(valore > 0)) {
+      consigliato.textContent = "Prezzo consigliato in base allo sconto abituale: —";
+      return;
+    }
+    const netto = valore * (1 - sconto / 100);
+    acquisto.value = netto.toFixed(2);
+    consigliato.textContent = "Prezzo consigliato in base allo sconto abituale: " +
+      netto.toFixed(2).replace(".", ",") + " €";
   }
 
   fornitore.addEventListener("change", aggiorna);
-  prezzo.addEventListener("input", aggiorna);
+  vendita.addEventListener("input", aggiorna);
   aggiorna();
 })();
 </script>

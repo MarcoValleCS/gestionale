@@ -110,6 +110,9 @@
       <a class="nav-link {% if request.resolver_match.url_name == 'follow_up' %}active{% endif %}" href="{% url 'sales:follow_up' %}">
         <i class="bi bi-hourglass-split"></i> Da seguire
       </a>
+      <a class="nav-link {% if request.resolver_match.namespace == 'leads' %}active{% endif %}" href="{% url 'leads:board' %}">
+        <i class="bi bi-funnel"></i> Lead
+      </a>
       {% endif %}
 
       <div class="nav-section">Cantieri e assistenza</div>
@@ -121,6 +124,9 @@
       </a>
       <a class="nav-link {% if 'photo' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'jobs:photo_list' %}">
         <i class="bi bi-camera"></i> Foto e bolle
+      </a>
+      <a class="nav-link {% if request.resolver_match.namespace == 'gallery' %}active{% endif %}" href="{% url 'gallery:photo_list' %}">
+        <i class="bi bi-images"></i> Galleria
       </a>
 
       <div class="nav-section">Acquisti</div>
