@@ -50,6 +50,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
+# Il token CSRF viaggia nei form (input hidden), nessun JavaScript lo legge
+# dal cookie: lo si può nascondere agli script, così un eventuale XSS non può
+# rubarlo per forgiare richieste.
+CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 60 * 60 * 12  # sessione di 12 ore
 # Non riscrivere la sessione a ogni richiesta: con più utenti collegati è una
 # scrittura sul database per ogni pagina aperta. La sessione viene salvata solo

@@ -417,7 +417,8 @@ def timeentry_standard(request):
 
 
 # ---------------------------------------------------------------- ferie
-class LeaveListView(ListView):
+class LeaveListView(RoleRequiredMixin, ListView):
+    allowed_roles = HR_EDIT_ROLES
     model = LeaveRequest
     template_name = "hr/leave_list.html"
     context_object_name = "leaves"

@@ -16,7 +16,13 @@
   function showFeedback(message, isError) {
     const box = document.getElementById("template-feedback");
     if (!box) return;
-    box.innerHTML = "<i class='bi " + (isError ? "bi-exclamation-triangle" : "bi-check-circle") + "'></i> " + message;
+    // Il messaggio contiene dati del server (es. nome del modello): va
+    // inserito come testo, non come HTML, altrimenti diventa un XSS.
+    box.textContent = "";
+    const icona = document.createElement("i");
+    icona.className = "bi " + (isError ? "bi-exclamation-triangle" : "bi-check-circle");
+    box.appendChild(icona);
+    box.appendChild(document.createTextNode(" " + message));
     box.className = "alert py-2 small mb-3 " + (isError ? "alert-warning" : "alert-info");
     box.classList.remove("d-none");
   }

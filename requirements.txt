@@ -1,6 +1,6 @@
 # Dipendenze bloccate a versioni precise: le stesse versioni che sono state
 # testate, così una build non cambia sotto i piedi (vedi «pip check» e i test).
-Django==6.1.1
+Django==6.1.2
 psycopg[binary]==3.3.6
 whitenoise==6.12.0
 brotli==1.2.0
