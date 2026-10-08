@@ -353,6 +353,20 @@ permessi dei ruoli.
 Il repository include un workflow **GitHub Actions** (`.github/workflows/tests.yml`) che
 esegue tutti i test a ogni push o pull request (scheda **Actions** del repository).
 
+## Assistente AI in linguaggio naturale (MCP, locale)
+
+Il file `scripts/mcp_server.py` espone i dati del gestionale in sola lettura
+(clienti, preventivi, articoli, giacenze, fatture da incassare) agli assistenti
+AI tramite protocollo MCP (trasporto stdio, niente rete). Esempio di domande:
+«che preventivi aperti ha il cliente X?», «quanti bidet bianchi in giacenza?».
+
+```bash
+pip install -r requirements-mcp.txt
+.venv\Scripts\python.exe scripts\mcp_server.py
+```
+
+Va collegato come server stdio del client MCP. Non scrive mai sul database.
+
 ## Deploy su VPS Linux (Docker)
 
 Serve un VPS (es. Ubuntu 22.04/24.04, 1–2 GB di RAM bastano) e, se vuoi l'HTTPS automatico,

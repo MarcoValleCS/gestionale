@@ -1,0 +1,3 @@
+# Dipendenze SOLO per il server MCP locale (scripts/mcp_server.py).
+# Tenute separate da requirements.txt: in produzione (Docker) non servono.
+mcp==1.30.0
