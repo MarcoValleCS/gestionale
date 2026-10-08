@@ -284,9 +284,13 @@
       apriArticolo.addEventListener("click", function () {
         const select = row.querySelector('[name$="-product"]');
         const base = apriArticolo.dataset.productUrl || "";
-        if (select && select.value && base) {
-          window.open(base.replace("/0/", "/" + select.value + "/"), "_blank");
-        }
+        if (!select || !select.value || !base) return;
+        const url = base.replace("/0/", "/" + select.value + "/");
+        // Anche aprire la scheda articolo può far perdere le modifiche
+        // (es. app installata): con il form sporco chiede prima conferma.
+        aperturaConfermata(function () {
+          window.open(url, "_blank");
+        }, "Stai aprendo la scheda articolo senza salvare: le modifiche andranno perse. Vuoi salvarle ora?");
       });
       if (productSelect) {
         productSelect.addEventListener("change", function () { aggiornaPulsanteArticolo(row); });
@@ -508,13 +512,16 @@
   let formSubmitting = false;
   let bypassNavigate = false;
   let formDirty = false;
-  let pendingUrl = null;
+  // Azione in sospeso (navigare o aprire la scheda articolo): parte solo se
+  // l'utente sceglie «Esci senza salvare» nella finestra di conferma.
+  let pendingAction = null;
   let unsavedModal = null;
   let modaleEl = null;
   function markFormDirty() {
     formDirty = true;
   }
-  function mostraModaleUnsaved() {
+  const TESTO_UNSAVED_DEFAULT = "Stai cambiando pagina senza salvare: le modifiche andranno perse. Vuoi salvarle ora?";
+  function mostraModaleUnsaved(testo) {
     if (!unsavedModal) {
       if (!window.bootstrap) {
         // Senza Bootstrap si ricade sulla conferma del browser.
@@ -525,7 +532,19 @@
       }
       unsavedModal = bootstrap.Modal.getOrCreateInstance(modaleEl);
     }
+    const corpo = modaleEl.querySelector("#unsaved-text");
+    if (corpo) corpo.textContent = testo || TESTO_UNSAVED_DEFAULT;
     unsavedModal.show();
+  }
+  // Fa partire un'apertura solo dopo l'eventuale conferma: se il form è
+  // pulito apre subito, altrimenti chiede prima se salvare o scartare.
+  function aperturaConfermata(azione, testo) {
+    if (!formDirty || formSubmitting || bypassNavigate) {
+      azione();
+      return;
+    }
+    pendingAction = azione;
+    mostraModaleUnsaved(testo);
   }
   if (documentForm) {
     modaleEl = document.createElement("div");
@@ -540,7 +559,7 @@
             "<h5 class='modal-title'><i class='bi bi-exclamation-triangle me-2'></i>Modifiche non salvate</h5>" +
             "<button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Resta nella pagina'></button>" +
           "</div>" +
-          "<div class='modal-body'>Stai cambiando pagina senza salvare: le modifiche andranno perse. Vuoi salvarle ora?</div>" +
+          "<div class='modal-body' id='unsaved-text'>Stai cambiando pagina senza salvare: le modifiche andranno perse. Vuoi salvarle ora?</div>" +
           "<div class='modal-footer'>" +
             "<button type='button' class='btn btn-outline-secondary' data-bs-dismiss='modal'>Resta nella pagina</button>" +
             "<button type='button' class='btn btn-danger' id='unsaved-discard'>Esci senza salvare</button>" +
@@ -556,7 +575,9 @@
     modaleEl.querySelector("#unsaved-discard").addEventListener("click", function () {
       bypassNavigate = true;
       if (unsavedModal) unsavedModal.hide();
-      if (pendingUrl) window.location.href = pendingUrl;
+      const azione = pendingAction;
+      pendingAction = null;
+      if (azione) azione();
     });
     documentForm.addEventListener("input", markFormDirty);
     documentForm.addEventListener("change", markFormDirty);
@@ -576,8 +597,10 @@
       if (anchor.hasAttribute("data-bs-toggle")) return;
       if (anchor.closest(".autocomplete-menu")) return;
       event.preventDefault();
-      pendingUrl = anchor.href;
-      mostraModaleUnsaved();
+      const destinazione = anchor.href;
+      aperturaConfermata(function () {
+        window.location.href = destinazione;
+      });
     });
     window.addEventListener("beforeunload", function (event) {
       if (formSubmitting || bypassNavigate || !formDirty) return;
