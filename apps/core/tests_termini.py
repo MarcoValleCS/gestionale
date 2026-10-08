@@ -39,8 +39,19 @@ class TerminiVenditaTest(TestCase):
         self.client.force_login(admin)
         risposta = self.client.get(reverse("sales:quote_create"))
         self.assertEqual(risposta.status_code, 200)
-        self.assertContains(risposta, "Condizioni di vendita disponibili su: aquaforma.space/termini")
+        self.assertContains(risposta, "Condizioni di vendita disponibili su:")
+        self.assertContains(risposta, "aquaforma.space/termini")
         self.assertNotContains(risposta, "caparra confirmatoria")
+
+    def test_note_conservano_link_sicuri(self):
+        from apps.core.richtext import clean_notes
+
+        pulito = clean_notes(
+            'Vedi <a href="https://aquaforma.space/termini">termini</a> '
+            'e <a href="javascript:alert(1)">no</a>.'
+        )
+        self.assertIn('href="https://aquaforma.space/termini"', pulito)
+        self.assertNotIn("javascript:", pulito)
 
     def test_email_preventivo_con_link_termini(self):
         _oggetto, corpo = contenuto(

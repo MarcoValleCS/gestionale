@@ -10,8 +10,10 @@ passa invariato, con i caratteri < e > correttamente codificati.
 """
 import nh3
 
-# Solo decorazioni del testo: niente immagini, link, tabelle o script.
-ALLOWED_TAGS = {"b", "strong", "i", "em", "u", "s", "br", "p", "div", "span", "ul", "ol", "li"}
+# Solo decorazioni del testo e collegamenti http(s): niente immagini, tabelle o script.
+# I link servono, ad esempio, per rimandare alle condizioni di vendita
+# pubblicate sul sito (anche nel PDF i link restano cliccabili).
+ALLOWED_TAGS = {"b", "strong", "i", "em", "u", "s", "br", "p", "div", "span", "ul", "ol", "li", "a"}
 
 # Lo stile è ammesso solo su questi elementi ed è filtrato proprietà per proprietà
 ALLOWED_ATTRIBUTES = {
@@ -21,6 +23,7 @@ ALLOWED_ATTRIBUTES = {
     "li": {"style"},
     "ul": {"style"},
     "ol": {"style"},
+    "a": {"href", "title"},
 }
 
 # Proprietà CSS consentite: niente posizionamento, colori di sfondo o URL
@@ -36,8 +39,9 @@ def clean_notes(value):
         tags=ALLOWED_TAGS,
         attributes=ALLOWED_ATTRIBUTES,
         filter_style_properties=ALLOWED_STYLES,
+        url_schemes={"http", "https"},
         strip_comments=True,
-        link_rel=None,
+        link_rel="noopener",
     )
 
 

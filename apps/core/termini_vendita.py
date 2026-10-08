@@ -64,4 +64,7 @@ def termini_url(company, base_url=""):
 
 
 # Riga breve stampata nei documenti al posto del testo integrale.
-RIGA_TERMINI_BREVE = "Condizioni di vendita disponibili su: aquaforma.space/termini"
+RIGA_TERMINI_BREVE = (
+    'Condizioni di vendita disponibili su: '
+    '<a href="https://aquaforma.space/termini">aquaforma.space/termini</a>'
+)
