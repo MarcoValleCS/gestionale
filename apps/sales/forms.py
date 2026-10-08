@@ -7,7 +7,6 @@ from django.utils import timezone
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
 from apps.core.forms import AutocompleteSelect, BaseBootstrapModelForm, menu_aliquote, menu_unita, usa_autocomplete
-from apps.core.models import CompanySettings
 
 from .models import (
     DISPLAY_LINE_TYPES,
@@ -184,9 +183,11 @@ class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         self.apply_job_queryset()
         self.apply_commission_queryset()
         if not self.instance.pk:
+            from apps.core.termini_vendita import RIGA_TERMINI_BREVE
+
             self.fields["date"].initial = timezone.localdate()
             self.fields["valid_until"].initial = timezone.localdate() + timedelta(days=30)
-            self.fields["terms_text"].initial = CompanySettings.load().get_sales_terms()
+            self.fields["terms_text"].initial = RIGA_TERMINI_BREVE
 
 
 class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
@@ -211,8 +212,10 @@ class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         self.apply_job_queryset()
         self.apply_commission_queryset()
         if not self.instance.pk:
+            from apps.core.termini_vendita import RIGA_TERMINI_BREVE
+
             self.fields["date"].initial = timezone.localdate()
-            self.fields["terms_text"].initial = CompanySettings.load().get_sales_terms()
+            self.fields["terms_text"].initial = RIGA_TERMINI_BREVE
 
 
 class QuoteTemplateForm(BaseBootstrapModelForm):

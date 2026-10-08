@@ -32,14 +32,15 @@ class TerminiVenditaTest(TestCase):
         risposta = self.client.get(reverse("core:termini"))
         self.assertContains(risposta, "Termini di Prova SpA, P.IVA 00000000000.")
 
-    def test_nuovo_preventivo_include_i_termini(self):
+    def test_nuovo_preventivo_include_la_riga_termini(self):
         from django.contrib.auth import get_user_model
 
         admin = get_user_model().objects.create_superuser("admin", "a@example.com", "password123!")
         self.client.force_login(admin)
         risposta = self.client.get(reverse("sales:quote_create"))
         self.assertEqual(risposta.status_code, 200)
-        self.assertContains(risposta, "Condizioni generali di vendita")
+        self.assertContains(risposta, "Condizioni di vendita disponibili su: aquaforma.space/termini")
+        self.assertNotContains(risposta, "caparra confirmatoria")
 
     def test_email_preventivo_con_link_termini(self):
         _oggetto, corpo = contenuto(
