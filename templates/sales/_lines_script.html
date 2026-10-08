@@ -500,40 +500,64 @@
   });
   const documentForm = document.getElementById("document-form");
 
-  /* Avviso modifiche non salvate: banner + conferma prima di uscire.
-     Le impostazioni programmate all'avvio (rinumerazione, default q.tà e
-     sconto) non sparano eventi, quindi non sporcano lo stato iniziale. */
+  /* Modifiche non salvate: nessun avviso fisso durante la compilazione.
+     Solo quando si prova a cambiare pagina, la navigazione si blocca e una
+     finestra chiede se salvare o scartare. Le impostazioni programmate
+     all'avvio (rinumerazione, default q.tà e sconto) non sparano eventi,
+     quindi non sporcano lo stato iniziale. */
   let formSubmitting = false;
   let bypassNavigate = false;
   let formDirty = false;
-  let unsavedBanner = null;
-  function showUnsavedBanner() {
-    if (!unsavedBanner) return;
-    unsavedBanner.classList.remove("d-none");
-    unsavedBanner.classList.add("d-flex");
-  }
+  let pendingUrl = null;
+  let unsavedModal = null;
+  let modaleEl = null;
   function markFormDirty() {
-    if (formDirty) return;
     formDirty = true;
-    showUnsavedBanner();
+  }
+  function mostraModaleUnsaved() {
+    if (!unsavedModal) {
+      if (!window.bootstrap) {
+        // Senza Bootstrap si ricade sulla conferma del browser.
+        if (window.confirm("Hai modifiche non salvate. Salvarle ora? (OK = salva, Annulla = resta nella pagina)")) {
+          documentForm.requestSubmit();
+        }
+        return;
+      }
+      unsavedModal = bootstrap.Modal.getOrCreateInstance(modaleEl);
+    }
+    unsavedModal.show();
   }
   if (documentForm) {
-    unsavedBanner = document.createElement("div");
-    unsavedBanner.id = "unsaved-banner";
-    unsavedBanner.className = "alert alert-warning d-none align-items-center justify-content-between gap-3 flex-wrap py-2 px-3 mb-3";
-    unsavedBanner.setAttribute("role", "alert");
-    const testo = document.createElement("div");
-    testo.innerHTML = "<i class='bi bi-exclamation-triangle-fill me-2'></i><strong>Modifiche non salvate.</strong> Salva prima di tornare indietro o le perderai.";
-    const salvaBtn = document.createElement("button");
-    salvaBtn.type = "button";
-    salvaBtn.className = "btn btn-warning btn-sm";
-    salvaBtn.innerHTML = "<i class='bi bi-check-lg me-1'></i>Salva ora";
-    salvaBtn.addEventListener("click", function () {
+    modaleEl = document.createElement("div");
+    modaleEl.className = "modal fade";
+    modaleEl.id = "unsaved-modal";
+    modaleEl.tabIndex = -1;
+    modaleEl.setAttribute("aria-hidden", "true");
+    modaleEl.innerHTML =
+      "<div class='modal-dialog'>" +
+        "<div class='modal-content'>" +
+          "<div class='modal-header'>" +
+            "<h5 class='modal-title'><i class='bi bi-exclamation-triangle me-2'></i>Modifiche non salvate</h5>" +
+            "<button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Resta nella pagina'></button>" +
+          "</div>" +
+          "<div class='modal-body'>Stai cambiando pagina senza salvare: le modifiche andranno perse. Vuoi salvarle ora?</div>" +
+          "<div class='modal-footer'>" +
+            "<button type='button' class='btn btn-outline-secondary' data-bs-dismiss='modal'>Resta nella pagina</button>" +
+            "<button type='button' class='btn btn-danger' id='unsaved-discard'>Esci senza salvare</button>" +
+            "<button type='button' class='btn btn-primary' id='unsaved-save'><i class='bi bi-check-lg me-1'></i>Salva ora</button>" +
+          "</div>" +
+        "</div>" +
+      "</div>";
+    document.body.appendChild(modaleEl);
+    modaleEl.querySelector("#unsaved-save").addEventListener("click", function () {
+      if (unsavedModal) unsavedModal.hide();
       documentForm.requestSubmit();
     });
-    unsavedBanner.appendChild(testo);
-    unsavedBanner.appendChild(salvaBtn);
-    documentForm.prepend(unsavedBanner);
+    modaleEl.querySelector("#unsaved-discard").addEventListener("click", function () {
+      bypassNavigate = true;
+      if (unsavedModal) unsavedModal.hide();
+      if (pendingUrl) window.location.href = pendingUrl;
+    });
     documentForm.addEventListener("input", markFormDirty);
     documentForm.addEventListener("change", markFormDirty);
     documentForm.addEventListener("submit", function (event) {
@@ -549,12 +573,11 @@
       if (!anchor || anchor.target === "_blank") return;
       const href = anchor.getAttribute("href") || "";
       if (!href || href.charAt(0) === "#" || href.indexOf("javascript:") === 0) return;
+      if (anchor.hasAttribute("data-bs-toggle")) return;
       if (anchor.closest(".autocomplete-menu")) return;
       event.preventDefault();
-      if (window.confirm("Hai modifiche non salvate. Tornare indietro senza salvare? Le modifiche andranno perse.")) {
-        bypassNavigate = true;
-        window.location.href = anchor.href;
-      }
+      pendingUrl = anchor.href;
+      mostraModaleUnsaved();
     });
     window.addEventListener("beforeunload", function (event) {
       if (formSubmitting || bypassNavigate || !formDirty) return;

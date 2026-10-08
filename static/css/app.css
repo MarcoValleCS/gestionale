@@ -448,14 +448,6 @@ a:hover {
 .doc-lines .col-sposta { min-width: 74px; }
 .doc-lines .cell-sposta { vertical-align: middle; }
 
-/* Banner modifiche non salvate: resta visibile in alto durante la compilazione. */
-#unsaved-banner {
-  position: sticky;
-  top: 70px;
-  z-index: 30;
-  box-shadow: 0 4px 14px rgba(146, 64, 14, 0.18);
-}
-
 /* ----------------------------------------------------- posta ricevuta */
 .email-body {
   font-size: 0.9rem;
