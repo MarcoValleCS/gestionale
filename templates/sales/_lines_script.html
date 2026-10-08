@@ -288,8 +288,9 @@
         const url = base.replace("/0/", "/" + select.value + "/");
         // Anche aprire la scheda articolo può far perdere le modifiche
         // (es. app installata): con il form sporco chiede prima conferma.
+        // Si apre nella stessa scheda, per non accumulare schede del browser.
         aperturaConfermata(function () {
-          window.open(url, "_blank");
+          window.location.href = url;
         }, "Stai aprendo la scheda articolo senza salvare: le modifiche andranno perse. Vuoi salvarle ora?");
       });
       if (productSelect) {
