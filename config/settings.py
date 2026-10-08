@@ -58,7 +58,9 @@ SESSION_COOKIE_AGE = 60 * 60 * 12  # sessione di 12 ore
 SESSION_SAVE_EVERY_REQUEST = False
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB (import Excel)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
+# Ogni riga documento vale ~10 campi: 5000 regge preventivi da ~400 righe
+# (oggi il max reale è 14). Il default Django (1000) bloccherebbe già a ~100 righe.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 
 # Limiti anti-abuso (finestra in secondi): usati da apps.core.middleware
 ABUSE_THROTTLE = {
@@ -74,6 +76,10 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+# Timeout di rete per l'invio: senza, un SMTP lento blocca il thread della
+# richiesta a tempo indeterminato (con 8 utenti e 6 thread basta poco per
+# saturare i worker). 20 secondi bastano per PEC/provider normali.
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "20"))
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Gestionale <no-reply@example.com>")
 EMAIL_IS_CONFIGURED = bool(EMAIL_HOST)
 
