@@ -521,3 +521,86 @@ class AccontoOrdineTest(BillingTestBase):
         self.assertEqual(risposta.status_code, 302)
         resto = SalesInvoice.objects.get(source_order=self.order, kind=SalesInvoice.KIND_BALANCE)
         self.assertEqual(resto.subtotal, Decimal("2100.00"))
+
+
+class AccontoFissoTest(BillingTestBase):
+    """Acconto a importo fisso scalato dalle fatture delle consegne.
+
+    Esempio: ordine 3.000 €, acconto 1.000 €. Consegna da 300 € → fattura a 0 €
+    (300 scalati); consegna da 700 € → fattura a 0 € (acconto esaurito);
+    consegne successive fatturate per intero.
+    """
+
+    def setUp(self):
+        self.order = self.confirmed_order("300")  # 300 × 10,00 € = 3.000 €
+        register_movement(product=self.product, delta=Decimal("300"), movement_type="load", user=self.user)
+
+    def _fattura_consegna(self, qty):
+        nota = services.create_delivery_note_from_order(self.order, user=self.user)
+        riga = nota.lines.get()
+        riga.qty = Decimal(qty)
+        riga.save(update_fields=["qty"])
+        errors = services.issue_delivery_note(nota, user=self.user)
+        self.assertEqual(errors, [])
+        return services.create_sales_invoice_from_delivery_note(nota, user=self.user)
+
+    def test_acconto_importo_fisso(self):
+        acconto = services.create_order_advance(self.order, amount=Decimal("1000"), user=self.user)
+        self.assertEqual(acconto.kind, SalesInvoice.KIND_ADVANCE)
+        self.assertEqual(acconto.subtotal, Decimal("1000.00"))
+        self.assertEqual(acconto.lines.count(), 1)
+        self.assertIsNone(acconto.lines.get().product_id)
+        riepilogo = services.order_billing_summary(self.order)
+        self.assertEqual(riepilogo["advance_remaining"], Decimal("1000.00"))
+
+    def test_acconto_fisso_oltre_il_residuo(self):
+        with self.assertRaises(ValidationError):
+            services.create_order_advance(self.order, amount=Decimal("4000"), user=self.user)
+        with self.assertRaises(ValidationError):
+            services.create_order_advance(self.order, amount=Decimal("0"), user=self.user)
+
+    def test_scalo_progressivo_fino_a_esaurimento(self):
+        services.create_order_advance(self.order, amount=Decimal("1000"), user=self.user)
+
+        prima = self._fattura_consegna("30")  # merci 300 €
+        self.assertEqual(prima.subtotal, Decimal("0.00"))
+        storno = prima.lines.get(is_advance_deduction=True)
+        self.assertEqual(storno.unit_price, Decimal("-300.00"))
+        self.assertEqual(services.order_billing_summary(self.order)["advance_remaining"], Decimal("700.00"))
+
+        seconda = self._fattura_consegna("70")  # merci 700 €
+        self.assertEqual(seconda.subtotal, Decimal("0.00"))
+        self.assertEqual(services.order_billing_summary(self.order)["advance_remaining"], Decimal("0.00"))
+
+        terza = self._fattura_consegna("200")  # merci 2.000 €, acconto esaurito
+        self.assertEqual(terza.subtotal, Decimal("2000.00"))
+        self.assertFalse(terza.lines.filter(is_advance_deduction=True).exists())
+
+        riepilogo = services.order_billing_summary(self.order)
+        self.assertEqual(riepilogo["committed"], Decimal("3000.00"))
+        self.assertEqual(riepilogo["residual"], Decimal("0"))
+
+    def test_acconto_percentuale_non_alimenta_il_monte(self):
+        services.create_order_advance(self.order, Decimal("10"), user=self.user)
+        fattura = self._fattura_consegna("30")
+        self.assertFalse(fattura.lines.filter(is_advance_deduction=True).exists())
+        self.assertEqual(fattura.subtotal, Decimal("300.00"))
+
+    def test_acconto_annullato_non_conta(self):
+        acconto = services.create_order_advance(self.order, amount=Decimal("1000"), user=self.user)
+        SalesInvoice.objects.filter(pk=acconto.pk).update(status=SalesInvoice.STATUS_CANCELLED)
+        fattura = self._fattura_consegna("30")
+        self.assertFalse(fattura.lines.filter(is_advance_deduction=True).exists())
+        self.assertEqual(services.order_billing_summary(self.order)["advance_remaining"], Decimal("0"))
+
+    def test_vista_acconto_importo_fisso(self):
+        self.login()
+        risposta = self.client.post(
+            reverse("billing:salesinvoice_from_order", args=[self.order.pk]),
+            {"tipo": "advance", "importo": "1000"},
+        )
+        self.assertEqual(risposta.status_code, 302)
+        acconto = SalesInvoice.objects.get(source_order=self.order, kind=SalesInvoice.KIND_ADVANCE)
+        self.assertEqual(acconto.subtotal, Decimal("1000.00"))
+        pagina = self.client.get(reverse("sales:order_detail", args=[self.order.pk])).content.decode("utf-8")
+        self.assertIn("Acconto da scalare", pagina)

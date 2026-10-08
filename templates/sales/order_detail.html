@@ -94,6 +94,12 @@
           <div class="col"><div class="text-muted">Da fatturare</div><div class="fw-semibold {% if billing.residual > 0 %}text-danger{% else %}text-success{% endif %}">{{ billing.residual|money }} €</div></div>
           <div class="col"><div class="text-muted">Bozze</div><div class="fw-semibold">{{ billing.drafts }}</div></div>
         </div>
+        {% if billing.advance_remaining > 0 %}
+        <div class="alert alert-info py-2 small mb-3">
+          <i class="bi bi-wallet2 me-1"></i> Acconto da scalare: <b>{{ billing.advance_remaining|money }} €</b> —
+          le prossime fatture lo detrarranno in automatico.
+        </div>
+        {% endif %}
         <div class="d-flex gap-2 flex-wrap no-print">
           <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#form-acconto-ordine" {% if billing.residual <= 0 %}disabled{% endif %}><i class="bi bi-wallet2"></i> Acconto</button>
           {% if billing.residual > 0 and billing.residual < billing.total %}
@@ -108,8 +114,10 @@
           <form method="post" action="{% url 'billing:salesinvoice_from_order' order.pk %}" class="row g-2 align-items-end">
             {% csrf_token %}
             <input type="hidden" name="tipo" value="advance">
-            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="ordine-acconto-percento">Acconto %</label><input class="form-control form-control-sm" id="ordine-acconto-percento" name="percento" inputmode="decimal" placeholder="es. 30" required></div>
+            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="ordine-acconto-percento">Acconto %</label><input class="form-control form-control-sm" id="ordine-acconto-percento" name="percento" inputmode="decimal" placeholder="es. 30"></div>
+            <div class="col-6 col-md-3"><label class="form-label mb-1 small" for="ordine-acconto-importo">oppure importo fisso €</label><input class="form-control form-control-sm" id="ordine-acconto-importo" name="importo" inputmode="decimal" placeholder="es. 1000"></div>
             <div class="col-12 col-md-3"><button class="btn btn-primary btn-sm" type="submit">Crea acconto</button></div>
+            <div class="col-12 form-text">L'importo fisso verrà scalato in automatico dalle fatture successive.</div>
           </form>
         </div>
       </div>

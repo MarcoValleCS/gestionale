@@ -569,10 +569,14 @@ def salesinvoice_create_from_order(request, pk):
     tipo = request.POST.get("tipo", "")
     try:
         if tipo == "advance":
-            percento = _numero_decimale(request.POST.get("percento"))
-            if percento is None:
-                raise ValidationError("Indica la percentuale dell'acconto.")
-            invoice = services.create_order_advance(order, percento, user=request.user)
+            importo = _numero_decimale(request.POST.get("importo"))
+            if importo is not None:
+                invoice = services.create_order_advance(order, amount=importo, user=request.user)
+            else:
+                percento = _numero_decimale(request.POST.get("percento"))
+                if percento is None:
+                    raise ValidationError("Indica la percentuale oppure l'importo fisso dell'acconto.")
+                invoice = services.create_order_advance(order, percento, user=request.user)
         elif tipo == "balance":
             invoice = services.create_order_balance(order, user=request.user)
         else:

@@ -218,6 +218,11 @@ class SalesInvoice(TotalsDocument, TimeStampedModel):
 
 class SalesInvoiceLine(DocumentLine):
     invoice = models.ForeignKey(SalesInvoice, on_delete=models.CASCADE, related_name="lines", verbose_name="Fattura")
+    is_advance_deduction = models.BooleanField(
+        "Storno acconto",
+        default=False,
+        help_text="Riga negativa che scala un acconto fisso già fatturato per lo stesso ordine.",
+    )
 
 
 class PurchaseInvoice(TotalsDocument, TimeStampedModel):

@@ -155,6 +155,7 @@ def create_sales_invoice_from_order(order, user=None, only_delivered=False):
         )
         for row in payload:
             SalesInvoiceLine.objects.create(invoice=invoice, **row)
+        _apply_advance_storno(order, invoice)
         invoice.recalculate()
     return invoice
 
@@ -177,6 +178,7 @@ def create_sales_invoice_from_delivery_note(note, user=None):
         )
         for row in _invoice_lines_from(lambda line: line.qty, note.lines.all()):
             SalesInvoiceLine.objects.create(invoice=invoice, **row)
+        _apply_advance_storno(note.source_order, invoice)
         invoice.recalculate()
         note.invoiced = True
         note.save(update_fields=["invoiced"])
@@ -386,9 +388,115 @@ def order_billing_summary(order):
         "invoiced": sum(per_tipo.values(), Decimal("0")),
         "committed": committed,
         "residual": totale - committed,
+        "advance_remaining": advance_pool_summary(order)["remaining"],
         "documents": documenti,
         "drafts": sum(1 for d in documenti if d.status == SalesInvoice.STATUS_DRAFT),
     }
+
+
+def _vat_rate_for_order(order):
+    """Aliquota IVA più usata nelle righe dell'ordine (o 22%)."""
+    from apps.core.models import VatRate
+
+    riga = (
+        order.lines.filter(product__isnull=False)
+        .exclude(vat_rate__isnull=True)
+        .values("vat_rate")
+        .annotate(quante=models.Count("pk"))
+        .order_by("-quante")
+        .first()
+    )
+    if riga:
+        aliquota = VatRate.objects.filter(pk=riga["vat_rate"]).first()
+        if aliquota:
+            return aliquota
+    return VatRate.objects.filter(code="22").first() or VatRate.objects.first()
+
+
+def advance_pool_summary(order):
+    """Acconto fisso da scalare: versato, già scalato e residuo per aliquota.
+
+    Fanno monte solo le righe «a corpo» (senza articolo) delle fatture di
+    acconto non annullate; gli acconti in percentuale hanno righe articolo
+    scalate e non alimentano il monte. Lo scalato è la somma delle righe di
+    storno (negative) nelle altre fatture dell'ordine.
+    """
+    from apps.core.rounding import round2
+
+    versato = {}
+    scalato = {}
+    aliquote = {}
+    fatture = (
+        SalesInvoice.objects.filter(source_order=order)
+        .exclude(status=SalesInvoice.STATUS_CANCELLED)
+        .prefetch_related("lines__vat_rate")
+    )
+    for fattura in fatture:
+        for riga in fattura.lines.all():
+            if riga.is_display:
+                continue
+            quota = aliquote.setdefault(
+                riga.vat_rate_id, {"vat_rate": riga.vat_rate, "versato": Decimal("0"), "scalato": Decimal("0")}
+            )
+            if riga.is_advance_deduction:
+                quota["scalato"] += riga.line_subtotal
+            elif fattura.kind == SalesInvoice.KIND_ADVANCE and riga.product_id is None:
+                quota["versato"] += riga.line_subtotal
+    per_vat = []
+    residuo_totale = Decimal("0")
+    for quota in aliquote.values():
+        # lo storno è negativo: lo scalato effettivo è il suo valore assoluto
+        residuo = round2(quota["versato"] + quota["scalato"])
+        if residuo < 0:
+            residuo = Decimal("0")
+        if quota["versato"] > 0:
+            per_vat.append((quota["vat_rate"], residuo))
+            residuo_totale += residuo
+    return {"remaining": round2(residuo_totale), "per_vat": per_vat}
+
+
+def _apply_advance_storno(order, invoice):
+    """Scala l'acconto fisso residuo dalle merci in fattura (storno per aliquota).
+
+    Aggiunge una riga negativa «Storno acconto» per ogni aliquota presente
+    nelle merci, fino a esaurire il residuo. Restituisce l'importo scalato.
+    """
+    from apps.core.rounding import round2
+
+    if order is None or invoice.kind == SalesInvoice.KIND_ADVANCE:
+        return Decimal("0")
+    residui = {getattr(iva, "pk", None): (iva, residuo) for iva, residuo in advance_pool_summary(order)["per_vat"]}
+    if not any(residuo > 0 for _, residuo in residui.values()):
+        return Decimal("0")
+    basi = {}
+    posizione = 0
+    for riga in invoice.lines.all():
+        posizione = max(posizione, riga.position or 0)
+        if riga.is_display or riga.is_advance_deduction:
+            continue
+        chiave = riga.vat_rate_id
+        base = basi.setdefault(chiave, [riga.vat_rate, Decimal("0")])
+        base[1] += riga.line_subtotal
+    scalato = Decimal("0")
+    for chiave, (iva, base) in basi.items():
+        residuo = residui.get(chiave, (None, Decimal("0")))[1]
+        quota = round2(min(residuo, base))
+        if quota <= 0:
+            continue
+        posizione += 1
+        SalesInvoiceLine.objects.create(
+            invoice=invoice,
+            position=posizione,
+            description=f"Storno acconto ordine {order.number}"[:300],
+            qty=Decimal("1"),
+            unit_price=-quota,
+            vat_rate=iva,
+            is_advance_deduction=True,
+        )
+        scalato += quota
+    if scalato > 0:
+        invoice.recalculate()
+    return scalato
 
 
 def _order_lines_scaled(order, ratio):
@@ -444,27 +552,54 @@ def _create_order_linked_invoice(order, kind, payload, *, percent=None, user=Non
     return invoice
 
 
-def create_order_advance(order, percent, user=None):
-    """Acconto su un ordine: le righe sono ridotte alla percentuale indicata.
+def create_order_advance(order, percent=None, amount=None, user=None):
+    """Acconto su un ordine: in percentuale (righe scalate) o a importo fisso.
 
-    Esempio: ordine di 3.000 € con acconto al 30% → fattura di 900 € con le
-    quantità di ogni riga ridotte del 30%. Le voci restano quelle dell'ordine.
+    Percentuale: le righe sono ridotte alla percentuale indicata (es. ordine
+    di 3.000 € con acconto al 30% → fattura di 900 €). Le voci restano quelle
+    dell'ordine.
+    Importo fisso: una riga «Acconto ordine …» da scalare poi dalle fatture
+    delle consegne (es. acconto 1.000 € su ordine di 3.000 €).
     """
     from apps.core.rounding import round2
 
-    percentuale = Decimal(percent)
-    if percentuale <= 0 or percentuale > 100:
-        raise ValidationError("La percentuale dell'acconto deve essere fra 0 e 100.")
     summary = order_billing_summary(order)
     if summary["total"] <= 0:
         raise ValidationError("L'ordine non ha un imponibile.")
-    importo = round2(summary["total"] * percentuale / 100)
-    if importo > summary["residual"] + Decimal("0.01"):
-        raise ValidationError(
-            f"L'acconto del {percentuale}% ({importo:.2f} €) supera quanto resta da fatturare "
-            f"({summary['residual']:.2f} €)."
-        )
-    payload = _order_lines_scaled(order, percentuale / 100)
+    if amount is not None:
+        importo = round2(Decimal(amount))
+        if importo <= 0:
+            raise ValidationError("L'importo dell'acconto deve essere positivo.")
+        if importo > summary["residual"] + Decimal("0.01"):
+            raise ValidationError(
+                f"L'acconto di {importo:.2f} € supera quanto resta da fatturare ({summary['residual']:.2f} €)."
+            )
+        iva = _vat_rate_for_order(order)
+        payload = [
+            {
+                "position": 1,
+                "section": "",
+                "product": None,
+                "description": f"Acconto ordine {order.number}"[:300],
+                "qty": Decimal("1"),
+                "uom": None,
+                "unit_price": importo,
+                "discount_pct": Decimal("0"),
+                "vat_rate": iva,
+            }
+        ]
+        percentuale = None
+    else:
+        percentuale = Decimal(percent) if percent is not None else None
+        if percentuale is None or percentuale <= 0 or percentuale > 100:
+            raise ValidationError("Indica la percentuale dell'acconto (fra 0 e 100) oppure un importo fisso.")
+        importo = round2(summary["total"] * percentuale / 100)
+        if importo > summary["residual"] + Decimal("0.01"):
+            raise ValidationError(
+                f"L'acconto del {percentuale}% ({importo:.2f} €) supera quanto resta da fatturare "
+                f"({summary['residual']:.2f} €)."
+            )
+        payload = _order_lines_scaled(order, percentuale / 100)
     if not payload:
         raise ValidationError("L'ordine non ha righe fatturabili.")
     with transaction.atomic():
@@ -484,7 +619,10 @@ def create_order_balance(order, user=None):
     if not payload:
         raise ValidationError("L'ordine non ha righe fatturabili.")
     with transaction.atomic():
-        return _create_order_linked_invoice(order, SalesInvoice.KIND_BALANCE, payload, user=user)
+        invoice = _create_order_linked_invoice(order, SalesInvoice.KIND_BALANCE, payload, user=user)
+        _apply_advance_storno(order, invoice)
+        invoice.recalculate()
+        return invoice
 
 
 # --------------------------------------------------------- fatture ricevute
