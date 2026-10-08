@@ -48,4 +48,6 @@ urlpatterns = [
     path("manifest.webmanifest", views.manifest, name="manifest"),
     path("sw.js", views.service_worker, name="service_worker"),
     path("offline/", views.offline, name="offline"),
+    # Condizioni di vendita: pagina pubblica, senza login
+    path("termini/", views.termini_vendita, name="termini"),
 ]

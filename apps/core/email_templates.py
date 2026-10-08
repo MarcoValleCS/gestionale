@@ -18,6 +18,7 @@ SEGNAPOSTO = (
     ("{riferimento}", "vostro riferimento"),
     ("{azienda}", "nome dell'azienda"),
     ("{validita}", "riga con la validità (preventivi)"),
+    ("{termini}", "condizioni di vendita (riga completa con link, o vuota)"),
 )
 
 DEFAULTS = {
@@ -27,6 +28,7 @@ DEFAULTS = {
             "Buongiorno,\n"
             "in allegato il preventivo {numero} del {data} di {totale} €.\n"
             "{validita}"
+            "{termini}"
             "Restiamo a disposizione per qualsiasi chiarimento.\n\n"
             "Cordiali saluti\n"
             "{azienda}"

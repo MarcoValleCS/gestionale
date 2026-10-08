@@ -64,6 +64,12 @@
             <div class="col-md-3">{% include "partials/field.html" with field=form.document_color %}</div>
             <div class="col-md-3">{% include "partials/field.html" with field=form.document_style %}</div>
             <div class="col-12">{% include "partials/field.html" with field=form.quote_footer %}</div>
+            <div class="col-12">{% include "partials/field.html" with field=form.sales_terms %}</div>
+            <p class="small text-muted mb-0">
+              Le condizioni di vendita entrano nei nuovi preventivi e ordini, nelle email
+              (segnaposto <code>{termini}</code>) e nella pagina pubblica
+              <a href="/termini">/termini</a> del sito.
+            </p>
           </div>
           <div class="border rounded p-3">
             <div class="small text-muted mb-2">Anteprima stile «{{ company.get_document_style_display }}»</div>

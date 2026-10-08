@@ -186,7 +186,7 @@ class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
             self.fields["valid_until"].initial = timezone.localdate() + timedelta(days=30)
-            self.fields["terms_text"].initial = CompanySettings.load().quote_footer
+            self.fields["terms_text"].initial = CompanySettings.load().get_sales_terms()
 
 
 class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
@@ -212,7 +212,7 @@ class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         self.apply_commission_queryset()
         if not self.instance.pk:
             self.fields["date"].initial = timezone.localdate()
-            self.fields["terms_text"].initial = CompanySettings.load().quote_footer
+            self.fields["terms_text"].initial = CompanySettings.load().get_sales_terms()
 
 
 class QuoteTemplateForm(BaseBootstrapModelForm):

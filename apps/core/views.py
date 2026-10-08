@@ -1118,3 +1118,16 @@ def service_worker(request):
 @login_not_required
 def offline(request):
     return render(request, "core/offline.html")
+
+
+@login_not_required
+def termini_vendita(request):
+    """Condizioni generali di vendita: pagina pubblica, senza login."""
+    from apps.core.models import CompanySettings
+
+    company = CompanySettings.load()
+    return render(
+        request,
+        "core/termini.html",
+        {"page_title": "Condizioni generali di vendita", "company": company, "termini": company.get_sales_terms()},
+    )

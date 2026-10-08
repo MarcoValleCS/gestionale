@@ -1,0 +1,87 @@
+{% load core_extras %}<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Condizioni generali di vendita di {{ company.name }}: preventivi, ordini, consegne, recesso e garanzie.">
+  <title>{{ page_title }} · {{ company.name }}</title>
+  <style>
+    :root { --colore: {{ company.document_color|default:"#1d4ed8" }}; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1f2937;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      background: #f4f6fb;
+    }
+    .foglio {
+      max-width: 760px;
+      margin: 32px auto 48px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(16, 24, 40, 0.10);
+      overflow: hidden;
+    }
+    .testata { background: var(--colore); color: #fff; padding: 28px 36px; }
+    .testata .azienda { font-size: 22px; font-weight: 700; margin: 0 0 2px; }
+    .testata .titolo { font-size: 14px; opacity: 0.9; margin: 0; }
+    .corpo { padding: 12px 36px 8px; }
+    .corpo p { margin: 0 0 14px; }
+    .piede {
+      border-top: 1px solid #e5e7eb;
+      margin: 8px 36px 0;
+      padding: 14px 0 26px;
+      font-size: 13px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .azioni { text-align: center; padding: 0 36px 30px; }
+    .azioni button {
+      font: inherit;
+      padding: 9px 22px;
+      border-radius: 8px;
+      border: 1px solid #d3d9e4;
+      background: #fff;
+      cursor: pointer;
+    }
+    .azioni button.principale {
+      background: var(--colore);
+      border-color: var(--colore);
+      color: #fff;
+      font-weight: 600;
+    }
+    @media print {
+      body { background: #fff; }
+      .foglio { max-width: none; margin: 0; box-shadow: none; border-radius: 0; }
+      .azioni { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="foglio">
+    <div class="testata">
+      <p class="azienda">{{ company.name }}</p>
+      <p class="titolo">{{ page_title }}</p>
+    </div>
+    <div class="corpo">
+      {{ termini|richtext }}
+    </div>
+    <div class="piede">
+      <div>
+        {{ company.name }}{% if company.vat_number %} · P.IVA {{ company.vat_number }}{% endif %}
+        {% if company.email %} · {{ company.email }}{% endif %}
+        {% if company.phone %} · Tel. {{ company.phone }}{% endif %}
+      </div>
+      <div>{{ company.website }}</div>
+    </div>
+    <div class="azioni">
+      <button class="principale" onclick="window.print()">Stampa / Salva PDF</button>
+    </div>
+  </div>
+</body>
+</html>

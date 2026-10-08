@@ -230,6 +230,11 @@ class CompanySettings(models.Model):
         blank=True,
         default="Pagamento: come concordato.\nPrezzi IVA esclusa salvo diversa indicazione.",
     )
+    sales_terms = models.TextField(
+        "Condizioni di vendita (preventivi, ordini e pagina pubblica)",
+        blank=True,
+        help_text="Lascia vuoto per usare il testo standard. Ammessi segnaposto {azienda} {indirizzo} {piva} {email} {telefono} e formattazione semplice (grassetto, elenchi).",
+    )
 
     # -------------------------------------------------------- aspetto grafico
     BACKGROUND_CHOICES = [
@@ -285,6 +290,12 @@ class CompanySettings(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_sales_terms(self):
+        """Condizioni di vendita con i dati aziendali (proprie o standard)."""
+        from .termini_vendita import render_termini
+
+        return render_termini(self, (self.sales_terms or "").strip() or None)
 
     def save(self, *args, **kwargs):
         self.pk = 1

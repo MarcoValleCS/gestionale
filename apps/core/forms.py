@@ -165,6 +165,7 @@ class CompanySettingsForm(BaseBootstrapModelForm):
             "theme_color",
             "theme_background",
             "quote_footer",
+            "sales_terms",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -173,6 +174,7 @@ class CompanySettingsForm(BaseBootstrapModelForm):
             self.fields[campo].widget.attrs["type"] = "color"
             self.fields[campo].widget.attrs["class"] = "form-control form-control-color"
         self.fields["quote_footer"].widget.attrs["rows"] = 4
+        self.fields["sales_terms"].widget.attrs["rows"] = 12
 
 
 class WikiPageForm(BaseBootstrapModelForm):

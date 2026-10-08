@@ -192,6 +192,9 @@ def quote_reminder(request, pk):
             "totale": format_money(preventivo.grand_total),
             "giorni": giorni,
             "azienda": CompanySettings.load().name,
+            "termini": (
+                f"Condizioni generali di vendita: {request.build_absolute_uri(reverse('core:termini'))}\n"
+            ),
         },
     )
     try:
@@ -447,6 +450,9 @@ class QuoteDetailView(RoleRequiredMixin, DetailView):
                 f"Il preventivo è valido fino al {self.object.valid_until:%d/%m/%Y}.\n"
                 if self.object.valid_until
                 else ""
+            ),
+            "termini": (
+                f"Condizioni generali di vendita: {self.request.build_absolute_uri(reverse('core:termini'))}\n"
             ),
         }
         context["email_subject"], context["email_body"] = contenuto(EmailTemplate.KIND_QUOTE, contesto)
