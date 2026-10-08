@@ -18,6 +18,9 @@
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:order_print' order.pk %}"><i class="bi bi-printer"></i> Stampa</a>
+    {% if pdf_available %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:order_pdf' order.pk %}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+    {% endif %}
     {% if roles.is_admin or roles.is_sales or roles.is_warehouse %}
     <form method="post" action="{% url 'billing:deliverynote_from_order' order.pk %}">{% csrf_token %}
       <button class="btn btn-outline-primary btn-sm" type="submit" title="Crea il documento di trasporto con le quantità da consegnare">
@@ -183,14 +186,14 @@
             </tr>
             {% endif %}
             {% endfor %}
-            {% if block.subsection and block.lines %}
+            {% if block.subsection and block.has_articles %}
             <tr class="table-light">
               <td colspan="8" class="text-end small text-muted">Totale {{ block.subsection }}</td>
               <td class="text-end fw-semibold">{{ block.subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% endfor %}
-            {% if group.section and group.lines %}
+            {% if group.section and group.has_articles %}
             <tr class="table-light">
               <td colspan="8" class="text-end small text-muted">Totale {{ group.section }}</td>
               <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>

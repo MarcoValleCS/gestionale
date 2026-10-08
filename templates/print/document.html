@@ -41,6 +41,8 @@
       color: #fff;
       font-weight: 600;
     }
+    .toolbar-azioni { display: flex; align-items: center; gap: 8px; }
+    .toolbar-hint { font-size: 11px; color: #6b7280; max-width: 340px; }
     .sheet {
       position: relative;
       width: 210mm;
@@ -201,17 +203,35 @@
     @media print {
       body { background: #fff; }
       .toolbar { display: none !important; }
-      .sheet { width: auto; min-height: 0; margin: 0; padding: 0 0 24mm; box-shadow: none; }
+      .sheet { width: auto; min-height: 0; margin: 0; padding: 0 0 6mm; box-shadow: none; }
       .accent-bar { margin: 0 0 8mm; }
-      .sheet-footer { position: fixed; bottom: 0; left: 0; right: 0; padding-top: 2mm; }
-      @page { size: A4; margin: 12mm 14mm 14mm; }
+      /* Piè di pagina ripetuto su ogni foglio dentro il margine inferiore:
+         non copre mai il contenuto (prima era fisso e si sovrapponeva). */
+      .sheet-footer {
+        position: running(piepagina);
+        border-top: 1px solid #e5e7eb;
+        padding-top: 2mm;
+        left: auto;
+        right: auto;
+      }
+      table.lines thead { display: table-header-group; }
+      table.lines tr { break-inside: avoid; }
+      @page {
+        size: A4;
+        margin: 12mm 14mm 20mm;
+        @bottom { content: element(piepagina); }
+      }
     }
   </style>
 </head>
 <body>
   <div class="toolbar">
     <a href="{{ back_url }}">&#8592; Torna indietro</a>
-    <button class="primary" onclick="window.print()">Stampa / Salva PDF</button>
+    <div class="toolbar-azioni">
+      {% if download_url %}<a href="{{ download_url }}">Scarica PDF</a>{% endif %}
+      <span class="toolbar-hint">Per un PDF senza le scritte del browser, usa «Scarica PDF» oppure deseleziona «Intestazioni e piè di pagina» nel dialogo di stampa.</span>
+      <button class="primary" onclick="window.print()">Stampa / Salva PDF</button>
+    </div>
   </div>
 
   <div class="sheet stile-{{ company.document_style|default:'classico' }}">
@@ -312,14 +332,14 @@
         </tr>
         {% endif %}
         {% endfor %}
-        {% if block.subsection and block.lines and show_prices %}
+        {% if block.subsection and block.has_articles and show_prices %}
         <tr class="section-total subsection-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ block.subsection }}</td>
           <td class="num">{{ block.subtotal|money }} €</td>
         </tr>
         {% endif %}
         {% endfor %}
-        {% if group.section and group.lines and show_prices %}
+        {% if group.section and group.has_articles and show_prices %}
         <tr class="section-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ group.section }}</td>
           <td class="num">{{ group.subtotal|money }} €</td>
@@ -335,7 +355,7 @@
       <div class="notes-block">
         {% if notes %}
         <div class="notes-title">Condizioni e note</div>
-        {{ notes|richtext }}
+        {{ notes|richtext|linkify_urls }}
         {% endif %}
       </div>
       {% if show_prices %}

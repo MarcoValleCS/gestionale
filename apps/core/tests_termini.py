@@ -53,6 +53,17 @@ class TerminiVenditaTest(TestCase):
         self.assertIn('href="https://aquaforma.space/termini"', pulito)
         self.assertNotIn("javascript:", pulito)
 
+    def test_linkify_urls_solo_testo_in_chiaro(self):
+        from apps.core.templatetags.core_extras import linkify_urls
+
+        fuori = linkify_urls("Condizioni su: aquaforma.space/termini.")
+        self.assertIn('<a href="https://aquaforma.space/termini">aquaforma.space/termini</a>.', fuori)
+        gia = linkify_urls('<a href="https://a.it/x">a.it/x</a> e b.it/y.')
+        self.assertEqual(gia.count("<a "), 2)
+        self.assertIn('<a href="https://b.it/y">b.it/y</a>.', gia)
+        # niente falsi positivi: file e abbreviazioni restano testo
+        self.assertNotIn("<a ", linkify_urls("vedi allegato fattura.pdf e art. 1490 c.c."))
+
     def test_email_preventivo_con_link_termini(self):
         _oggetto, corpo = contenuto(
             EmailTemplate.KIND_QUOTE,

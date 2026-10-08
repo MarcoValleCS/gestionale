@@ -686,6 +686,34 @@ class QuotePdfTest(FlowTestBase):
         else:
             self.assertIsNone(pdf, "senza WeasyPrint il PDF e' None e il gestionale continua a funzionare")
 
+    def test_scarica_pdf_preventivo(self):
+        from apps.core.pdf import pdf_available
+
+        if not pdf_available():
+            self.skipTest("WeasyPrint non disponibile")
+        response = self.client.get(reverse("sales:quote_pdf", args=[self.quote.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        contenuto = b"".join(response.streaming_content)
+        self.assertTrue(contenuto.startswith(b"%PDF-"))
+
+    def test_scarica_pdf_ordine(self):
+        from apps.core.pdf import pdf_available
+
+        if not pdf_available():
+            self.skipTest("WeasyPrint non disponibile")
+        order = SalesOrder.objects.create(customer=self.customer)
+        order.lines.create(
+            product=self.product, description=self.product.name, qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10.00"), vat_rate=self.vat22,
+        )
+        order.recalculate()
+        response = self.client.get(reverse("sales:order_pdf", args=[order.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        contenuto = b"".join(response.streaming_content)
+        self.assertTrue(contenuto.startswith(b"%PDF-"))
+
 
 class CommissionTest(FlowTestBase):
     """La provvigione a chi ha presentato il cliente erode il margine."""
@@ -1495,6 +1523,184 @@ class RigheStileOdooTest(FlowTestBase):
         self.assertEqual((prima.position, seconda.position), (2, 1))
         ordine = list(quote.lines.order_by("position", "pk").values_list("description", flat=True))
         self.assertEqual(ordine, ["seconda", "prima"])
+
+    def test_riordino_sezioni_resta_dopo_salvataggio(self):
+        """Spostare sezione/sottosezione/articolo con le frecce e salvare: l'ordine resta."""
+        quote = Quote.objects.create(customer=self.customer)
+        sezione = quote.lines.create(position=1, line_type="section", description="SEZ")
+        sotto = quote.lines.create(position=2, line_type="subsection", description="SUB")
+        articolo = quote.lines.create(
+            product=self.product, description="art", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22, position=3,
+        )
+
+        def riga(form, pk, tipo, descrizione, posizione, prodotto=None, prezzo="0"):
+            form.update(
+                {
+                    f"lines-{form['i']}-id": pk,
+                    f"lines-{form['i']}-position": posizione,
+                    f"lines-{form['i']}-line_type": tipo,
+                    f"lines-{form['i']}-section": "",
+                    f"lines-{form['i']}-product": prodotto or "",
+                    f"lines-{form['i']}-description": descrizione,
+                    f"lines-{form['i']}-qty": "1",
+                    f"lines-{form['i']}-uom": self.uom.pk if prodotto else "",
+                    f"lines-{form['i']}-unit_price": prezzo,
+                    f"lines-{form['i']}-discount_pct": "0",
+                    f"lines-{form['i']}-vat_rate": self.vat22.pk if prodotto else "",
+                }
+            )
+
+        # SUB prima di SEZ: le posizioni inviate seguono il nuovo ordine visibile
+        dati = {
+            "customer": self.customer.pk,
+            "date": "2026-01-10",
+            "valid_until": "",
+            "payment_term": "",
+            "reference": "",
+            "commission_contact": "",
+            "commission_pct": "0",
+            "terms_text": "",
+            "notes": "",
+            "lines-TOTAL_FORMS": "4",
+            "lines-INITIAL_FORMS": "3",
+            "lines-MIN_NUM_FORMS": "0",
+            "lines-MAX_NUM_FORMS": "1000",
+            "i": 0,
+        }
+        riga(dati, sezione.pk, "section", "SEZ", "2")
+        dati["i"] = 1
+        riga(dati, sotto.pk, "subsection", "SUB", "1")
+        dati["i"] = 2
+        riga(dati, articolo.pk, "article", "art", "3", prodotto=self.product.pk, prezzo="10")
+        dati["i"] = 3
+        riga(dati, "", "article", "", "4")
+        del dati["i"]
+        response = self.client.post(reverse("sales:quote_update", args=[quote.pk]), dati)
+        self.assertEqual(response.status_code, 302)
+        ordine = list(quote.lines.order_by("position", "pk").values_list("description", flat=True))
+        self.assertEqual(ordine, ["SUB", "SEZ", "art"])
+        posizioni = list(quote.lines.order_by("position", "pk").values_list("position", flat=True))
+        self.assertEqual(posizioni, [1, 2, 3])
+
+    def test_posizioni_duplicate_si_normalizzano(self):
+        """Posizioni pari in ingresso: il salvataggio le rende univoche 1..N (stesso ordine)."""
+        quote = Quote.objects.create(customer=self.customer)
+        prima = quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        seconda = quote.lines.create(line_type="section", description="S")
+        terza = quote.lines.create(
+            product=self.product, description="b", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        response = self.client.post(
+            reverse("sales:quote_update", args=[quote.pk]),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "3",
+                "lines-INITIAL_FORMS": "3",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-id": prima.pk,
+                "lines-0-position": "1",
+                "lines-0-line_type": "article",
+                "lines-0-description": "a",
+                "lines-0-qty": "1",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "10",
+                "lines-0-discount_pct": "0",
+                "lines-0-vat_rate": self.vat22.pk,
+                "lines-1-id": seconda.pk,
+                "lines-1-position": "1",
+                "lines-1-line_type": "section",
+                "lines-1-description": "S",
+                "lines-1-qty": "1",
+                "lines-1-unit_price": "0",
+                "lines-1-discount_pct": "0",
+                "lines-2-id": terza.pk,
+                "lines-2-position": "1",
+                "lines-2-line_type": "article",
+                "lines-2-description": "b",
+                "lines-2-qty": "1",
+                "lines-2-uom": self.uom.pk,
+                "lines-2-unit_price": "10",
+                "lines-2-discount_pct": "0",
+                "lines-2-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        posizioni = list(quote.lines.order_by("position", "pk").values_list("position", flat=True))
+        self.assertEqual(posizioni, [1, 2, 3])
+        ordine = list(quote.lines.order_by("position", "pk").values_list("description", flat=True))
+        self.assertEqual(ordine, ["a", "S", "b"])
+
+    def test_sottosezione_vuota_cancellata_non_blocca(self):
+        """Una nuova sottosezione vuota subito eliminata col cestino non blocca il salvataggio."""
+        quote = Quote.objects.create(customer=self.customer)
+        articolo = quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        response = self.client.post(
+            reverse("sales:quote_update", args=[quote.pk]),
+            {
+                "customer": self.customer.pk,
+                "date": "2026-01-10",
+                "valid_until": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "2",
+                "lines-INITIAL_FORMS": "1",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-id": articolo.pk,
+                "lines-0-position": "1",
+                "lines-0-line_type": "article",
+                "lines-0-description": "a",
+                "lines-0-qty": "1",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "10",
+                "lines-0-discount_pct": "0",
+                "lines-0-vat_rate": self.vat22.pk,
+                "lines-1-id": "",
+                "lines-1-position": "2",
+                "lines-1-line_type": "subsection",
+                "lines-1-description": "",
+                "lines-1-qty": "1",
+                "lines-1-unit_price": "0",
+                "lines-1-discount_pct": "0",
+                "lines-1-DELETE": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302, "la riga vuota eliminata non deve bloccare")
+        self.assertEqual(quote.lines.count(), 1)
+
+    def test_subtotale_solo_con_articoli(self):
+        """Sottosezione con la sola nota: intestazione e nota sì, «Totale 0,00» no."""
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(position=1, line_type="section", description="S")
+        quote.lines.create(position=2, line_type="subsection", description="P")
+        quote.lines.create(position=3, line_type="note", description="nota blabla")
+        quote.recalculate()
+        for nome_url in ("sales:quote_detail", "sales:quote_print"):
+            pagina = self.client.get(reverse(nome_url, args=[quote.pk])).content.decode("utf-8")
+            self.assertIn("nota blabla", pagina)
+            self.assertNotIn("Totale P", pagina)
+            self.assertNotIn("Totale S", pagina)
 
     def test_convertire_in_ordine_mantiene_le_sezioni(self):
         quote = Quote.objects.create(customer=self.customer)

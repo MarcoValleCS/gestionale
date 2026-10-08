@@ -19,6 +19,9 @@
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_print' quote.pk %}"><i class="bi bi-printer"></i> Stampa</a>
+    {% if pdf_available %}
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:quote_pdf' quote.pk %}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+    {% endif %}
     <form method="post" action="{% url 'sales:quote_duplicate' quote.pk %}">{% csrf_token %}
       <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-copy"></i> Duplica</button>
     </form>
@@ -108,14 +111,14 @@
             </tr>
             {% endif %}
             {% endfor %}
-            {% if block.subsection and block.lines %}
+            {% if block.subsection and block.has_articles %}
             <tr class="table-light">
               <td colspan="7" class="text-end small text-muted">Totale {{ block.subsection }}</td>
               <td class="text-end fw-semibold">{{ block.subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% endfor %}
-            {% if group.section and group.lines %}
+            {% if group.section and group.has_articles %}
             <tr class="table-light">
               <td colspan="7" class="text-end small text-muted">Totale {{ group.section }}</td>
               <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>
@@ -137,7 +140,7 @@
         <div class="mb-3"><div class="text-muted small">Note interne</div><div style="white-space: pre-line">{{ quote.notes }}</div></div>
         {% endif %}
         {% if quote.terms_text %}
-        <div><div class="text-muted small">Condizioni</div><div>{{ quote.terms_text|richtext }}</div></div>
+        <div><div class="text-muted small">Condizioni</div><div>{{ quote.terms_text|richtext|linkify_urls }}</div></div>
         {% endif %}
       </div>
     </div>

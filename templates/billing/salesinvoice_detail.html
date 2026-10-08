@@ -102,14 +102,14 @@
             </tr>
             {% endif %}
             {% endfor %}
-            {% if block.subsection and block.lines %}
+            {% if block.subsection and block.has_articles %}
             <tr class="table-light">
               <td colspan="7" class="text-end small text-muted">Totale {{ block.subsection }}</td>
               <td class="text-end fw-semibold">{{ block.subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% endfor %}
-            {% if group.section and group.lines %}
+            {% if group.section and group.has_articles %}
             <tr class="table-light">
               <td colspan="7" class="text-end small text-muted">Totale {{ group.section }}</td>
               <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>

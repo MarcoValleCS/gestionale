@@ -304,6 +304,9 @@ def build_print_context(
         "show_prices": show_prices,
         "show_discount": show_discount,
         "table_columns": colonne,
+        # Le viste di stampa lo valorizzano (download del PDF generato dal
+        # gestionale); resta vuoto per gli altri documenti (fatture, DDT…).
+        "download_url": "",
     }
 
 
@@ -538,6 +541,28 @@ class QuotePrintView(RoleRequiredMixin, DetailView):
         return context
 
 
+def _pdf_download_response(request, document, numero, render, stampa_url):
+    """File PDF generato dal gestionale (niente scritte del browser)."""
+    from io import BytesIO
+
+    from django.http import FileResponse
+
+    pdf = render(document)
+    if pdf is None:
+        messages.warning(request, "PDF non disponibile su questo sistema: usa «Stampa / Salva PDF» del browser.")
+        return redirect(stampa_url, pk=document.pk)
+    return FileResponse(BytesIO(pdf), as_attachment=True, filename=f"{numero}.pdf", content_type="application/pdf")
+
+
+@role_required(*QUOTE_ROLES)
+def quote_pdf_download(request, pk):
+    """Scarica il PDF del preventivo generato dal gestionale."""
+    from .pdf import render_quote_pdf
+
+    quote = get_object_or_404(Quote, pk=pk)
+    return _pdf_download_response(request, quote, quote.number, render_quote_pdf, "sales:quote_print")
+
+
 @role_required(*QUOTE_ROLES)
 def quote_send(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
@@ -688,8 +713,10 @@ class SalesOrderDetailView(RoleRequiredMixin, DetailView):
         context["vat_rows"] = self.object.vat_breakdown()
         context["purchase_orders"] = self.object.purchase_orders.select_related("supplier").order_by("pk")
         from apps.billing.services import order_billing_summary
+        from apps.core.pdf import pdf_available
 
         context["billing"] = order_billing_summary(self.object)
+        context["pdf_available"] = pdf_available()
         return context
 
 
@@ -771,26 +798,21 @@ class SalesOrderPrintView(RoleRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         doc = self.object
-        context.update(
-            build_print_context(
-                doc,
-                title="Conferma d'ordine",
-                counterparty=doc.customer,
-                counterparty_label="Spett.le cliente",
-                meta_rows=[
-                    ("Data", fdate(doc.date)),
-                    ("Consegna prevista", fdate(doc.expected_date)),
-                    ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
-                    ("Vostro riferimento", doc.reference),
-                    ("Cantiere", str(doc.job) if doc.job_id else ""),
-                ],
-                back_url=reverse("sales:order_detail", args=[doc.pk]),
-                notes=doc.terms_text,
-                show_signature=True,
-                signature_label="Conferma d'ordine (data e firma)",
-            )
-        )
+        # import locale: printing.py usa funzioni di questo modulo, quindi
+        # importarlo in cima creerebbe un ciclo
+        from .printing import order_print_context
+
+        context.update(order_print_context(doc))
         return context
+
+
+@role_required(*ORDER_VIEW_ROLES)
+def order_pdf_download(request, pk):
+    """Scarica il PDF della conferma d'ordine generato dal gestionale."""
+    from .pdf import render_order_pdf
+
+    order = get_object_or_404(SalesOrder, pk=pk)
+    return _pdf_download_response(request, order, order.number, render_order_pdf, "sales:order_print")
 
 
 @role_required(*ORDER_EDIT_ROLES)

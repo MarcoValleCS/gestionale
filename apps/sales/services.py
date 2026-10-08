@@ -40,8 +40,21 @@ def duplicate_quote(quote, user=None):
                 discount_pct=line.discount_pct,
                 vat_rate=line.vat_rate,
             )
+        _normalizza_posizioni(new)
         new.recalculate()
         return new
+
+
+def _normalizza_posizioni(documento):
+    """Rinumera le righe 1..N nell'ordine di visualizzazione.
+
+    Evita di propagare posizioni duplicate o buchi (duplica/converti copiano
+    le righe così come stanno): l'ordine resta quello di (position, pk).
+    """
+    for position, line in enumerate(documento.lines.order_by("position", "pk"), start=1):
+        if line.position != position:
+            line.position = position
+            line.save(update_fields=["position"])
 
 
 def espandi_kit(documento, fk_field="quote"):
@@ -128,6 +141,7 @@ def convert_quote_to_order(quote, user=None):
                 discount_pct=line.discount_pct,
                 vat_rate=line.vat_rate,
             )
+        _normalizza_posizioni(order)
         order.recalculate()
         quote.status = Quote.STATUS_CONVERTED
         quote.save(update_fields=["status"])

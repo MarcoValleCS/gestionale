@@ -583,6 +583,9 @@
     documentForm.addEventListener("input", markFormDirty);
     documentForm.addEventListener("change", markFormDirty);
     documentForm.addEventListener("submit", function (event) {
+      // Riallinea le posizioni all'ordine visibile: anche se una riga fosse
+      // stata spostata senza rinumerare, il server riceve 1..N univoci.
+      renumber();
       if (!validateLines()) {
         event.preventDefault();
         return;

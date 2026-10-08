@@ -1,7 +1,9 @@
 """Filtri template personalizzati."""
+import re
 from decimal import Decimal
 
 from django import template
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from ..richtext import clean_notes
@@ -81,6 +83,40 @@ def guida(value):
     from ..richtext import clean_guida
 
     return mark_safe(clean_guida(value))
+
+
+_URL_RE = re.compile(
+    r"(https?://[^\s<>\"']+|www\.[^\s<>\"']+|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/[^\s<>\"']+)",
+    re.IGNORECASE,
+)
+_NON_TESTO_RE = re.compile(r"(<a\b[^>]*>.*?</a>|<[^>]+>)", re.IGNORECASE | re.DOTALL)
+_PUNTEGGIATURA_FINALE = ".,;:!?)"
+
+
+def _sostituisci_url(match):
+    url = match.group(0)
+    coda = ""
+    while url and url[-1] in _PUNTEGGIATURA_FINALE:
+        coda = url[-1] + coda
+        url = url[:-1]
+    href = url if re.match(r"https?://", url, re.IGNORECASE) else "https://" + url
+    return f'<a href="{escape(href)}">{escape(url)}</a>' + coda
+
+
+@register.filter
+def linkify_urls(value):
+    """Rende cliccabili gli URL scritti in chiaro (scheda, stampa e PDF).
+
+    Opera su HTML già sanificato (es. dopo ``richtext``): collega solo gli
+    URL fuori dai tag e dai link esistenti. Così anche i documenti creati
+    prima del link cliccabile mostrano «aquaforma.space/termini» cliccabile.
+    """
+    if not value:
+        return ""
+    parti = _NON_TESTO_RE.split(str(value))
+    for i in range(0, len(parti), 2):
+        parti[i] = _URL_RE.sub(_sostituisci_url, parti[i])
+    return mark_safe("".join(parti))
 
 
 @register.filter

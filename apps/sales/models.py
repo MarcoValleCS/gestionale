@@ -144,12 +144,19 @@ def group_lines_by_section(lines):
     numero = 0
 
     def nuovo_gruppo(titolo, riga_sezione=None):
-        gruppo = {"section": titolo, "lines": [], "subtotal": ZERO, "section_line": riga_sezione, "blocks": []}
+        gruppo = {
+            "section": titolo,
+            "lines": [],
+            "subtotal": ZERO,
+            "section_line": riga_sezione,
+            "blocks": [],
+            "has_articles": False,
+        }
         groups.append(gruppo)
         return gruppo
 
     def nuovo_blocco(gruppo, titolo=""):
-        blocco = {"subsection": titolo, "lines": [], "subtotal": ZERO}
+        blocco = {"subsection": titolo, "lines": [], "subtotal": ZERO, "has_articles": False}
         gruppo["blocks"].append(blocco)
         return blocco
 
@@ -185,6 +192,8 @@ def group_lines_by_section(lines):
             line.row_number = numero
             blocco["subtotal"] += line.line_subtotal
             corrente["subtotal"] += line.line_subtotal
+            blocco["has_articles"] = True
+            corrente["has_articles"] = True
         else:
             # nota: si mostra ma non conta
             line.row_number = None
