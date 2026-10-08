@@ -1123,17 +1123,18 @@ class BugVariTest(FlowTestBase):
         for tipo in ("article", "section", "subsection", "note"):
             self.assertIn(f'data-add-line-type="{tipo}"', pagina)
 
-        # ordine effettivo dei campi nella prima riga (nomi completi, per non
-        # confondersi con «nav-section» della barra laterale)
-        posizione_descrizione = pagina.index('name="lines-0-description"')
-        posizione_qta = pagina.index('name="lines-0-qty"')
+        # ordine effettivo dei campi nella riga modello (quella che il JavaScript
+        # clona col pulsante «Riga»: nomi completi, per non confondersi con
+        # «nav-section» della barra laterale)
+        posizione_descrizione = pagina.index('name="lines-__prefix__-description"')
+        posizione_qta = pagina.index('name="lines-__prefix__-qty"')
         self.assertLess(
             posizione_descrizione, posizione_qta,
             "il campo descrizione deve venire prima di quello della quantità",
         )
         # posizione e tipo viaggiano nascosti: l'ordine lo decide l'utente
-        self.assertIn('name="lines-0-position"', pagina)
-        self.assertIn('name="lines-0-line_type"', pagina)
+        self.assertIn('name="lines-__prefix__-position"', pagina)
+        self.assertIn('name="lines-__prefix__-line_type"', pagina)
         self.assertIn(
             'class="btn btn-outline-secondary btn-sm move-line"', pagina,
             "le frecce su/giù devono comparire nelle righe del preventivo",
@@ -1718,7 +1719,8 @@ class RigheStileOdooTest(FlowTestBase):
         """Gli ordini fornitore non inviano la posizione: niente frecce (e niente promesse)."""
         response = self.client.get(reverse("purchasing:po_create"))
         pagina = response.content.decode("utf-8")
-        self.assertIn("lines-0-product", pagina)
+        self.assertNotIn("lines-0-product", pagina, "nessuna riga vuota iniziale")
+        self.assertIn("empty-line-template", pagina, "le righe si aggiungono comunque col pulsante")
         self.assertNotIn('class="btn btn-outline-secondary btn-sm move-line"', pagina)
 
     def test_il_modello_riporta_il_tipo_riga(self):

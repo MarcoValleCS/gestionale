@@ -291,7 +291,7 @@ class QuickCreateTest(TestCase):
         self.assertContains(response, "autocomplete-wrap")
         self.assertContains(response, 'name="tax_code"')
         self.assertContains(response, 'name="job"')
-        self.assertContains(response, 'name="lines-0-section"')
+        self.assertContains(response, 'name="lines-__prefix__-section"')
         self.assertContains(response, "customer-discounts")
 
     def test_crea_varianti(self):

@@ -25,7 +25,7 @@ from .forms import (
 )
 from .models import PriceListItem, PurchaseOrder, PurchaseOrderLine, SupplierPriceList
 
-PurchaseOrderLineFormSet = modelformset_factory(PurchaseOrderLine, form=PurchaseOrderLineForm, extra=1, can_delete=True)
+PurchaseOrderLineFormSet = modelformset_factory(PurchaseOrderLine, form=PurchaseOrderLineForm, extra=0, can_delete=True)
 
 PRICELIST_ROLES = (ROLE_ADMIN, ROLE_PURCHASING)
 PO_VIEW_ROLES = (ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUSE)

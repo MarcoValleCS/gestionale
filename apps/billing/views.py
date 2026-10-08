@@ -36,9 +36,9 @@ from .models import (
     SalesInvoiceLine,
 )
 
-DeliveryNoteLineFormSet = modelformset_factory(DeliveryNoteLine, form=DeliveryNoteLineForm, extra=1, can_delete=True)
-SalesInvoiceLineFormSet = modelformset_factory(SalesInvoiceLine, form=SalesInvoiceLineForm, extra=1, can_delete=True)
-PurchaseInvoiceLineFormSet = modelformset_factory(PurchaseInvoiceLine, form=PurchaseInvoiceLineForm, extra=1, can_delete=True)
+DeliveryNoteLineFormSet = modelformset_factory(DeliveryNoteLine, form=DeliveryNoteLineForm, extra=0, can_delete=True)
+SalesInvoiceLineFormSet = modelformset_factory(SalesInvoiceLine, form=SalesInvoiceLineForm, extra=0, can_delete=True)
+PurchaseInvoiceLineFormSet = modelformset_factory(PurchaseInvoiceLine, form=PurchaseInvoiceLineForm, extra=0, can_delete=True)
 
 DDT_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE)
 DDT_VIEW_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, ROLE_PURCHASING)

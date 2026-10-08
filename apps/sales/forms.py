@@ -72,9 +72,9 @@ class LineFormMixin:
     defaults_context = "sale"
 
     # Campi di servizio del modulo righe: cambiarli da soli non rende
-    # «compilata» la riga vuota in fondo al modulo, che il JavaScript rinumera
-    # comunque. Senza questo, il salvataggio del preventivo fallisce senza che
-    # l'utente veda nulla.
+    # «compilata» una riga aggiunta via JavaScript e lasciata vuota, che il
+    # JavaScript rinumera comunque. Senza questo, il salvataggio del preventivo
+    # fallisce senza che l'utente veda nulla.
     service_fields = {"position", "line_type"}
 
     def has_changed(self):

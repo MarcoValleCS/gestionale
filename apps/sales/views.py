@@ -37,9 +37,9 @@ from .models import (
     group_lines_by_section,
 )
 
-QuoteLineFormSet = modelformset_factory(QuoteLine, form=QuoteLineForm, extra=1, can_delete=True)
-SalesOrderLineFormSet = modelformset_factory(SalesOrderLine, form=SalesOrderLineForm, extra=1, can_delete=True)
-QuoteTemplateLineFormSet = modelformset_factory(QuoteTemplateLine, form=QuoteTemplateLineForm, extra=1, can_delete=True)
+QuoteLineFormSet = modelformset_factory(QuoteLine, form=QuoteLineForm, extra=0, can_delete=True)
+SalesOrderLineFormSet = modelformset_factory(SalesOrderLine, form=SalesOrderLineForm, extra=0, can_delete=True)
+QuoteTemplateLineFormSet = modelformset_factory(QuoteTemplateLine, form=QuoteTemplateLineForm, extra=0, can_delete=True)
 
 QUOTE_ROLES = (ROLE_ADMIN, ROLE_SALES)
 ORDER_VIEW_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_WAREHOUSE, ROLE_PURCHASING)
