@@ -56,6 +56,14 @@
             </tbody>
           </table>
         </div>
+        <div class="line-addbar no-print">
+          <div class="line-addbar-pill">
+            <button type="button" class="btn btn-primary btn-sm" data-add-line-type="article"><i class="bi bi-plus-lg"></i> Riga</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-add-line-type="section"><i class="bi bi-bookmark"></i> Sezione</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-add-line-type="subsection">Sottosezione</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-add-line-type="note">Nota</button>
+          </div>
+        </div>
         <div id="lines-feedback" class="alert alert-danger py-2 small m-3 d-none"></div>
         {% if line_formset.non_form_errors %}
         <div class="card-body py-2 text-danger small">{% for error in line_formset.non_form_errors %}{{ error }}<br>{% endfor %}</div>

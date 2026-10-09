@@ -448,6 +448,30 @@ a:hover {
 .doc-lines .col-sposta { min-width: 74px; }
 .doc-lines .cell-sposta { vertical-align: middle; }
 
+/* Barra di aggiunta righe sempre visibile in fondo alla tabella: resta
+   incollata in basso durante lo scroll (sticky-bottom, senza calcoli). */
+.line-addbar {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 1010;
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 0.25rem;
+  pointer-events: none;
+}
+.line-addbar-pill {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 999px;
+  padding: 0.4rem 0.6rem;
+  box-shadow: 0 6px 20px rgba(16, 24, 40, 0.16);
+  pointer-events: auto;
+}
+
 /* ----------------------------------------------------- posta ricevuta */
 .email-body {
   font-size: 0.9rem;

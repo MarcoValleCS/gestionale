@@ -1802,6 +1802,26 @@ class RigheStileOdooTest(FlowTestBase):
         self.assertIn("empty-line-template", pagina, "le righe si aggiungono comunque col pulsante")
         self.assertNotIn('class="btn btn-outline-secondary btn-sm move-line"', pagina)
 
+    def test_barra_aggiunta_righe_sempre_visibile(self):
+        """Ogni modulo righe ha la barra sticky in fondo alla tabella."""
+        pagine = [
+            reverse("sales:quote_create"),
+            reverse("sales:order_create"),
+            reverse("sales:quote_template_create"),
+            reverse("purchasing:po_create"),
+            reverse("billing:salesinvoice_create"),
+            reverse("billing:purchaseinvoice_create"),
+            reverse("billing:deliverynote_create"),
+        ]
+        for url in pagine:
+            with self.subTest(url=url):
+                pagina = self.client.get(url).content.decode("utf-8")
+                self.assertIn("line-addbar", pagina)
+                self.assertIn('data-add-line-type="article"', pagina)
+        pagina = self.client.get(reverse("sales:quote_create")).content.decode("utf-8")
+        for tipo in ("section", "subsection", "note"):
+            self.assertIn(f'data-add-line-type="{tipo}"', pagina)
+
     def test_il_modello_riporta_il_tipo_riga(self):
         template = QuoteTemplate.objects.create(name="Bagno tipo")
         template.lines.create(line_type="section", description="Bagno")
