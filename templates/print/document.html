@@ -239,8 +239,10 @@
 
     <header class="header">
       <div>
-        {% if company.logo %}
-        <img class="company-logo" src="{{ company.logo.url }}" alt="{{ company.name }}">
+        {% if logo_src %}
+        <img class="company-logo" src="{{ logo_src }}" alt="">
+        {% elif company.logo %}
+        <img class="company-logo" src="{{ company.logo.url }}" alt="">
         {% endif %}
         <div class="company-name">{{ company.name }}</div>
         <div class="company-block">
@@ -327,7 +329,7 @@
           <td class="num">{% if show_discount %}{{ line.unit_price|money }} €{% else %}{{ line.net_unit_price|net_price }} €{% endif %}</td>
           {% if show_discount %}<td class="num">{{ line.discount_pct|qty }}%</td>{% endif %}
           <td class="num">{{ line.vat_rate.rate|qty }}%</td>
-          <td class="num">{{ line.line_subtotal|money }} €</td>
+          <td class="num">{% if gross_amounts %}{{ line.line_total|money }}{% else %}{{ line.line_subtotal|money }}{% endif %} €</td>
           {% endif %}
         </tr>
         {% endif %}
@@ -335,14 +337,14 @@
         {% if block.subsection and block.has_articles and show_prices %}
         <tr class="section-total subsection-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ block.subsection }}</td>
-          <td class="num">{{ block.subtotal|money }} €</td>
+          <td class="num">{% if gross_amounts %}{{ block.total|money }}{% else %}{{ block.subtotal|money }}{% endif %} €</td>
         </tr>
         {% endif %}
         {% endfor %}
         {% if group.section and group.has_articles and show_prices %}
         <tr class="section-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ group.section }}</td>
-          <td class="num">{{ group.subtotal|money }} €</td>
+          <td class="num">{% if gross_amounts %}{{ group.total|money }}{% else %}{{ group.subtotal|money }}{% endif %} €</td>
         </tr>
         {% endif %}
         {% empty %}

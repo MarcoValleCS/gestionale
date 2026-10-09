@@ -32,6 +32,8 @@ def quote_print_context(quote, *, back_url=None):
         signature_label="Per accettazione (data e firma)",
         # lo sconto è una trattativa interna: al cliente va il prezzo già scontato
         show_discount=False,
+        # al cliente si mostrano gli importi già comprensivi di IVA
+        gross_amounts=True,
     )
     context["company"] = company
     context["logo_src"] = logo_data_uri() or (company.logo.url if company.logo else "")
@@ -58,6 +60,8 @@ def order_print_context(order, *, back_url=None):
         notes=order.terms_text,
         show_signature=True,
         signature_label="Conferma d'ordine (data e firma)",
+        # come nei preventivi: al cliente gli importi comprensivi di IVA
+        gross_amounts=True,
     )
     context["company"] = company
     context["logo_src"] = logo_data_uri() or (company.logo.url if company.logo else "")

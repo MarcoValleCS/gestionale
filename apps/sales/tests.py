@@ -1202,6 +1202,71 @@ class BugVariTest(FlowTestBase):
         self.assertIn('colspan="7"', pagina, "la riga di sezione deve occupare 7 colonne")
         self.assertIn('colspan="6"', pagina, "il totale di sezione deve occuparne 6 più il valore")
 
+    def test_il_preventivo_stampato_mostra_importi_ivati(self):
+        """Al cliente gli importi di riga e di sezione includono l'IVA."""
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(line_type="section", description="S")
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("100.00"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        pagina = self.client.get(reverse("sales:quote_print", args=[quote.pk])).content.decode("utf-8")
+        # riga: 100 + 22% = 122,00; il totale di sezione somma gli importi ivati
+        self.assertIn('<td class="num">122,00 €</td>', pagina)
+        self.assertIn("Totale S", pagina)
+        # il riepilogo fiscale resta imponibile + IVA + totale
+        self.assertIn("100,00", pagina)
+        self.assertIn("22,00", pagina)
+
+    def test_la_fattura_stampata_mostra_importi_imponibili(self):
+        """Alle fatture non è stato chiesto: restano gli imponibili di riga."""
+        from apps.billing.models import SalesInvoice
+
+        fattura = SalesInvoice.objects.create(customer=self.customer, date=timezone.localdate())
+        fattura.lines.create(
+            product=self.product, description="Riga", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("50.00"), discount_pct=Decimal("10"),
+            vat_rate=self.vat22,
+        )
+        fattura.recalculate()
+        pagina = self.client.get(reverse("billing:salesinvoice_print", args=[fattura.pk])).content.decode("utf-8")
+        # riga: 2 × 45 = 90,00 imponibile (il lordo 109,80 sta solo nel totale)
+        self.assertIn('<td class="num">90,00 €</td>', pagina)
+
+    def test_stampa_senza_logo_niente_doppione(self):
+        """Senza logo non c'è nessuna immagine: il nome compare una sola volta in testata."""
+        company = CompanySettings.load()
+        company.logo = None
+        company.save()
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        pagina = self.client.get(reverse("sales:quote_print", args=[quote.pk])).content.decode("utf-8")
+        self.assertNotIn('<img class="company-logo"', pagina)
+
+    def test_stampa_con_logo_usa_data_uri(self):
+        """Col logo caricato l'immagine è incorporata (niente URL relativo rotto nel PDF)."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        company = CompanySettings.load()
+        company.logo.save("logo.png", SimpleUploadedFile("logo.png", b"datifinti"), save=True)
+        try:
+            quote = Quote.objects.create(customer=self.customer)
+            quote.lines.create(
+                product=self.product, description="a", qty=Decimal("1"), uom=self.uom,
+                unit_price=Decimal("10"), vat_rate=self.vat22,
+            )
+            quote.recalculate()
+            pagina = self.client.get(reverse("sales:quote_print", args=[quote.pk])).content.decode("utf-8")
+            self.assertIn('<img class="company-logo" src="data:image/png;base64,', pagina)
+        finally:
+            company.logo.delete(save=False)
+            CompanySettings.objects.filter(pk=company.pk).update(logo=None)
+
     def test_il_prezzo_netto_arrotonda_bene_i_casi_bassi(self):
         """0,35 scontato del 5% fa 0,3325: al cliente serve il valore esatto."""
         from apps.core.templatetags.core_extras import net_price
@@ -1282,6 +1347,20 @@ class RigheStileOdooTest(FlowTestBase):
         self.assertEqual(blocchi[1]["subtotal"], Decimal("10.00"))
         self.assertEqual(blocchi[2]["subtotal"], Decimal("20.00"))
         self.assertEqual(gruppi[0]["subtotal"], Decimal("30.00"))
+
+    def test_totali_lordi_ivati_per_stampa(self):
+        """Ogni gruppo/blocco espone anche il totale IVA inclusa (stampe al cliente)."""
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(line_type="section", description="Bagno")
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("100.00"), vat_rate=self.vat22,
+        )
+        gruppi = group_lines_by_section(quote.lines.order_by("position", "pk"))
+        # 100 + 22% = 122,00 sia nel blocco che nel gruppo
+        self.assertEqual(gruppi[0]["total"], Decimal("122.00"))
+        self.assertEqual(gruppi[0]["blocks"][0]["total"], Decimal("122.00"))
+        self.assertEqual(gruppi[0]["subtotal"], Decimal("100.00"), "l'imponibile resta invariato")
 
     def test_la_stampa_mostra_i_subtotali_delle_sottosezioni(self):
         quote = Quote.objects.create(customer=self.customer)

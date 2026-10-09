@@ -135,6 +135,9 @@ def group_lines_by_section(lines):
     interno alla sezione, con il subtotale delle sole righe che stanno sotto di
     essa. Note e righe di testo non pesano nei totali.
 
+    ``subtotal`` è l'imponibile, ``total`` è l'importo IVA inclusa (per le
+    stampe al cliente): entrambi sommano le sole righe articolo.
+
     Restano supportate anche le vecchie sezioni scritte riga per riga (campo
     ``section``): righe consecutive con lo stesso testo formano un gruppo.
     """
@@ -148,6 +151,7 @@ def group_lines_by_section(lines):
             "section": titolo,
             "lines": [],
             "subtotal": ZERO,
+            "total": ZERO,
             "section_line": riga_sezione,
             "blocks": [],
             "has_articles": False,
@@ -156,7 +160,7 @@ def group_lines_by_section(lines):
         return gruppo
 
     def nuovo_blocco(gruppo, titolo=""):
-        blocco = {"subsection": titolo, "lines": [], "subtotal": ZERO, "has_articles": False}
+        blocco = {"subsection": titolo, "lines": [], "subtotal": ZERO, "total": ZERO, "has_articles": False}
         gruppo["blocks"].append(blocco)
         return blocco
 
@@ -192,6 +196,8 @@ def group_lines_by_section(lines):
             line.row_number = numero
             blocco["subtotal"] += line.line_subtotal
             corrente["subtotal"] += line.line_subtotal
+            blocco["total"] += line.line_total
+            corrente["total"] += line.line_total
             blocco["has_articles"] = True
             corrente["has_articles"] = True
         else:
@@ -201,8 +207,10 @@ def group_lines_by_section(lines):
         corrente["lines"].append(line)
     for group in groups:
         group["subtotal"] = round2(group["subtotal"])
+        group["total"] = round2(group["total"])
         for block in group["blocks"]:
             block["subtotal"] = round2(block["subtotal"])
+            block["total"] = round2(block["total"])
     return groups
 
 

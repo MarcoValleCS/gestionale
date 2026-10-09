@@ -278,8 +278,13 @@ def build_print_context(
     show_prices=True,
     show_discount=True,
     extra_fields=None,
+    gross_amounts=False,
 ):
-    """Contesto per il documento stampabile (templates/print/document.html)."""
+    """Contesto per il documento stampabile (templates/print/document.html).
+
+    Con ``gross_amounts=True`` gli importi di riga e i totali di sezione
+    includono l'IVA (stampe al cliente: preventivi e conferme d'ordine).
+    """
     lines = document.lines.select_related("product", "uom", "vat_rate")
     # numero di colonne della tabella righe: serve ai colspan delle sezioni.
     # Viene calcolato qui per non lasciare aritmetica fragile nel template.
@@ -303,6 +308,7 @@ def build_print_context(
         "signature_label": signature_label,
         "show_prices": show_prices,
         "show_discount": show_discount,
+        "gross_amounts": gross_amounts,
         "table_columns": colonne,
         # Le viste di stampa lo valorizzano (download del PDF generato dal
         # gestionale); resta vuoto per gli altri documenti (fatture, DDT…).

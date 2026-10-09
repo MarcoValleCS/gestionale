@@ -261,6 +261,37 @@ class QuickCreateTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("name", response.json()["errors"])
 
+    def test_crea_rapida_articolo_con_codice(self):
+        response = self.client.post(
+            reverse("catalog:quick_create"),
+            {"code": "ART23151", "name": "Termoarredo", "uom": self.uom.pk, "context": "sale"},
+        )
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(pk=response.json()["id"])
+        self.assertEqual(product.code, "ART23151")
+
+    def test_crea_rapida_articolo_codice_duplicato(self):
+        Product.objects.create(
+            code="ART23151", name="Esistente", uom=self.uom,
+            sale_vat=self.vat, purchase_vat=self.vat,
+        )
+        for duplicato in ("ART23151", "art23151"):
+            response = self.client.post(
+                reverse("catalog:quick_create"),
+                {"code": duplicato, "name": "Altro", "uom": self.uom.pk, "context": "sale"},
+            )
+            self.assertEqual(response.status_code, 400, f"codice {duplicato} già in uso: deve fallire")
+            self.assertIn("code", response.json()["errors"])
+
+    def test_crea_rapida_articolo_senza_codice_assegnato(self):
+        response = self.client.post(
+            reverse("catalog:quick_create"),
+            {"name": "Senza codice", "uom": self.uom.pk, "context": "sale"},
+        )
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(pk=response.json()["id"])
+        self.assertTrue(product.code.startswith("ART"))
+
     def test_crea_rapido_cliente(self):
         response = self.client.post(
             reverse("contacts:quick_create"),

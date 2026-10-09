@@ -111,8 +111,9 @@ class ProductQuickForm(BaseBootstrapModelForm):
 
     class Meta:
         model = Product
-        fields = ["name", "uom", "main_supplier", "min_stock", "sale_price", "purchase_price"]
+        fields = ["code", "name", "uom", "main_supplier", "min_stock", "sale_price", "purchase_price"]
         labels = {
+            "code": "Codice",
             "name": "Descrizione",
             "uom": "Unità di misura",
             "sale_price": "Prezzo vendita",
@@ -132,6 +133,14 @@ class ProductQuickForm(BaseBootstrapModelForm):
         )
         if context_type == "purchase":
             self.fields["sale_price"].widget.attrs["placeholder"] = "—"
+        self.fields["code"].required = False
+        self.fields["code"].help_text = "Facoltativo: se vuoto viene assegnato in automatico."
+
+    def clean_code(self):
+        codice = (self.cleaned_data.get("code") or "").strip()
+        if codice and Product.objects.filter(code__iexact=codice).exists():
+            raise forms.ValidationError("Questo codice è già in uso da un altro articolo.")
+        return codice
 
     def save(self, commit=True):
         prodotto = super().save(commit=False)
