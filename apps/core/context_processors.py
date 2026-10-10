@@ -73,7 +73,12 @@ def roles(request):
             "posta_non_lette": _posta_non_letta(user),
         }
 
-    names = set(user.groups.values_list("name", flat=True))
+    names = getattr(request, "_ruoli_cache", None)
+    if names is None:
+        # Fuori dal middleware (es. nei test) si leggono qui una sola volta.
+        names = set(user.groups.values_list("name", flat=True))
+    else:
+        names = set(names)
     return {
         "roles": {
             "is_admin": "Amministratore" in names,
@@ -93,9 +98,13 @@ def roles(request):
 def _messaggi_non_letti(utente):
     """Quanti messaggi interni non letti ha l'utente (per il pallino nel menu)."""
     try:
+        from .cache import memoizza
         from .models import InternalMessage
 
-        return InternalMessage.objects.filter(recipient=utente, read_at__isnull=True).count()
+        def conta():
+            return InternalMessage.objects.filter(recipient=utente, read_at__isnull=True).count()
+
+        return memoizza(f"badge_msg_{utente.pk}", conta, 60)
     except Exception:  # tabelle non ancora migrate
         return 0
 
@@ -103,9 +112,14 @@ def _messaggi_non_letti(utente):
 def _posta_non_letta(utente):
     """Quante email rilevanti non lette ci sono in casella."""
     try:
+        from .cache import memoizza
         from .models import InboundEmail
 
-        return InboundEmail.objects.filter(is_relevant=True, read_at__isnull=True).count()
+        def conta():
+            return InboundEmail.objects.filter(is_relevant=True, read_at__isnull=True).count()
+
+        # Il conteggio è globale (non dipende dall'utente): una chiave sola.
+        return memoizza("badge_posta", conta, 60)
     except Exception:
         return 0
 

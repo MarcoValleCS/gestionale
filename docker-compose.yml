@@ -29,6 +29,11 @@ services:
       - "wal_compression=on"
       - "-c"
       - "max_wal_size=512MB"
+      # Query oltre 1 secondo nei log: servono per trovare le pagine lente.
+      - "-c"
+      - "log_min_duration_statement=1000"
+      - "-c"
+      - "log_line_prefix=%t [%p] "
     shm_size: "256mb"
     volumes:
       - pgdata:/var/lib/postgresql/data

@@ -1,5 +1,5 @@
 """Generazione del PDF della fattura (WeasyPrint)."""
-from apps.core.pdf import pdf_available, render_pdf  # noqa: F401  (riesportate)
+from apps.core.pdf import pdf_available, render_pdf, render_pdf_cached  # noqa: F401  (riesportate)
 
 
 def render_invoice_pdf(invoice):
@@ -8,5 +8,6 @@ def render_invoice_pdf(invoice):
 
     from .printing import sales_invoice_print_context
 
+    modificato = getattr(invoice, "updated_at", "") or ""
     html = render_to_string("print/document.html", sales_invoice_print_context(invoice))
-    return render_pdf(html)
+    return render_pdf_cached(f"pdf_fattura_{invoice.pk}_{modificato}", html)

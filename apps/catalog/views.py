@@ -111,7 +111,6 @@ class ProductDetailView(DetailView):
         context["variants"] = product.variants.order_by("name")
         context["components"] = product.components.select_related("component").order_by("component__name")
         context["attachments"] = product.attachments.select_related("uploaded_by")[:20]
-        context["component_choices"] = Product.objects.filter(active=True).exclude(pk=product.pk).order_by("name")
         return context
 
 
@@ -368,6 +367,7 @@ class CategoryListView(RoleRequiredMixin, ListView):
     model = Category
     template_name = "catalog/category_list.html"
     context_object_name = "categories"
+    paginate_by = 50
 
     def get_queryset(self):
         return Category.objects.select_related("parent").annotate(product_count=Sum("products")).order_by("name")

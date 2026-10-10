@@ -254,6 +254,10 @@ class EmailAndSdiTest(BillingTestBase):
         self.assertEqual(nature[0].text, "N1")
 
     def test_invio_email_con_pdf(self):
+        from django.core.management import call_command
+
+        from apps.core.models import EmailInCoda
+
         invoice = self.issued_invoice()
         self.login()
         with override_settings(
@@ -262,10 +266,18 @@ class EmailAndSdiTest(BillingTestBase):
             response = self.client.post(
                 reverse("billing:salesinvoice_email", args=[invoice.pk]),
                 {"to": "cliente@example.com", "subject": "Fattura di prova", "message": "Buongiorno"},
+                follow=True,
             )
-        self.assertEqual(response.status_code, 302)
         from django.core import mail
 
+        # La pagina accoda; spedisce il comando in background.
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(response, "accodata per cliente@example.com")
+        voce = EmailInCoda.objects.get()
+        self.assertEqual(voce.stato, EmailInCoda.STATO_ATTESA)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, SalesInvoice.STATUS_ISSUED)
+        call_command("invia_coda_email")
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
         self.assertEqual(message.to, ["cliente@example.com"])
@@ -298,9 +310,18 @@ class EmailAndSdiTest(BillingTestBase):
         with override_settings(
             EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", EMAIL_IS_CONFIGURED=True
         ):
-            self.client.post(reverse("billing:salesinvoice_sdi_send", args=[invoice.pk]))
+            response = self.client.post(reverse("billing:salesinvoice_sdi_send", args=[invoice.pk]), follow=True)
         from django.core import mail
+        from django.core.management import call_command
 
+        from apps.core.models import EmailInCoda
+
+        # La pagina accoda l'XML; lo trasmette il comando in background.
+        self.assertContains(response, "accodata per lo SDI")
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.sdi_status, SalesInvoice.SDI_GENERATED)
+        self.assertEqual(EmailInCoda.objects.count(), 1)
+        call_command("invia_coda_email")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to[0], "sdi01@pec.fatturapa.it")
         self.assertTrue(mail.outbox[0].attachments[0][0].startswith("IT"))

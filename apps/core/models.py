@@ -183,11 +183,16 @@ class NumberSequence(models.Model):
         return f"{base}{number:0{self.padding}d}"
 
 
+# Cache in memoria dei dati azienda (una copia per processo): evita di toccare
+# il disco a ogni pagina. Dura 60 secondi; la save() la azzera subito.
+_IMPOSTAZIONI_MEMORIA = None
+_IMPOSTAZIONI_SCADENZA = 0.0
+
+
 class CompanySettings(models.Model):
     """Dati dell'azienda (record singolo)."""
 
     CHIAVE_CACHE = "company_settings"
-
     name = models.CharField("Ragione sociale", max_length=200, default="La mia azienda")
     vat_number = models.CharField("Partita IVA", max_length=20, blank=True)
     tax_code = models.CharField("Codice fiscale", max_length=20, blank=True)
@@ -306,15 +311,27 @@ class CompanySettings(models.Model):
         """Dati azienda (record singolo), con cache breve.
 
         Vengono letti a ogni pagina dai context processor: senza cache sono due
-        query per richiesta. La cache si azzera al salvataggio.
+        query per richiesta. La cache su file resta (condivisa fra i worker),
+        ma davanti c'è una cache in memoria del processo (60 secondi): così la
+        pagina tipica non tocca proprio il disco.
         """
+        import time
+
+        from django.conf import settings as impostazioni
+
         from .cache import memoizza
 
-        def leggi():
+        global _IMPOSTAZIONI_MEMORIA, _IMPOSTAZIONI_SCADENZA
+        if getattr(impostazioni, "IN_TEST", False):
             oggetto, _ = cls.objects.get_or_create(pk=1)
             return oggetto
-
-        return memoizza(cls.CHIAVE_CACHE, leggi, 300)
+        adesso = time.monotonic()
+        if _IMPOSTAZIONI_SCADENZA > adesso and _IMPOSTAZIONI_MEMORIA is not None:
+            return _IMPOSTAZIONI_MEMORIA
+        oggetto = memoizza(cls.CHIAVE_CACHE, lambda: cls.objects.get_or_create(pk=1)[0], 300)
+        _IMPOSTAZIONI_MEMORIA = oggetto
+        _IMPOSTAZIONI_SCADENZA = adesso + 60
+        return oggetto
 
     def save(self, *args, **kwargs):
         self.pk = 1
@@ -322,6 +339,9 @@ class CompanySettings(models.Model):
         from .cache import dimentica
 
         dimentica(self.CHIAVE_CACHE)
+        global _IMPOSTAZIONI_MEMORIA, _IMPOSTAZIONI_SCADENZA
+        _IMPOSTAZIONI_MEMORIA = None
+        _IMPOSTAZIONI_SCADENZA = 0
 
     # ------------------------------------------------------------- colori
     @property
@@ -467,7 +487,14 @@ class ActivityLog(models.Model):
         verbose_name = "Attività"
         verbose_name_plural = "Registro attività"
         ordering = ["-created_at", "-pk"]
-        indexes = [models.Index(fields=["-created_at"], name="activity_date_idx")]
+        indexes = [
+            models.Index(fields=["-created_at"], name="activity_date_idx"),
+            # I filtri della pagina «Registro attività» (utente/tipo/azione):
+            # senza questi indici ogni apertura scansiona tutta la tabella.
+            models.Index(fields=["user", "-created_at"], name="activity_user_date_idx"),
+            models.Index(fields=["model_name", "-created_at"], name="activity_type_date_idx"),
+            models.Index(fields=["action", "-created_at"], name="activity_action_date_idx"),
+        ]
 
     def __str__(self):
         return f"{self.get_action_display()} {self.model_name} {self.object_label}".strip()
@@ -512,6 +539,14 @@ class InternalMessage(TimeStampedModel):
             self.read_at = timezone.now()
             self.save(update_fields=["read_at", "updated_at"])
         return self.read_at
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Il pallino dei non letti nel menu è in cache: si azzera alla
+        # creazione e alla lettura, così resta aggiornato.
+        from .cache import dimentica
+
+        dimentica(f"badge_msg_{self.recipient_id}")
 
 
 class InboundEmail(TimeStampedModel):
@@ -577,7 +612,59 @@ class InboundEmail(TimeStampedModel):
         if self.read_at is None:
             self.read_at = timezone.now()
             self.save(update_fields=["read_at", "updated_at"])
+            from .cache import dimentica
+
+            dimentica("badge_posta")
         return self.read_at
+
+
+class EmailInCoda(models.Model):
+    """Email da inviare accodata dalla pagina e spedita in background.
+
+    Inviare un'email (soprattutto PEC/SDI) può bloccare la pagina fino a 20
+    secondi: con 6 thread bastano 2-3 invii lenti in parallelo per far
+    accodare tutto il gestionale. La vista accoda in millisecondi (un INSERT),
+    il comando ``invia_coda_email`` (cron ogni 2 minuti) spedisce davvero.
+    """
+
+    STATO_ATTESA = "attesa"
+    STATO_INVIATA = "inviata"
+    STATO_FALLITA = "fallita"
+    STATO_CHOICES = [
+        (STATO_ATTESA, "In attesa"),
+        (STATO_INVIATA, "Inviata"),
+        (STATO_FALLITA, "Fallita"),
+    ]
+
+    # Cosa aggiornare quando l'invio riesce (es. segnare il preventivo inviato).
+    MODELLO_PREVENTIVO = "preventivo"
+    MODELLO_FATTURA = "fattura"
+    MODELLO_FATTURA_SDI = "fattura_sdi"
+    MODELLO_LIBERA = "libera"
+
+    to_email = models.EmailField("Destinatario", max_length=254)
+    subject = models.CharField("Oggetto", max_length=300)
+    body = models.TextField("Testo")
+    attachment = models.BinaryField("Allegato", null=True, blank=True)
+    attachment_name = models.CharField("Nome allegato", max_length=150, blank=True)
+    attachment_type = models.CharField("Tipo allegato", max_length=80, default="application/pdf")
+    descrizione = models.CharField("Descrizione", max_length=120, blank=True)
+    modello = models.CharField("Riferimento", max_length=20, default=MODELLO_LIBERA)
+    oggetto_id = models.PositiveIntegerField("ID oggetto", null=True, blank=True)
+    stato = models.CharField("Stato", max_length=20, choices=STATO_CHOICES, default=STATO_ATTESA, db_index=True)
+    tentativi = models.PositiveSmallIntegerField("Tentativi", default=0)
+    ultimo_errore = models.CharField("Ultimo errore", max_length=300, blank=True)
+    created_at = models.DateTimeField("Accodata il", auto_now_add=True)
+    sent_at = models.DateTimeField("Inviata il", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Email in coda"
+        verbose_name_plural = "Coda email"
+        ordering = ["created_at", "pk"]
+        indexes = [models.Index(fields=["stato", "created_at"], name="emailcoda_stato_idx")]
+
+    def __str__(self):
+        return f"{self.descrizione or self.subject} → {self.to_email}".strip()
 
 
 # ------------------------------------------------------------------- guida

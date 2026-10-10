@@ -216,6 +216,45 @@ def save_invoice_xml(invoice):
     return invoice.xml_file
 
 
+def accoda_invoice_sdi(invoice):
+    """Accoda l'XML per la trasmissione allo SDI via PEC (invio in background).
+
+    Generare l'XML è veloce, la PEC può impiegare decine di secondi: la vista
+    accoda e risponde subito, il comando ``invia_coda_email`` trasmette.
+    """
+    from apps.core.mailing import accoda_email
+    from apps.core.models import EmailInCoda
+
+    from .emailing import email_configured
+
+    if not email_configured():
+        raise ValidationError(
+            "Configura prima l'invio email/PEC (variabili EMAIL_* nel file .env) per trasmettere allo SDI."
+        )
+    if invoice.status == SalesInvoice.STATUS_DRAFT:
+        raise ValidationError("Emetti prima la fattura, poi trasmettila allo SDI.")
+    if not invoice.xml_file:
+        save_invoice_xml(invoice)
+
+    customer = invoice.customer
+    destination = (customer.sdi_code or customer.pec or "").strip()
+    subject = f"Fattura {destination} {invoice.number}"
+    with invoice.xml_file.open("rb") as handle:
+        filename = invoice.xml_file.name.rsplit("/", 1)[-1]
+        xml_bytes = handle.read()
+    return accoda_email(
+        to_email=settings.SDI_PEC_ADDRESS,
+        subject=subject,
+        message=f"Invio della fattura {invoice.number} al Sistema di Interscambio.",
+        attachment=xml_bytes,
+        attachment_name=filename,
+        attachment_type="application/xml",
+        descrizione=f"SDI {invoice.number} ({destination})",
+        modello=EmailInCoda.MODELLO_FATTURA_SDI,
+        oggetto_id=invoice.pk,
+    )
+
+
 def send_invoice_sdi(invoice):
     """Invia l'XML allo SDI per PEC (richiede SMTP/PEC configurato)."""
     from .emailing import email_configured

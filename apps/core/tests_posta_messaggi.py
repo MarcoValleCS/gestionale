@@ -166,6 +166,10 @@ class PostaTest(TestCase):
     # ----------------------------------------------------------- risposta
     @override_settings(EMAIL_IS_CONFIGURED=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_risposta_inviata(self):
+        from django.core.management import call_command
+
+        from .models import EmailInCoda
+
         self.sincronizza([messaggio_email()])
         email_ricevuta = InboundEmail.objects.get()
         self.login()
@@ -174,10 +178,14 @@ class PostaTest(TestCase):
             {"body": "Buongiorno, le mando il preventivo."},
             follow=True,
         )
+        # La pagina accoda; spedisce il comando in background.
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(risposta, "Risposta accodata")
+        self.assertEqual(EmailInCoda.objects.count(), 1)
+        call_command("invia_coda_email")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["cliente@example.it"])
         self.assertTrue(mail.outbox[0].subject.startswith("Re:"))
-        self.assertContains(risposta, "Risposta inviata")
 
     def test_risposta_senza_testo_avvisa(self):
         self.sincronizza([messaggio_email()])

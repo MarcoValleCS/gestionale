@@ -589,33 +589,46 @@ class QuoteEmailTest(FlowTestBase):
 
     @override_settings(EMAIL_IS_CONFIGURED=True)
     def test_invio_riuscito_porta_il_preventivo_a_inviato(self):
-        with mock.patch("apps.sales.emailing.send_quote_email", return_value=True) as invio:
+        """La pagina accoda in millisecondi; lo stato cambia all'invio in background."""
+        from django.core import mail as posta
+
+        from apps.core.mailing import invia_voce_coda
+        from apps.core.models import EmailInCoda
+
+        with mock.patch("apps.sales.emailing.render_quote_pdf", return_value=b"%PDF-1.4 finto"):
             response = self.client.post(
                 reverse("sales:quote_email", args=[self.quote.pk]),
                 {"to": "cliente@example.com", "subject": "Preventivo X", "message": "Buongiorno"},
                 follow=True,
             )
-        self.assertEqual(invio.call_count, 1)
-        self.assertContains(response, "inviato a cliente@example.com")
+        self.assertContains(response, "accodato per cliente@example.com")
+        self.assertEqual(len(posta.outbox), 0)
+        voce = EmailInCoda.objects.get()
+        self.assertEqual(voce.stato, EmailInCoda.STATO_ATTESA)
+        self.quote.refresh_from_db()
+        self.assertEqual(self.quote.status, Quote.STATUS_DRAFT)
+        invia_voce_coda(voce)
+        self.assertEqual(len(posta.outbox), 1)
+        self.assertEqual(posta.outbox[0].to, ["cliente@example.com"])
         self.quote.refresh_from_db()
         self.assertEqual(self.quote.status, Quote.STATUS_SENT)
 
     @override_settings(EMAIL_IS_CONFIGURED=True)
     def test_invio_fallito_avvisa_e_non_cambia_stato(self):
-        with mock.patch("apps.sales.emailing.send_quote_email", side_effect=Exception("SMTP non raggiungibile")):
+        with mock.patch("apps.core.mailing.accoda_email", side_effect=Exception("DB non raggiungibile")):
             response = self.client.post(
                 reverse("sales:quote_email", args=[self.quote.pk]),
                 {"to": "cliente@example.com", "subject": "x", "message": "y"},
                 follow=True,
             )
-        self.assertContains(response, "Invio non riuscito")
+        self.assertContains(response, "Accodamento non riuscito")
         self.quote.refresh_from_db()
         self.assertEqual(self.quote.status, Quote.STATUS_DRAFT)
 
     def test_invio_su_preventivo_gia_inviato_non_cambia_stato(self):
         self.quote.status = Quote.STATUS_ACCEPTED
         self.quote.save(update_fields=["status"])
-        with mock.patch("apps.sales.emailing.send_quote_email", return_value=True):
+        with mock.patch("apps.core.mailing.accoda_email", return_value=True):
             self.client.post(
                 reverse("sales:quote_email", args=[self.quote.pk]),
                 {"to": "cliente@example.com", "subject": "x", "message": "y"},

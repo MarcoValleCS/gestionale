@@ -60,6 +60,14 @@ def home(request):
     # cache per un minuto, tanto i numeri cambiano solo alla consegna di un ordine.
     stats = memoizza(f"analytics_summary_{period}", lambda: analytics.summary(period), 60)
 
+    # I prodotti sotto scorta scorrono tutto il catalogo (23k articoli) con una
+    # somma per riga: si tengono in cache per un minuto come le statistiche.
+    sotto_scorta = memoizza(
+        "sotto_scorta",
+        lambda: (low_stock_qs.count(), list(low_stock_qs[:10])),
+        60,
+    )
+
     # Finestra temporale del grafico: 1 / 3 / 6 / 12 mesi, spostabile indietro
     try:
         months = int(request.GET.get("finestra", 12))
@@ -111,8 +119,8 @@ def home(request):
         "quotes_open": Quote.objects.filter(status__in=["draft", "sent"]).count(),
         "orders_open": SalesOrder.objects.exclude(status__in=["delivered", "cancelled"]).count(),
         "po_open": PurchaseOrder.objects.exclude(status__in=["received", "cancelled"]).count(),
-        "low_stock_count": low_stock_qs.count(),
-        "low_stock": low_stock_qs[:10],
+        "low_stock_count": sotto_scorta[0],
+        "low_stock": sotto_scorta[1],
         "recent_quotes": Quote.objects.select_related("customer").order_by("-created_at")[:5],
         "recent_orders": SalesOrder.objects.select_related("customer").order_by("-created_at")[:5],
         "recent_pos": PurchaseOrder.objects.select_related("supplier").order_by("-created_at")[:5],
@@ -260,6 +268,7 @@ def email_templates_view(request):
 @role_required(ROLE_ADMIN)
 def activity_log(request):
     """Registro delle modifiche: chi ha toccato cosa."""
+    from .cache import memoizza
     from .models import ActivityLog
 
     voci = ActivityLog.objects.select_related("user")
@@ -275,13 +284,23 @@ def activity_log(request):
 
     totale = voci.count()
     voci = voci[:300]
-    utenti = (
-        ActivityLog.objects.exclude(user__isnull=True)
-        .values_list("user_id", "user__username")
-        .distinct()
-        .order_by("user__username")
+    # Le tendine dei filtri scorrono tutto il registro: si tengono in cache
+    # per 5 minuti (i valori cambiano solo quando si crea un nuovo tipo/utente).
+    utenti = memoizza(
+        "registro_utenti",
+        lambda: list(
+            ActivityLog.objects.exclude(user__isnull=True)
+            .values_list("user_id", "user__username")
+            .distinct()
+            .order_by("user__username")
+        ),
+        300,
     )
-    tipi = ActivityLog.objects.values_list("model_name", flat=True).distinct().order_by("model_name")
+    tipi = memoizza(
+        "registro_tipi",
+        lambda: list(ActivityLog.objects.values_list("model_name", flat=True).distinct().order_by("model_name")),
+        300,
+    )
     return render(
         request,
         "core/activity.html",
@@ -698,9 +717,9 @@ def posta_messaggio(request, pk):
 
 @role_required(*POSTA_ROLES)
 def posta_rispondi(request, pk):
-    """Risponde a una email dalla casella aziendale."""
-    from .mailing import email_configured, send_document_email
-    from .models import InboundEmail
+    """Accoda una risposta a una email della casella aziendale (invio in background)."""
+    from .mailing import accoda_email, email_configured
+    from .models import EmailInCoda, InboundEmail
 
     email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
     if request.method != "POST":
@@ -718,11 +737,17 @@ def posta_rispondi(request, pk):
         if not oggetto.lower().startswith("re:"):
             oggetto = f"Re: {oggetto}"
         try:
-            send_document_email(to_email=email_ricevuta.sender_email, subject=oggetto, message=testo)
+            accoda_email(
+                to_email=email_ricevuta.sender_email,
+                subject=oggetto,
+                message=testo,
+                descrizione=f"Risposta a {email_ricevuta.sender_email}",
+                modello=EmailInCoda.MODELLO_LIBERA,
+            )
         except Exception as exc:
-            messages.error(request, f"Risposta non inviata: {exc}")
+            messages.error(request, f"Risposta non accodata: {exc}")
         else:
-            messages.success(request, f"Risposta inviata a {email_ricevuta.sender_email}.")
+            messages.success(request, f"Risposta accodata per {email_ricevuta.sender_email}: verrà inviata entro pochi minuti.")
     return redirect("core:posta_messaggio", pk=pk)
 
 

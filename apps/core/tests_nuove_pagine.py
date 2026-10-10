@@ -12,7 +12,7 @@ from django.utils import timezone
 from apps.billing.models import PurchaseInvoice, SalesInvoice
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
-from apps.core.models import ActivityLog, UnitOfMeasure, VatRate
+from apps.core.models import ActivityLog, EmailInCoda, UnitOfMeasure, VatRate
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
 from apps.sales.models import Quote, QuoteLine, SalesOrder
 
@@ -150,12 +150,21 @@ class ScadenzarioTest(PagineTestBase):
 
     @override_settings(EMAIL_IS_CONFIGURED=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_sollecito_inviato(self):
+        from django.core.management import call_command
+
         fattura = self.fattura("FT-1", -10)
         self.login()
         response = self.client.post(reverse("billing:salesinvoice_reminder", args=[fattura.pk]), follow=True)
+        # La pagina accoda in millisecondi; l'invio vero lo fa il comando in background.
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(response, "Sollecito accodato")
+        voce = EmailInCoda.objects.get()
+        self.assertEqual(voce.stato, EmailInCoda.STATO_ATTESA)
+        call_command("invia_coda_email")
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("FT-1", mail.outbox[0].subject)
-        self.assertContains(response, "Sollecito inviato")
+        voce.refresh_from_db()
+        self.assertEqual(voce.stato, EmailInCoda.STATO_INVIATA)
 
     def test_vendite_accede_il_magazziniere_no(self):
         self.login(self.vendite)
@@ -206,12 +215,17 @@ class FollowUpTest(PagineTestBase):
 
     @override_settings(EMAIL_IS_CONFIGURED=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_sollecito_preventivo(self):
+        from django.core.management import call_command
+
         preventivo = self.preventivo("PRE-1", 20)
         self.login()
         response = self.client.post(reverse("sales:quote_reminder", args=[preventivo.pk]), follow=True)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(response, "Sollecito accodato")
+        self.assertEqual(EmailInCoda.objects.count(), 1)
+        call_command("invia_coda_email")
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("PRE-1", mail.outbox[0].subject)
-        self.assertContains(response, "Sollecito inviato")
 
 
 class ImpostazioniEmailTest(PagineTestBase):

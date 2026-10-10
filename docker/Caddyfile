@@ -1,6 +1,13 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+	# Log degli accessi con durata della risposta: servono per trovare le
+	# pagine lente (i tempi finiscono nei log Docker, già ruotati).
+	log {
+		output stdout
+		format json
+	}
+
 	# Header di sicurezza
 	header {
 		-Server

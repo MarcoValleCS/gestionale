@@ -17,11 +17,15 @@ ALWAYS_ALLOWED_PREFIXES = ("/accounts/", "/static/", "/media/", "/guida/")
 ALWAYS_ALLOWED_EXACT = ("/manifest.webmanifest", "/sw.js", "/offline/")
 
 
-def is_collaborator_only(user):
-    """True se l'utente ha il ruolo «Collaboratore» e nessun altro."""
+def is_collaborator_only(user, ruoli=None):
+    """True se l'utente ha il ruolo «Collaboratore» e nessun altro.
+
+    Si possono passare i gruppi già letti (``ruoli``) per evitare una seconda
+    query quando il chiamante li ha già caricati.
+    """
     if not user or not user.is_authenticated or user.is_superuser:
         return False
-    ruoli = set(user.groups.values_list("name", flat=True))
+    ruoli = set(user.groups.values_list("name", flat=True)) if ruoli is None else set(ruoli)
     if ROLE_COLLABORATOR not in ruoli:
         return False
     return not (ruoli - set(RESTRICTED_ROLES))
@@ -32,7 +36,12 @@ class CollaboratorRestrictionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if is_collaborator_only(getattr(request, "user", None)):
+        # I gruppi servono anche al context processor dei ruoli: si leggono una
+        # sola volta qui e si riusano, così ogni pagina risparmia una query.
+        utente = getattr(request, "user", None)
+        if utente and utente.is_authenticated and not utente.is_superuser:
+            request._ruoli_cache = set(utente.groups.values_list("name", flat=True))
+        if is_collaborator_only(utente, ruoli=getattr(request, "_ruoli_cache", None)):
             percorso = request.path
             consentito = (
                 percorso.startswith(ALWAYS_ALLOWED_PREFIXES)

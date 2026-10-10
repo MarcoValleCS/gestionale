@@ -22,3 +22,6 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ("code", "name", "barcode")
     filter_horizontal = ("tags",)
     inlines = [KitComponentInline]
+    # Con 23k articoli: pagine piccole e niente query per riga sulle FK.
+    list_per_page = 50
+    list_select_related = ("category", "uom", "sale_vat")

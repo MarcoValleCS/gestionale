@@ -1,6 +1,17 @@
 from django.contrib import admin
 
-from .models import Attachment, CompanySettings, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .models import Attachment, CompanySettings, EmailInCoda, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+
+
+@admin.register(EmailInCoda)
+class EmailInCodaAdmin(admin.ModelAdmin):
+    """Coda email in background: qui si vedono gli invii falliti."""
+
+    list_display = ("descrizione", "to_email", "stato", "tentativi", "created_at", "sent_at")
+    list_filter = ("stato",)
+    search_fields = ("to_email", "subject", "descrizione")
+    readonly_fields = ("stato", "tentativi", "ultimo_errore", "created_at", "sent_at")
+    list_per_page = 50
 
 
 @admin.register(Attachment)

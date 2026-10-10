@@ -20,7 +20,20 @@ RUN chmod +x docker/entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["docker/entrypoint.sh"]
-# Ottimizzato per 1 vCPU / 1 GB RAM: 2 worker con thread, riciclo periodico dei worker
+# Ottimizzato per 1 vCPU / 1 GB RAM: 2 worker con thread, riciclo periodico dei worker.
+# Il log degli accessi include i microsecondi (ultimo campo): serve per trovare
+# le pagine lente nei log senza altri strumenti.
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--worker-class", "gthread", \
+     "--workers", "2", \
+     "--threads", "3", \
+     "--timeout", "60", \
+     "--graceful-timeout", "30", \
+     "--max-requests", "800", \
+     "--max-requests-jitter", "100", \
+     "--access-logfile", "-", \
+     "--access-logformat", "%(h)s %(t)s \"%(r)s\" %(s)s %(b)s %(D)s"]
 CMD ["gunicorn", "config.wsgi:application", \
      "--bind", "0.0.0.0:8000", \
      "--worker-class", "gthread", \

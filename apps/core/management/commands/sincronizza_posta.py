@@ -1,8 +1,9 @@
 """Scarica le nuove email dalla casella aziendale.
 
-Da mettere in cron sul server, per esempio ogni 5 minuti:
+Da mettere in cron sul server (un giro leggero ogni 20 minuti basta: la posta
+si legge comunque dal database, e un giro troppo frequente ruba CPU al sito):
 
-    */5 * * * * cd /opt/gestionale && docker compose exec -T web python manage.py sincronizza_posta >> /var/log/gestionale-posta.log 2>&1
+    */20 * * * * cd /opt/gestionale && flock -n /var/tmp/gestionale-posta.lock nice -n 10 docker compose exec -T web python manage.py sincronizza_posta --limite 40 >> /var/log/gestionale-posta.log 2>&1
 
 Uso manuale:
 
@@ -18,7 +19,7 @@ class Command(BaseCommand):
     help = "Copia le email della casella aziendale nel gestionale (via IMAP)."
 
     def add_arguments(self, parser):
-        parser.add_argument("--limite", type=int, default=100, help="Quante email recenti controllare (default 100)")
+        parser.add_argument("--limite", type=int, default=40, help="Quante email recenti controllare (default 40)")
         parser.add_argument("--cartella", default="", help="Cartella IMAP (default: quella configurata)")
         parser.add_argument("--riclassifica", action="store_true", help="Ricalcola risposte/rilevanti sulle email già scaricate")
 

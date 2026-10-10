@@ -180,7 +180,8 @@ def quote_reminder(request, pk):
 
     giorni = (timezone.localdate() - preventivo.date).days
     from apps.core.email_templates import contenuto
-    from apps.core.models import CompanySettings, EmailTemplate
+    from apps.core.mailing import accoda_email
+    from apps.core.models import CompanySettings, EmailInCoda, EmailTemplate
     from apps.core.utils import format_money
 
     oggetto, corpo = contenuto(
@@ -198,14 +199,21 @@ def quote_reminder(request, pk):
         },
     )
     try:
-        emailing.send_quote_email(preventivo, to_email=preventivo.customer.email, subject=oggetto, message=corpo)
+        pdf = emailing.render_quote_pdf(preventivo)
+        accoda_email(
+            to_email=preventivo.customer.email,
+            subject=oggetto,
+            message=corpo,
+            attachment=pdf,
+            attachment_name=f"Preventivo_{preventivo.number}.pdf",
+            descrizione=f"Sollecito {preventivo.number} a {preventivo.customer.email}",
+            modello=EmailInCoda.MODELLO_PREVENTIVO,
+            oggetto_id=preventivo.pk,
+        )
     except Exception as exc:
-        messages.error(request, f"Sollecito non inviato: {exc}")
+        messages.error(request, f"Sollecito non accodato: {exc}")
     else:
-        if preventivo.status == Quote.STATUS_DRAFT:
-            preventivo.status = Quote.STATUS_SENT
-            preventivo.save(update_fields=["status"])
-        messages.success(request, f"Sollecito inviato a {preventivo.customer.email} per {preventivo.number}.")
+        messages.success(request, f"Sollecito accodato per {preventivo.customer.email} ({preventivo.number}): verrà inviato entro pochi minuti.")
     return redirect("sales:follow_up")
 
 
@@ -583,7 +591,14 @@ def quote_send(request, pk):
 
 @role_required(*QUOTE_ROLES)
 def quote_email(request, pk):
-    """Invia il preventivo per email (con PDF in allegato se disponibile)."""
+    """Accoda il preventivo per l'invio email (con PDF in allegato se disponibile).
+
+    L'invio vero avviene in background ogni 2 minuti: la pagina risponde
+    subito anche se il server di posta è lento.
+    """
+    from apps.core.mailing import accoda_email
+    from apps.core.models import EmailInCoda
+
     quote = get_object_or_404(Quote.objects.select_related("customer"), pk=pk)
     if request.method == "POST":
         to_email = (request.POST.get("to") or quote.customer.email or "").strip()
@@ -596,18 +611,25 @@ def quote_email(request, pk):
             messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
         else:
             try:
-                pdf_attached = emailing.send_quote_email(
-                    quote, to_email=to_email, subject=subject, message=message_body
+                pdf = emailing.render_quote_pdf(quote)
+                accoda_email(
+                    to_email=to_email,
+                    subject=subject,
+                    message=message_body,
+                    attachment=pdf,
+                    attachment_name=f"Preventivo_{quote.number}.pdf",
+                    descrizione=f"Preventivo {quote.number} a {to_email}",
+                    modello=EmailInCoda.MODELLO_PREVENTIVO,
+                    oggetto_id=quote.pk,
                 )
             except Exception as exc:
-                messages.error(request, f"Invio non riuscito: {exc}")
+                messages.error(request, f"Accodamento non riuscito: {exc}")
             else:
-                # inviare il preventivo lo porta da «bozza» a «inviato»
-                if quote.status == Quote.STATUS_DRAFT:
-                    quote.status = Quote.STATUS_SENT
-                    quote.save(update_fields=["status", "updated_at"])
-                extra = "" if pdf_attached else " (senza allegato PDF: non disponibile su questo sistema)"
-                messages.success(request, f"Preventivo {quote.number} inviato a {to_email}{extra}.")
+                extra = "" if pdf else " (senza allegato PDF: non disponibile su questo sistema)"
+                messages.success(
+                    request,
+                    f"Preventivo {quote.number} accodato per {to_email}{extra}: verrà inviato entro pochi minuti.",
+                )
     return redirect("sales:quote_detail", pk=quote.pk)
 
 

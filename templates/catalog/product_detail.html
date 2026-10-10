@@ -118,12 +118,11 @@
         <form method="post" action="{% url 'catalog:product_component_add' product.pk %}" class="row g-2 align-items-end no-print">
           {% csrf_token %}
           <div class="col-7">
-            <label class="form-label" for="component-select">Aggiungi componente</label>
-            <select class="form-select form-select-sm" id="component-select" name="component">
-              {% for choice in component_choices %}
-              <option value="{{ choice.pk }}">{{ choice.code }} – {{ choice.name }}</option>
-              {% endfor %}
-            </select>
+            <label class="form-label" for="component-search">Aggiungi componente</label>
+            <input class="form-control form-control-sm" id="component-search" type="search"
+                   placeholder="Cerca per codice o nome…" autocomplete="off">
+            <input type="hidden" name="component" id="component-id">
+            <div class="list-group mt-1" id="component-suggest" hidden></div>
           </div>
           <div class="col-3">
             <label class="form-label" for="component-qty">Qtà</label>
@@ -133,6 +132,44 @@
             <button class="btn btn-outline-primary btn-sm w-100" type="submit"><i class="bi bi-plus-lg"></i></button>
           </div>
         </form>
+        <script>
+        // Autocompletamento componenti: con 23k articoli un menu a tendina con
+        // tutte le voci pesava megabyte. Si cercano max 12 risultati alla volta.
+        (function () {
+          var campo = document.getElementById("component-search");
+          var nascosto = document.getElementById("component-id");
+          var suggerimenti = document.getElementById("component-suggest");
+          if (!campo) return;
+          var attesa = null;
+          campo.addEventListener("input", function () {
+            nascosto.value = "";
+            var testo = campo.value.trim();
+            if (testo.length < 2) { suggerimenti.hidden = true; suggerimenti.innerHTML = ""; return; }
+            clearTimeout(attesa);
+            attesa = setTimeout(function () {
+              fetch("{% url 'catalog:search' %}?q=" + encodeURIComponent(testo), {headers: {"X-Requested-With": "XMLHttpRequest"}})
+                .then(function (r) { return r.ok ? r.json() : {results: []}; })
+                .then(function (dati) {
+                  suggerimenti.innerHTML = "";
+                  (dati.results || []).forEach(function (voce) {
+                    var bottone = document.createElement("button");
+                    bottone.type = "button";
+                    bottone.className = "list-group-item list-group-item-action py-1 small";
+                    bottone.textContent = voce.label + (voce.extra ? " (" + voce.extra + ")" : "");
+                    bottone.addEventListener("click", function () {
+                      campo.value = voce.label;
+                      nascosto.value = voce.id;
+                      suggerimenti.hidden = true;
+                    });
+                    suggerimenti.appendChild(bottone);
+                  });
+                  suggerimenti.hidden = !(dati.results && dati.results.length);
+                })
+                .catch(function () { suggerimenti.hidden = true; });
+            }, 250);
+          });
+        })();
+        </script>
         {% endif %}
         <p class="text-muted small mt-3 mb-0">
           Nei preventivi, quando scegli questo kit, i componenti vengono aggiunti automaticamente come righe a prezzo zero

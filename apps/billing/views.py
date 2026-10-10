@@ -139,7 +139,8 @@ def salesinvoice_reminder(request, pk):
 
     oggetto = f"Sollecito fattura {invoice.number}"
     from apps.core.email_templates import contenuto
-    from apps.core.models import CompanySettings, EmailTemplate
+    from apps.core.mailing import accoda_email
+    from apps.core.models import CompanySettings, EmailInCoda, EmailTemplate
     from apps.core.utils import format_money
 
     oggetto, corpo = contenuto(
@@ -155,11 +156,21 @@ def salesinvoice_reminder(request, pk):
         },
     )
     try:
-        emailing.send_invoice_email(invoice, to_email=invoice.customer.email, subject=oggetto, message=corpo)
+        pdf = emailing.render_invoice_pdf(invoice)
+        accoda_email(
+            to_email=invoice.customer.email,
+            subject=oggetto,
+            message=corpo,
+            attachment=pdf,
+            attachment_name=f"Fattura_{invoice.number}.pdf",
+            descrizione=f"Sollecito {invoice.number} a {invoice.customer.email}",
+            modello=EmailInCoda.MODELLO_FATTURA,
+            oggetto_id=invoice.pk,
+        )
     except Exception as exc:
-        messages.error(request, f"Sollecito non inviato: {exc}")
+        messages.error(request, f"Sollecito non accodato: {exc}")
     else:
-        messages.success(request, f"Sollecito inviato a {invoice.customer.email} per la fattura {invoice.number}.")
+        messages.success(request, f"Sollecito accodato per {invoice.customer.email} (fattura {invoice.number}): verrà inviato entro pochi minuti.")
     return redirect("billing:scadenzario")
 
 
@@ -666,7 +677,14 @@ def salesinvoice_delete(request, pk):
 
 @role_required(*SALES_INVOICE_ROLES)
 def salesinvoice_email(request, pk):
-    """Invia la fattura per email (con PDF in allegato se disponibile)."""
+    """Accoda la fattura per l'invio email (con PDF in allegato se disponibile).
+
+    L'invio vero avviene in background ogni 2 minuti: la pagina risponde
+    subito anche se il server di posta è lento.
+    """
+    from apps.core.mailing import accoda_email
+    from apps.core.models import EmailInCoda
+
     invoice = get_object_or_404(SalesInvoice.objects.select_related("customer"), pk=pk)
     if request.method == "POST":
         to_email = (request.POST.get("to") or invoice.customer.email or "").strip()
@@ -681,14 +699,22 @@ def salesinvoice_email(request, pk):
             messages.error(request, "Emetti prima la fattura, poi inviala al cliente.")
         else:
             try:
-                pdf_attached = emailing.send_invoice_email(invoice, to_email=to_email, subject=subject, message=message_body)
+                pdf = emailing.render_invoice_pdf(invoice)
+                accoda_email(
+                    to_email=to_email,
+                    subject=subject,
+                    message=message_body,
+                    attachment=pdf,
+                    attachment_name=f"Fattura_{invoice.number}.pdf",
+                    descrizione=f"Fattura {invoice.number} a {to_email}",
+                    modello=EmailInCoda.MODELLO_FATTURA,
+                    oggetto_id=invoice.pk,
+                )
             except Exception as exc:
-                messages.error(request, f"Invio non riuscito: {exc}")
+                messages.error(request, f"Accodamento non riuscito: {exc}")
             else:
-                if invoice.status == SalesInvoice.STATUS_ISSUED:
-                    services.mark_sales_invoice_sent(invoice)
-                extra = "" if pdf_attached else " (senza allegato PDF: non disponibile su questo sistema)"
-                messages.success(request, f"Fattura {invoice.number} inviata a {to_email}{extra}.")
+                extra = "" if pdf else " (senza allegato PDF: non disponibile su questo sistema)"
+                messages.success(request, f"Fattura {invoice.number} accodata per {to_email}{extra}: verrà inviata entro pochi minuti.")
     return redirect("billing:salesinvoice_detail", pk=invoice.pk)
 
 
@@ -721,15 +747,15 @@ def salesinvoice_sdi_send(request, pk):
     invoice = get_object_or_404(SalesInvoice, pk=pk)
     if request.method == "POST":
         try:
-            sdi.send_invoice_sdi(invoice)
+            sdi.accoda_invoice_sdi(invoice)
         except ValidationError as exc:
             messages.error(request, "; ".join(exc.messages))
         except Exception as exc:
-            messages.error(request, f"Invio allo SDI non riuscito: {exc}")
+            messages.error(request, f"Accodamento allo SDI non riuscito: {exc}")
         else:
             messages.success(
                 request,
-                f"Fattura {invoice.number} trasmessa allo SDI via PEC. Quando arrivano le ricevute, aggiorna l'esito qui sotto.",
+                f"Fattura {invoice.number} accodata per lo SDI via PEC: verrà trasmessa entro pochi minuti. Quando arrivano le ricevute, aggiorna l'esito qui sotto.",
             )
     return redirect("billing:salesinvoice_detail", pk=invoice.pk)
 

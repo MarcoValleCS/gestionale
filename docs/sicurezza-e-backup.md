@@ -69,7 +69,23 @@ Sono avvisi brevi: se ne arriva uno, c'è qualcosa da guardare sul server.
 ## Prestazioni
 
 - Le pagine più pesanti (dashboard, statistiche) tengono i conti in cache per
-  un minuto.
+  un minuto; anche i prodotti sotto scorta e le tendine del registro attività
+  sono in cache (60 s / 5 min).
+- Ogni pagina riusa i gruppi dell'utente letti una sola volta e i conteggi dei
+  badge (messaggi/posta) in cache per un minuto; i dati azienda restano in
+  memoria del processo per 60 secondi.
+- Email e PEC (preventivi, fatture, solleciti, SDI) si accodano dalla pagina e
+  partono in background ogni 2 minuti (`invia_coda_email`): un server di posta
+  lento non blocca più il sito. Gli invii falliti si vedono in Amministrazione
+  → Coda email.
+- I PDF dei documenti si riusano finché il documento non cambia (niente più
+  render WeasyPrint ripetuti); il selettore dei componenti kit usa
+  l'autocompletamento invece di 23k voci nel menu.
+- La posta si sincronizza ogni 20 minuti (non ogni 5) e salta i messaggi già
+  scaricati senza riscaricarli; il giro notturno resta alle 3:00.
+- I log registrano i tempi di risposta (Gunicorn in microsecondi, Caddy in
+  JSON) e le query oltre 1 secondo: per trovare le pagine lente basta
+  `docker compose logs web db | grep …`.
 - I menu di unità di misura e IVA sono condivisi fra tutte le righe: prima il
   modulo di un preventivo faceva una query per riga.
 - Il modulo di un documento non scarica più tutto il catalogo articoli: i costi

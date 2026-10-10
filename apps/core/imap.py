@@ -116,7 +116,7 @@ def _indirizzo(valore):
         return "", str(valore).strip()
 
 
-def sincronizza(limite=100, cartella=None):
+def sincronizza(limite=40, cartella=None):
     """Copia le ultime email dalla casella al database.
 
     Restituisce un riepilogo: quante esaminate, quante nuove, eventuali errori.
@@ -142,11 +142,17 @@ def sincronizza(limite=100, cartella=None):
         esito["esaminate"] = len(numeri)
 
         for numero in numeri:
+            # La casella cambia poco fra un giro e l'altro: se il messaggio è
+            # già stato copiato si salta senza scaricarlo di nuovo. Prima ogni
+            # giro scaricava tutte le intestazioni anche quando non c'era nulla
+            # di nuovo (100 fetch ogni 5 minuti sul provider).
+            uid = f"{cartella}:{numero.decode()}"
+            if uid in uid_esistenti:
+                continue
             stato, risposta = client.fetch(numero, "(RFC822.HEADER)")
             if stato != "OK" or not risposta or not isinstance(risposta[0], tuple):
                 continue
             messaggio = email.message_from_bytes(risposta[0][1])
-            uid = f"{cartella}:{numero.decode()}"
             if uid in uid_esistenti:
                 continue
             nome, indirizzo = _indirizzo(messaggio.get("From"))
@@ -176,6 +182,10 @@ def sincronizza(limite=100, cartella=None):
             pass
 
     _collega_contatti()
+    if esito["nuove"]:
+        from .cache import dimentica
+
+        dimentica("badge_posta")
     return esito
 
 
