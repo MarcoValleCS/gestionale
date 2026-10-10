@@ -179,7 +179,7 @@
             <tr>
               <td class="text-muted">{{ line.row_number }}</td>
               <td>
-                {% if line.product %}<a class="text-muted number-badge text-decoration-none" href="{% url 'catalog:product_detail' line.product.pk %}" title="Apri la scheda dell'articolo"><i class="bi bi-box-arrow-up-right"></i> {{ line.product.code }}</a>{% endif %}
+                {% if line.product %}<a class="text-muted number-badge text-decoration-none" href="{% url 'catalog:product_detail' line.product.pk %}" target="_blank" title="Apri la scheda dell'articolo"><i class="bi bi-box-arrow-up-right"></i> {{ line.product.code }}</a>{% endif %}
                 {{ line.description|default:"—" }}
               </td>
               <td class="text-end">{{ line.qty|qty }}</td>
