@@ -34,12 +34,3 @@ CMD ["gunicorn", "config.wsgi:application", \
      "--max-requests-jitter", "100", \
      "--access-logfile", "-", \
      "--access-logformat", "%(h)s %(t)s \"%(r)s\" %(s)s %(b)s %(D)s"]
-CMD ["gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8000", \
-     "--worker-class", "gthread", \
-     "--workers", "2", \
-     "--threads", "3", \
-     "--timeout", "60", \
-     "--graceful-timeout", "30", \
-     "--max-requests", "800", \
-     "--max-requests-jitter", "100"]
