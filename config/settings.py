@@ -218,6 +218,10 @@ if env("DB_ENGINE", "").lower() in {"postgres", "postgresql"}:
             "HOST": env("DB_HOST", "localhost"),
             "PORT": env("DB_PORT", "5432"),
             "CONN_MAX_AGE": 60,
+            # Verifica la connessione prima di riusarla: serve se il server l'ha
+            # chiusa nel frattempo (riavvio di Postgres, idle_session_timeout),
+            # altrimenti la prima query della richiesta fallirebbe.
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 else:

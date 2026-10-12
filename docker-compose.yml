@@ -25,6 +25,12 @@ services:
       - "maintenance_work_mem=64MB"
       - "-c"
       - "max_connections=25"
+      # Connessioni lasciate «in transazione» bloccano righe e vacuum: dopo 30
+      # secondi vengono chiuse. Quelle semplicemente inattive dopo 10 minuti.
+      - "-c"
+      - "idle_in_transaction_session_timeout=30s"
+      - "-c"
+      - "idle_session_timeout=10min"
       - "-c"
       - "wal_compression=on"
       - "-c"
