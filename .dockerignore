@@ -26,6 +26,11 @@ staticfiles/
 media/
 .cache/
 
+# ------------------------------------------- copia di lavoro su MariaDB
+# È un progetto Django annidato, con il suo ambiente e i suoi database:
+# non deve entrare nell'immagine, altrimenti si raddoppia la dimensione.
+gestionale-mariadb/
+
 # ------------------------------------------------------------ controllo
 .git/
 .gitignore

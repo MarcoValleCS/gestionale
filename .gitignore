@@ -18,6 +18,11 @@ staticfiles/
 media/
 backups/
 
+# ---------------------------------------------------------------- MariaDB
+# Copia di lavoro del progetto su MariaDB: cartella annidata e autonoma.
+# Non entra nel repository del gestionale originale.
+gestionale-mariadb/
+
 # ----------------------------------------------- file generati / personali
 _build_*.py
 *.docx
