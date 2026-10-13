@@ -6,7 +6,6 @@
 <form method="post" novalidate id="document-form">
   {% csrf_token %}
   {{ line_formset.management_form }}
-  {{ customer_discounts_json|json_script:"customer-discounts" }}
   <div class="row g-3">
     <div class="col-lg-8">
       <div class="card mb-3">

@@ -288,6 +288,7 @@ def build_print_context(
     show_prices=True,
     show_discount=True,
     show_sections=True,
+    show_product_code=True,
     extra_fields=None,
     gross_amounts=False,
 ):
@@ -297,6 +298,8 @@ def build_print_context(
     includono l'IVA (stampe al cliente: preventivi e conferme d'ordine).
     Con ``show_sections=False`` si nascondono intestazioni e subtotali di
     sezione e sottosezione (stampe pulite: fatture).
+    Con ``show_product_code=False`` si nasconde il codice articolo (preventivi:
+    è un dato interno, non serve al cliente).
     """
     lines = document.lines.select_related("product", "uom", "vat_rate")
     # numero di colonne della tabella righe: serve ai colspan delle sezioni.
@@ -322,6 +325,7 @@ def build_print_context(
         "show_prices": show_prices,
         "show_discount": show_discount,
         "show_sections": show_sections,
+        "show_product_code": show_product_code,
         "gross_amounts": gross_amounts,
         "table_columns": colonne,
         # Le viste di stampa lo valorizzano (download del PDF generato dal
@@ -337,10 +341,6 @@ def with_vat_rates(context, documento=None):
     context["quick_uoms"] = active_units()
     context["quick_vats"] = active_vat_rates()
     context["quick_suppliers"] = Contact.objects.filter(is_supplier=True, active=True).order_by("name")
-    context["customer_discounts_json"] = {
-        str(contact.pk): str(contact.sale_discount_pct)
-        for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
-    }
     # Per il margine servono i costi: si caricano solo quelli degli articoli già
     # presenti nel documento (pochi). Caricare tutto il catalogo significherebbe
     # un JSON enorme da scaricare a ogni apertura del modulo. Gli articoli scelti

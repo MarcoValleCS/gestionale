@@ -494,10 +494,6 @@ class SalesInvoiceCreateView(RoleRequiredMixin, CreateView):
         if "line_formset" not in context:
             context["line_formset"] = SalesInvoiceLineFormSet(prefix="lines", queryset=SalesInvoiceLine.objects.none())
         context["cancel_url"] = reverse("billing:salesinvoice_list")
-        context["customer_discounts_json"] = {
-            str(contact.pk): str(contact.sale_discount_pct)
-            for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
-        }
         return with_vat_rates(context)
 
     def post(self, request, *args, **kwargs):
@@ -537,10 +533,6 @@ class SalesInvoiceUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateV
         if "line_formset" not in context:
             context["line_formset"] = SalesInvoiceLineFormSet(prefix="lines", queryset=self.object.lines.select_related("product"))
         context["cancel_url"] = reverse("billing:salesinvoice_detail", args=[self.object.pk])
-        context["customer_discounts_json"] = {
-            str(contact.pk): str(contact.sale_discount_pct)
-            for contact in Contact.objects.filter(is_customer=True, active=True, sale_discount_pct__gt=0)
-        }
         return with_vat_rates(context, self.object)
 
     def post(self, request, *args, **kwargs):

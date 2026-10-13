@@ -113,7 +113,6 @@ class ContactCreateTest(TestCase):
                 "name": "Idraulica Verdi S.r.l.",
                 "is_customer": "on",
                 "country": "Italia",
-                "sale_discount_pct": "0",
                 "active": "on",
             },
         )
@@ -129,7 +128,6 @@ class ContactCreateTest(TestCase):
                 "name": "Ricambi Blu S.p.A.",
                 "is_supplier": "on",
                 "country": "Italia",
-                "sale_discount_pct": "0",
                 "active": "on",
             },
         )
@@ -138,25 +136,11 @@ class ContactCreateTest(TestCase):
         self.assertTrue(contatto.is_supplier)
         self.assertEqual(contatto.code[:3], "FOR")
 
-    def test_sconto_abituale_viene_salvato(self):
-        self.client.post(
-            reverse("contacts:create"),
-            {
-                "name": "Cliente Scontato S.r.l.",
-                "is_customer": "on",
-                "country": "Italia",
-                "sale_discount_pct": "15",
-                "active": "on",
-            },
-        )
-        contatto = Contact.objects.get(name="Cliente Scontato S.r.l.")
-        self.assertEqual(str(contatto.sale_discount_pct), "15.00")
-
     def test_senza_cliente_ne_fornitore_non_salva(self):
         """Il contatto deve essere almeno cliente o fornitore."""
         response = self.client.post(
             reverse("contacts:create"),
-            {"name": "Contatto Vuoto S.r.l.", "country": "Italia", "sale_discount_pct": "0"},
+            {"name": "Contatto Vuoto S.r.l.", "country": "Italia"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Contact.objects.filter(name="Contatto Vuoto S.r.l.").exists())
