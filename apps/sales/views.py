@@ -28,6 +28,7 @@ from .forms import (
 )
 from .models import (
     LINE_ARTICLE,
+    ZERO,
     Quote,
     QuoteLine,
     QuoteTemplate,
@@ -385,6 +386,25 @@ def save_document_lines(document, formset, fk_field):
 
 
 # --------------------------------------------------------------- preventivi
+def _margine_documento(documento, righe):
+    """Costo, margine e marginalità per la scheda del documento.
+
+    Stessa logica del pannello live del form: costo da listino fornitore
+    (o costo fissato alla conferma), margine sull'imponibile, provvigione
+    scorporata a parte.
+    """
+    from apps.core.rounding import round2
+
+    costo = sum((riga.line_cost for riga in righe if not riga.is_display), ZERO)
+    imponibile = Decimal(documento.subtotal or 0)
+    margine = round2(imponibile - costo)
+    percentuale = round2(margine / imponibile * 100) if imponibile else None
+    dopo_provvigione = None
+    if getattr(documento, "has_commission", False):
+        dopo_provvigione = round2(margine - documento.commission_amount)
+    return {"costo": costo, "margine": margine, "percentuale": percentuale, "dopo_provvigione": dopo_provvigione}
+
+
 class QuoteListView(RoleRequiredMixin, ListView):
     allowed_roles = QUOTE_ROLES
     model = Quote
@@ -449,9 +469,10 @@ class QuoteDetailView(RoleRequiredMixin, DetailView):
         from apps.core.pdf import pdf_available
 
         context["page_title"] = f"Preventivo {self.object.number}"
-        context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
+        context["lines"] = list(self.object.lines.select_related("product", "uom", "vat_rate"))
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
+        context["margine"] = _margine_documento(self.object, context["lines"])
         context["generated_order"] = self.object.generated_order
         context["email_configured"] = emailing.email_configured()
         context["pdf_available"] = pdf_available()
@@ -742,9 +763,10 @@ class SalesOrderDetailView(RoleRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Ordine {self.object.number}"
-        context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
+        context["lines"] = list(self.object.lines.select_related("product", "uom", "vat_rate"))
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
+        context["margine"] = _margine_documento(self.object, context["lines"])
         context["purchase_orders"] = self.object.purchase_orders.select_related("supplier").order_by("pk")
         context["received_map"] = _received_from_suppliers(self.object)
         from apps.billing.services import order_billing_summary

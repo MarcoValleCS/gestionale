@@ -112,7 +112,7 @@ class DocumentLine(TimeStampedModel):
         """
         if self.is_display:
             return ZERO
-        cost = self.unit_cost
+        cost = getattr(self, "unit_cost", None)
         if cost is None:
             cost = self.product.purchase_price if self.product_id else ZERO
         return Decimal(cost or 0) * Decimal(self.qty or 0)

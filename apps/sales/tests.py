@@ -1899,3 +1899,65 @@ class RigheStileOdooTest(FlowTestBase):
         dati = response.json()
         self.assertEqual(dati["lines"][0]["line_type"], "section")
         self.assertEqual(dati["lines"][1]["line_type"], "article")
+
+
+class MargineSchedeTest(FlowTestBase):
+    """Il margine si vede nelle schede in ogni stato, non solo nel form."""
+
+    def setUp(self):
+        self.login()
+
+    def _preventivo(self, stato="draft"):
+        quote = Quote.objects.create(customer=self.customer, status=stato)
+        quote.lines.create(
+            product=self.product, description="a", qty=Decimal("2"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        return quote
+
+    def test_scheda_preventivo_mostra_margine_in_bozza_e_accettato(self):
+        # costo 2 × 5 = 10, imponibile 20, margine 10 (50%)
+        for stato in ("draft", "accepted", "converted"):
+            with self.subTest(stato=stato):
+                quote = self._preventivo(stato=stato)
+                pagina = self.client.get(reverse("sales:quote_detail", args=[quote.pk])).content.decode("utf-8")
+                self.assertIn("Margine", pagina)
+                self.assertIn("10,00", pagina)
+
+    def test_scheda_ordine_mostra_margine_in_bozza_e_confermato(self):
+        quote = self._preventivo(stato="accepted")
+        order = services.convert_quote_to_order(quote, user=self.user)
+        for stato, msg in ((SalesOrder.STATUS_DRAFT, "bozza"), (SalesOrder.STATUS_CONFIRMED, "confermato")):
+            with self.subTest(stato=stato):
+                if stato == SalesOrder.STATUS_CONFIRMED:
+                    services.confirm_sales_order(order, user=self.user)
+                    order.refresh_from_db()
+                pagina = self.client.get(reverse("sales:order_detail", args=[order.pk])).content.decode("utf-8")
+                self.assertIn("Margine", pagina)
+                self.assertIn("10,00", pagina)
+
+    def test_magazzino_non_vede_costi(self):
+        from django.contrib.auth.models import Group
+
+        quote = self._preventivo()
+        order = services.convert_quote_to_order(quote, user=self.user)
+        magazziniere = User.objects.create_user("mag", password="password123!")
+        magazziniere.groups.add(Group.objects.get(name="Magazzino"))
+        self.client.force_login(magazziniere)
+        pagina = self.client.get(reverse("sales:order_detail", args=[order.pk])).content.decode("utf-8")
+        self.assertEqual(self.client.get(reverse("sales:order_detail", args=[order.pk])).status_code, 200)
+        self.assertNotIn("Costo merce", pagina)
+        self.assertNotIn("Dopo provvigione", pagina)
+
+    def test_line_cost_e_margine_dopo_provvigione(self):
+        quote = self._preventivo()
+        riga = quote.lines.get()
+        self.assertEqual(riga.line_cost, Decimal("10"))
+        self.assertEqual(quote.margin_after_commission, Decimal("10"))
+        from apps.contacts.models import Contact
+
+        quote.commission_contact = Contact.objects.create(name="Agente", is_customer=False)
+        quote.commission_pct = Decimal("10")
+        quote.save()
+        self.assertEqual(quote.margin_after_commission, Decimal("8"))
