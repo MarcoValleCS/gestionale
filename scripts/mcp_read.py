@@ -5,9 +5,22 @@ cliente, DDT, fatture emesse e ricevute, ordini fornitore, magazzino,
 catalogo, commesse, lead, personale e impostazioni. Tutte le funzioni leggono
 soltanto il database.
 """
+from typing import Annotated
+
+from pydantic import Field
+
 from mcp_common import (
+    LETTURA,
+    DataA,
+    DataDa,
+    Limite50,
+    Limite200,
+    Offset,
     _intervallo,
     _limite,
+    _metadati,
+    _offset,
+    _pagina,
     _riga,
     _righe_documento,
     _stato_codice,
@@ -24,8 +37,12 @@ def _oggi():
 
 
 # ============================================================== anagrafiche
-@_strumento
-def cerca_clienti(testo: str, limite: int = 10) -> list:
+@_strumento(annotazioni=LETTURA)
+def cerca_clienti(
+    testo: Annotated[str, Field(description="Testo da cercare (nome, codice, città, email o P.IVA; almeno 2 caratteri).")],
+    limite: Limite50 = 10,
+    offset: Offset = 0,
+) -> dict:
     """Cerca clienti e fornitori per nome, codice, città, email o P.IVA."""
     from django.db.models import Q
 
@@ -33,7 +50,9 @@ def cerca_clienti(testo: str, limite: int = 10) -> list:
 
     testo = (testo or "").strip()
     if len(testo) < 2:
-        return [{"errore": "Scrivi almeno 2 caratteri."}]
+        return {"errore": "Scrivi almeno 2 caratteri."}
+    inizio = _offset(offset)
+    massimo = _limite(limite)
     contatti = (
         Contact.objects.filter(
             Q(name__icontains=testo)
@@ -42,20 +61,21 @@ def cerca_clienti(testo: str, limite: int = 10) -> list:
             | Q(email__icontains=testo)
             | Q(vat_number__icontains=testo)
         )
-        .order_by("name")[: _limite(limite)]
+        .order_by("name")
     )
-    return [
+    elenco = [
         {
             **_riga(c, "code", "name", "city", "email", "phone", "vat_number"),
             "cliente": c.is_customer,
             "fornitore": c.is_supplier,
         }
-        for c in contatti
+        for c in contatti[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, contatti.count(), inizio, massimo)
 
 
-@_strumento
-def scheda_cliente(codice: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def scheda_cliente(codice: Annotated[str, Field(description="Codice esatto del contatto.")]) -> dict:
     """Scheda anagrafica di un cliente (per codice) con documenti aperti e fatture da incassare."""
     from apps.billing.models import SalesInvoice
     from apps.contacts.models import Contact
@@ -101,7 +121,12 @@ def scheda_cliente(codice: str) -> dict:
         "ordini_aperti": [_doc(r) for r in ordini],
         "fatture_aperte": [
             {
-                **_riga(f, "number", "date", "due_date", "status", "subtotal", "grand_total"),
+                "numero": f.number,
+                "data": _valore(f.date),
+                "scadenza": _valore(f.due_date),
+                "stato": f.get_status_display(),
+                "imponibile": _valore(f.subtotal),
+                "totale": _valore(f.grand_total),
                 "scaduta": bool(f.due_date and f.due_date < oggi),
             }
             for f in fatture
@@ -109,7 +134,7 @@ def scheda_cliente(codice: str) -> dict:
     }
 
 
-@_strumento
+@_strumento(annotazioni=LETTURA)
 def dati_azienda() -> dict:
     """Dati anagrafici dell'azienda (nome, P.IVA, indirizzo, contatti, IBAN)."""
     from apps.core.models import CompanySettings
@@ -121,20 +146,28 @@ def dati_azienda() -> dict:
     )
 
 
-@_strumento
-def lista_termini_pagamento() -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_termini_pagamento() -> dict:
     """Elenca le condizioni di pagamento (nome, giorni, fine mese)."""
     from apps.core.models import PaymentTerm
 
-    return [
+    elenco = [
         {"nome": t.name, "giorni": t.days, "fine_mese": t.end_of_month, "note": t.notes}
         for t in PaymentTerm.objects.order_by("days", "name")
     ]
+    return _pagina(elenco, len(elenco), 0, len(elenco))
 
 
 # ================================================================ preventivi
-@_strumento
-def lista_preventivi(stato: str = "", cliente: str = "", da_data: str = "", a_data: str = "", limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_preventivi(
+    stato: Annotated[str, Field(description="Stato del preventivo (bozza, inviato, accettato, rifiutato, convertito); vuoto = tutti.")] = "",
+    cliente: Annotated[str, Field(description="Parte del nome del cliente; vuoto = tutti.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca preventivi, più recenti prima. Stato: bozza, inviato, accettato, rifiutato, convertito
     (o vuoto). Filtro per cliente (parte del nome) e intervallo di date (da_data, a_data)."""
     from apps.sales.models import Quote
@@ -150,7 +183,9 @@ def lista_preventivi(stato: str = "", cliente: str = "", da_data: str = "", a_da
         righe = righe.filter(date__gte=da)
     if a:
         righe = righe.filter(date__lte=a)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": q.number,
             "data": _valore(q.date),
@@ -160,12 +195,13 @@ def lista_preventivi(stato: str = "", cliente: str = "", da_data: str = "", a_da
             "imponibile": _valore(q.subtotal),
             "totale": _valore(q.grand_total),
         }
-        for q in righe[: _limite(limite)]
+        for q in righe[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, righe.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_preventivo(numero: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_preventivo(numero: Annotated[str, Field(description="Numero esatto del preventivo.")]) -> dict:
     """Dettaglio di un preventivo per numero: testata, righe e totali."""
     from apps.sales.models import Quote
 
@@ -191,8 +227,12 @@ def dettaglio_preventivo(numero: str) -> dict:
     }
 
 
-@_strumento
-def preventivi_in_scadenza(giorni: int = 7, limite: int = 20) -> dict:
+@_strumento(annotazioni=LETTURA)
+def preventivi_in_scadenza(
+    giorni: Annotated[int, Field(ge=0, le=365, description="Giorni di preavviso da oggi (0-365).")] = 7,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Preventivi ancora aperti (bozza o inviati) con la validità scaduta o in scadenza entro N giorni."""
     from datetime import timedelta
 
@@ -206,9 +246,12 @@ def preventivi_in_scadenza(giorni: int = 7, limite: int = 20) -> dict:
     base = Quote.objects.filter(
         status__in=[Quote.STATUS_DRAFT, Quote.STATUS_SENT], valid_until__isnull=False
     ).select_related("customer")
+    inizio = _offset(offset)
+    massimo = _limite(limite)
 
     def _elenco(queryset):
-        return [
+        ordinate = queryset.order_by("valid_until")
+        elenco = [
             {
                 "numero": q.number,
                 "data": _valore(q.date),
@@ -217,21 +260,29 @@ def preventivi_in_scadenza(giorni: int = 7, limite: int = 20) -> dict:
                 "stato": q.get_status_display(),
                 "totale": _valore(q.grand_total),
             }
-            for q in queryset.order_by("valid_until")[: _limite(limite)]
+            for q in ordinate[inizio : inizio + massimo]
         ]
+        return {**_metadati(len(elenco), ordinate.count(), inizio, massimo), "elenco": elenco}
 
     scaduti = base.filter(valid_until__lt=oggi)
     in_scadenza = base.filter(valid_until__gte=oggi, valid_until__lte=oggi + timedelta(days=giorni))
     return {
         "entro_il": _valore(oggi + timedelta(days=giorni)),
-        "preventivi_scaduti": {"numero": scaduti.count(), "elenco": _elenco(scaduti)},
-        "preventivi_in_scadenza": {"numero": in_scadenza.count(), "elenco": _elenco(in_scadenza)},
+        "preventivi_scaduti": _elenco(scaduti),
+        "preventivi_in_scadenza": _elenco(in_scadenza),
     }
 
 
 # ===================================================== ordini cliente (vendite)
-@_strumento
-def lista_ordini(stato: str = "", cliente: str = "", da_data: str = "", a_data: str = "", limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_ordini(
+    stato: Annotated[str, Field(description="Stato dell'ordine (bozza, confermato, consegnato, annullato); vuoto = tutti.")] = "",
+    cliente: Annotated[str, Field(description="Parte del nome del cliente; vuoto = tutti.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca gli ordini cliente, più recenti prima. Stato: bozza, confermato, consegnato, annullato
     (o vuoto). Filtro per cliente e intervallo di date (da_data, a_data)."""
     from apps.sales.models import SalesOrder
@@ -248,7 +299,9 @@ def lista_ordini(stato: str = "", cliente: str = "", da_data: str = "", a_data: 
     if a:
         righe = righe.filter(date__lte=a)
     oggi = _oggi()
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": o.number,
             "data": _valore(o.date),
@@ -260,14 +313,15 @@ def lista_ordini(stato: str = "", cliente: str = "", da_data: str = "", a_data: 
             "totale": _valore(o.grand_total),
             "in_ritardo": bool(o.expected_date and o.expected_date < oggi and o.delivered_at is None),
         }
-        for o in righe[: _limite(limite)]
+        for o in righe[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, righe.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_ordine(numero: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_ordine(numero: Annotated[str, Field(description="Numero esatto dell'ordine cliente.")]) -> dict:
     """Dettaglio di un ordine cliente per numero: testata, righe con quantità consegnate/residue,
-    DDT e fatture collegate, eventuale provvvigione."""
+    DDT e fatture collegate, eventuale provvigione."""
     from apps.billing.models import DeliveryNote, SalesInvoice
     from apps.sales.models import SalesOrder
 
@@ -319,8 +373,12 @@ def dettaglio_ordine(numero: str) -> dict:
     return esito
 
 
-@_strumento
-def ordini_da_consegnare(solo_in_ritardo: bool = False, limite: int = 20) -> dict:
+@_strumento(annotazioni=LETTURA)
+def ordini_da_consegnare(
+    solo_in_ritardo: Annotated[bool, Field(description="True per i soli ordini oltre la consegna prevista.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Ordini confermati e non ancora consegnati, con le quantità residue per riga.
     Con solo_in_ritardo=True solo quelli oltre la consegna prevista."""
     from apps.sales.models import SalesOrder
@@ -333,8 +391,10 @@ def ordini_da_consegnare(solo_in_ritardo: bool = False, limite: int = 20) -> dic
     )
     if solo_in_ritardo:
         ordini = ordini.filter(expected_date__lt=oggi)
+    inizio = _offset(offset)
+    massimo = _limite(limite)
     elenco = []
-    for o in ordini[: _limite(limite)]:
+    for o in ordini[inizio : inizio + massimo]:
         residui = [
             {
                 "articolo": riga.product.code if riga.product_id else "",
@@ -357,16 +417,25 @@ def ordini_da_consegnare(solo_in_ritardo: bool = False, limite: int = 20) -> dic
                 "righe_da_consegnare": residui,
             }
         )
+    totale = ordini.count()
     return {
-        "totale_ordini": ordini.count(),
+        **_metadati(len(elenco), totale, inizio, massimo),
+        "totale_ordini": totale,
         "filtro": "solo in ritardo" if solo_in_ritardo else "tutti quelli confermati non consegnati",
         "ordini": elenco,
     }
 
 
 # ======================================================================= DDT
-@_strumento
-def lista_ddt(stato: str = "", cliente: str = "", da_data: str = "", a_data: str = "", limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_ddt(
+    stato: Annotated[str, Field(description="Stato del DDT (bozza, emesso, annullato); vuoto = tutti.")] = "",
+    cliente: Annotated[str, Field(description="Parte del nome del cliente; vuoto = tutti.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca i DDT in uscita, più recenti prima. Stato: bozza, emesso, annullato (o vuoto).
     Filtro per cliente e intervallo di date (da_data, a_data)."""
     from apps.billing.models import DeliveryNote
@@ -382,7 +451,9 @@ def lista_ddt(stato: str = "", cliente: str = "", da_data: str = "", a_data: str
         righe = righe.filter(date__gte=da)
     if a:
         righe = righe.filter(date__lte=a)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": d.number,
             "data": _valore(d.date),
@@ -393,12 +464,13 @@ def lista_ddt(stato: str = "", cliente: str = "", da_data: str = "", a_data: str
             "colli": d.packages,
             "vettore": d.carrier,
         }
-        for d in righe[: _limite(limite)]
+        for d in righe[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, righe.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_ddt(numero: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_ddt(numero: Annotated[str, Field(description="Numero esatto del DDT.")]) -> dict:
     """Dettaglio di un DDT per numero: testata, righe, destinazione e ordine collegato."""
     from apps.billing.models import DeliveryNote
 
@@ -427,8 +499,8 @@ def dettaglio_ddt(numero: str) -> dict:
     }
 
 
-@_strumento
-def ddt_da_fatturare(limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def ddt_da_fatturare(limite: Limite50 = 20, offset: Offset = 0) -> dict:
     """DDT emessi e non ancora fatturati, in ordine di data."""
     from apps.billing.models import DeliveryNote
 
@@ -437,7 +509,9 @@ def ddt_da_fatturare(limite: int = 20) -> list:
         .select_related("customer", "source_order")
         .order_by("date")
     )
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": d.number,
             "data": _valore(d.date),
@@ -445,13 +519,18 @@ def ddt_da_fatturare(limite: int = 20) -> list:
             "ordine": d.source_order.number if d.source_order_id else "",
             "totale_quantita": _valore(d.total_qty),
         }
-        for d in ddt[: _limite(limite)]
+        for d in ddt[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, ddt.count(), inizio, massimo)
 
 
 # ========================================================== fatture emesse
-@_strumento
-def fatture_da_incassare(solo_scadute: bool = False, limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def fatture_da_incassare(
+    solo_scadute: Annotated[bool, Field(description="True per le sole fatture oltre la scadenza.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Fatture emesse non pagate (inviate o emesse), con flag scadute."""
     from apps.billing.models import SalesInvoice
 
@@ -461,22 +540,35 @@ def fatture_da_incassare(solo_scadute: bool = False, limite: int = 20) -> list:
     ).select_related("customer")
     if solo_scadute:
         fatture = fatture.filter(due_date__lt=oggi)
-    fatture = fatture.order_by("due_date")[: _limite(limite)]
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    fatture = fatture.order_by("due_date")
+    elenco = [
         {
-            **_riga(f, "number", "date", "due_date", "subtotal", "grand_total"),
+            "numero": f.number,
+            "data": _valore(f.date),
+            "scadenza": _valore(f.due_date),
             "cliente": f.customer.name,
+            "imponibile": _valore(f.subtotal),
+            "totale": _valore(f.grand_total),
             "stato": f.get_status_display(),
             "scaduta": bool(f.due_date and f.due_date < oggi),
         }
-        for f in fatture
+        for f in fatture[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, fatture.count(), inizio, massimo)
 
 
-@_strumento
+@_strumento(annotazioni=LETTURA)
 def lista_fatture(
-    stato: str = "", cliente: str = "", da_data: str = "", a_data: str = "", solo_scadute: bool = False, limite: int = 20
-) -> list:
+    stato: Annotated[str, Field(description="Stato della fattura (bozza, emessa, inviata, pagata, annullata); vuoto = tutte.")] = "",
+    cliente: Annotated[str, Field(description="Parte del nome del cliente; vuoto = tutte.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    solo_scadute: Annotated[bool, Field(description="True per le sole fatture scadute e non pagate.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca le fatture emesse, più recenti prima. Stato: bozza, emessa, inviata, pagata, annullata
     (o vuoto). Filtri per cliente, intervallo di date (da_data, a_data) e solo_scadute."""
     from apps.billing.models import SalesInvoice
@@ -495,7 +587,9 @@ def lista_fatture(
         righe = righe.filter(date__gte=da)
     if a:
         righe = righe.filter(date__lte=a)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": f.number,
             "data": _valore(f.date),
@@ -507,12 +601,13 @@ def lista_fatture(
             "scaduta": f.is_overdue,
             "totale": _valore(f.grand_total),
         }
-        for f in righe[: _limite(limite)]
+        for f in righe[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, righe.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_fattura(numero: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_fattura(numero: Annotated[str, Field(description="Numero esatto della fattura emessa.")]) -> dict:
     """Dettaglio di una fattura emessa per numero: testata, righe, riepilogo IVA, stato SDI e
     documenti di origine."""
     from apps.billing.models import SalesInvoice
@@ -550,8 +645,8 @@ def dettaglio_fattura(numero: str) -> dict:
     }
 
 
-@_strumento
-def fatturato_periodo(da_data: str = "", a_data: str = "") -> dict:
+@_strumento(annotazioni=LETTURA)
+def fatturato_periodo(da_data: DataDa = "", a_data: DataA = "") -> dict:
     """Fatturato emesso in un periodo (default: mese corrente): totale, ripartizione per mese e per
     tipo di documento (fattura, acconto, SAL, saldo)."""
     from django.db.models import Count, Sum
@@ -594,11 +689,119 @@ def fatturato_periodo(da_data: str = "", a_data: str = "") -> dict:
     }
 
 
+# ============================================================== statistiche
+@_strumento(annotazioni=LETTURA)
+def statistiche_vendite(
+    periodo: Annotated[str, Field(description="Periodo di analisi: mese, anno o 12m.")] = "mese",
+    limite: Limite50 = 10,
+) -> dict:
+    """Statistiche di vendita per periodo: mese, anno o 12m. Fatturato, costo, provvigioni e
+    margine, con le classifiche per articolo, cliente, fornitore e cantiere."""
+    from apps.sales import analytics
+
+    codici = dict(analytics.PERIOD_CHOICES)
+    codice_periodo = (periodo or "mese").strip().lower()
+    if codice_periodo not in codici:
+        ammessi = ", ".join(f"{codice} ({etichetta})" for codice, etichetta in codici.items())
+        raise ValueError(f"Periodo {periodo!r} non valido. Valori ammessi: {ammessi}.")
+    dati = analytics.breakdowns(codice_periodo, limit=_limite(limite, massimo=50))
+
+    def _classifica(righe):
+        return [
+            {
+                "voce": riga["label"],
+                "fatturato": _valore(riga["revenue"]),
+                "costo": _valore(riga["cost"]),
+                "provvigioni": _valore(riga["commission"]),
+                "margine": _valore(riga["margin"]),
+                "margine_pct": _valore(riga["margin_pct"]),
+            }
+            for riga in righe
+        ]
+
+    sintesi = dati["summary"]
+    return {
+        "periodo": codici[codice_periodo],
+        "fatturato": _valore(sintesi["revenue"]),
+        "costo": _valore(sintesi["cost"]),
+        "provvigioni": _valore(sintesi["commission"]),
+        "margine": _valore(sintesi["margin"]),
+        "margine_pct": _valore(sintesi["margin_pct"]),
+        "margine_prima_provvigioni": _valore(sintesi["margin_before_commission"]),
+        "ordini": sintesi["orders"],
+        "per_articolo": _classifica(dati["by_product"]),
+        "per_cliente": _classifica(dati["by_customer"]),
+        "per_fornitore": _classifica(dati["by_supplier"]),
+        "per_cantiere": _classifica(dati["by_job"]),
+    }
+
+
+@_strumento(annotazioni=LETTURA)
+def provvigioni(
+    anno: Annotated[int, Field(ge=0, le=2100, description="Anno (es. 2026); 0 = anno corrente.")] = 0,
+    mese: Annotated[int, Field(ge=0, le=12, description="Mese 1-12; 0 = mese corrente.")] = 0,
+    stato: Annotated[str, Field(description="Stato: tutti, consegnati o confermati.")] = "tutti",
+) -> dict:
+    """Provvigioni maturate nel mese e nell'anno indicati (default: mese e anno correnti),
+    raggruppate per beneficiario. stato: tutti, consegnati o confermati."""
+    from apps.sales import analytics
+
+    stati = {
+        "tutti": analytics.STATO_TUTTI,
+        "consegnati": analytics.STATO_CONSEGNATI,
+        "confermati": analytics.STATO_CONFERMATI,
+    }
+    codice_stato = (stato or "tutti").strip().lower()
+    if codice_stato not in stati:
+        raise ValueError("Stato non valido: usa tutti, consegnati o confermati.")
+    try:
+        anno = int(anno) if anno else None
+        mese = int(mese) if mese else None
+    except (TypeError, ValueError):
+        raise ValueError("Anno e mese devono essere numeri (es. 2026, 10).")
+    report = analytics.commission_report(anno, mese, stati[codice_stato])
+    annuo = analytics.commission_year(anno or report["year"], stati[codice_stato])
+    return {
+        "mese": report["label"],
+        "stato": codice_stato,
+        "totale_provvigioni": _valore(report["total_commission"]),
+        "totale_maturate": _valore(report["total_paid"]),
+        "totale_in_maturare": _valore(report["total_pending"]),
+        "per_beneficiario": [
+            {
+                "beneficiario": voce["contact"].name,
+                "ordini": len(voce["orders"]),
+                "imponibile": _valore(voce["revenue"]),
+                "provvigione": _valore(voce["commission"]),
+                "maturata": _valore(voce["paid"]),
+                "in_maturare": _valore(voce["pending"]),
+            }
+            for voce in report["rows"]
+        ],
+        "anno": report["year"],
+        "per_beneficiario_anno": [
+            {
+                "beneficiario": voce["contact"].name,
+                "ordini": voce["orders"],
+                "imponibile": _valore(voce["revenue"]),
+                "provvigione": _valore(voce["commission"]),
+            }
+            for voce in annuo
+        ],
+    }
+
+
 # ===================================================== fatture ricevute (acquisti)
-@_strumento
+@_strumento(annotazioni=LETTURA)
 def lista_fatture_fornitori(
-    stato: str = "", fornitore: str = "", da_data: str = "", a_data: str = "", solo_scadute: bool = False, limite: int = 20
-) -> list:
+    stato: Annotated[str, Field(description="Stato della fattura (bozza, da pagare, pagata, annullata); vuoto = tutte.")] = "",
+    fornitore: Annotated[str, Field(description="Parte del nome del fornitore; vuoto = tutti.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    solo_scadute: Annotated[bool, Field(description="True per le sole fatture scadute e non pagate.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca le fatture ricevute dai fornitori. Stato: bozza, da pagare, pagata, annullata (o vuoto).
     Filtri per fornitore, intervallo di date (da_data, a_data) e solo_scadute."""
     from apps.billing.models import PurchaseInvoice
@@ -617,7 +820,9 @@ def lista_fatture_fornitori(
         righe = righe.filter(date__gte=da)
     if a:
         righe = righe.filter(date__lte=a)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": f.number,
             "documento_fornitore": f.supplier_reference,
@@ -628,12 +833,13 @@ def lista_fatture_fornitori(
             "scaduta": bool(f.due_date and f.is_open and f.due_date < oggi),
             "totale": _valore(f.grand_total),
         }
-        for f in righe[: _limite(limite)]
+        for f in righe[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, righe.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_fattura_fornitore(numero: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_fattura_fornitore(numero: Annotated[str, Field(description="Numero esatto della fattura ricevuta.")]) -> dict:
     """Dettaglio di una fattura ricevuta per numero: testata, righe e ordine collegato."""
     from apps.billing.models import PurchaseInvoice
 
@@ -661,8 +867,12 @@ def dettaglio_fattura_fornitore(numero: str) -> dict:
     }
 
 
-@_strumento
-def fatture_fornitori_da_pagare(solo_scadute: bool = False, limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def fatture_fornitori_da_pagare(
+    solo_scadute: Annotated[bool, Field(description="True per le sole fatture oltre la scadenza.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Fatture ricevute registrate e non ancora pagate, con flag scadute."""
     from apps.billing.models import PurchaseInvoice
 
@@ -670,8 +880,10 @@ def fatture_fornitori_da_pagare(solo_scadute: bool = False, limite: int = 20) ->
     fatture = PurchaseInvoice.objects.filter(status=PurchaseInvoice.STATUS_REGISTERED).select_related("supplier")
     if solo_scadute:
         fatture = fatture.filter(due_date__lt=oggi)
-    fatture = fatture.order_by("due_date")[: _limite(limite)]
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    fatture = fatture.order_by("due_date")
+    elenco = [
         {
             "numero": f.number,
             "documento_fornitore": f.supplier_reference,
@@ -681,13 +893,18 @@ def fatture_fornitori_da_pagare(solo_scadute: bool = False, limite: int = 20) ->
             "scaduta": bool(f.due_date and f.due_date < oggi),
             "totale": _valore(f.grand_total),
         }
-        for f in fatture
+        for f in fatture[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, fatture.count(), inizio, massimo)
 
 
 # =============================================================== scadenzario
-@_strumento
-def scadenzario(giorni: int = 30, limite: int = 20) -> dict:
+@_strumento(annotazioni=LETTURA)
+def scadenzario(
+    giorni: Annotated[int, Field(ge=0, le=365, description="Orizzonte in giorni da oggi (0-365).")] = 30,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Scadenzario attivo e passivo: fatture da incassare e da pagare in scadenza entro N giorni
     (default 30) e quelle già scadute, con totali."""
     from datetime import timedelta
@@ -710,9 +927,13 @@ def scadenzario(giorni: int = 30, limite: int = 20) -> dict:
         status=PurchaseInvoice.STATUS_REGISTERED, due_date__isnull=False
     ).select_related("supplier")
 
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+
     def _elenco(queryset, fornitore=False):
+        ordinate = queryset.order_by("due_date")
         elenco = []
-        for f in queryset.order_by("due_date")[: _limite(limite)]:
+        for f in ordinate[inizio : inizio + massimo]:
             elenco.append(
                 {
                     "numero": f.number,
@@ -722,7 +943,15 @@ def scadenzario(giorni: int = 30, limite: int = 20) -> dict:
                     "scaduta": bool(f.due_date and f.due_date < oggi),
                 }
             )
-        return elenco
+        totale = ordinate.count()
+        restituiti = len(elenco)
+        return {
+            "offset": inizio,
+            "limite": massimo,
+            "has_more": inizio + restituiti < totale,
+            "prossimo_offset": inizio + restituiti if inizio + restituiti < totale else None,
+            "elenco": elenco,
+        }
 
     def _sommario(queryset):
         dati = queryset.aggregate(numero=Count("pk"), totale=Sum("grand_total"))
@@ -734,18 +963,23 @@ def scadenzario(giorni: int = 30, limite: int = 20) -> dict:
     pagare_scaduti = debiti.filter(due_date__lt=oggi)
     return {
         "entro_il": _valore(fino),
-        "da_incassare": {**_sommario(da_incassare), "elenco": _elenco(da_incassare)},
-        "da_pagare": {**_sommario(da_pagare), "elenco": _elenco(da_pagare, fornitore=True)},
-        "scaduti_da_incassare": {**_sommario(incassare_scaduti), "elenco": _elenco(incassare_scaduti)},
-        "scaduti_da_pagare": {**_sommario(pagare_scaduti), "elenco": _elenco(pagare_scaduti, fornitore=True)},
+        "da_incassare": {**_sommario(da_incassare), **_elenco(da_incassare)},
+        "da_pagare": {**_sommario(da_pagare), **_elenco(da_pagare, fornitore=True)},
+        "scaduti_da_incassare": {**_sommario(incassare_scaduti), **_elenco(incassare_scaduti)},
+        "scaduti_da_pagare": {**_sommario(pagare_scaduti), **_elenco(pagare_scaduti, fornitore=True)},
     }
 
 
 # ========================================================== ordini fornitore
-@_strumento
+@_strumento(annotazioni=LETTURA)
 def lista_ordini_fornitore(
-    stato: str = "", fornitore: str = "", da_data: str = "", a_data: str = "", limite: int = 20
-) -> list:
+    stato: Annotated[str, Field(description="Stato dell'ordine (bozza, inviato, confermato, parzialmente ricevuto, ricevuto, annullato); vuoto = tutti.")] = "",
+    fornitore: Annotated[str, Field(description="Parte del nome del fornitore; vuoto = tutti.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca gli ordini ai fornitori. Stato: bozza, inviato, confermato, parzialmente ricevuto,
     ricevuto, annullato (o vuoto). Filtri per fornitore e intervallo di date."""
     from apps.purchasing.models import PurchaseOrder
@@ -762,7 +996,9 @@ def lista_ordini_fornitore(
     if a:
         righe = righe.filter(date__lte=a)
     oggi = _oggi()
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "numero": o.number,
             "data": _valore(o.date),
@@ -772,12 +1008,13 @@ def lista_ordini_fornitore(
             "totale": _valore(o.grand_total),
             "in_ritardo": bool(o.expected_date and o.expected_date < oggi and not o.all_received),
         }
-        for o in righe[: _limite(limite)]
+        for o in righe[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, righe.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_ordine_fornitore(numero: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_ordine_fornitore(numero: Annotated[str, Field(description="Numero esatto dell'ordine fornitore.")]) -> dict:
     """Dettaglio di un ordine fornitore per numero: testata, righe con quantità ricevute/residue."""
     from apps.purchasing.models import PurchaseOrder
 
@@ -803,15 +1040,20 @@ def dettaglio_ordine_fornitore(numero: str) -> dict:
     }
 
 
-@_strumento
-def ordini_fornitore_da_ricevere(solo_in_ritardo: bool = False, limite: int = 20) -> dict:
-    """Ordini fornitore ancora da ricevere (inviati, confermati o parzialmente ricevuti), con le
-    quantità residue. Con solo_in_ritardo=True solo quelli oltre la consegna prevista."""
+@_strumento(annotazioni=LETTURA)
+def ordini_fornitore_da_ricevere(
+    solo_in_ritardo: Annotated[bool, Field(description="True per i soli ordini oltre la consegna prevista.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
+    """Ordini fornitore ancora da ricevere (bozze, inviati, confermati o parzialmente ricevuti),
+    con le quantità residue. Con solo_in_ritardo=True solo quelli oltre la consegna prevista."""
     from apps.purchasing.models import PurchaseOrder
 
     oggi = _oggi()
     ordini = PurchaseOrder.objects.filter(
         status__in=[
+            PurchaseOrder.STATUS_DRAFT,
             PurchaseOrder.STATUS_SENT,
             PurchaseOrder.STATUS_CONFIRMED,
             PurchaseOrder.STATUS_PARTIAL,
@@ -820,8 +1062,10 @@ def ordini_fornitore_da_ricevere(solo_in_ritardo: bool = False, limite: int = 20
     if solo_in_ritardo:
         ordini = ordini.filter(expected_date__lt=oggi)
     ordini = ordini.order_by("expected_date", "date")
+    inizio = _offset(offset)
+    massimo = _limite(limite)
     elenco = []
-    for o in ordini[: _limite(limite)]:
+    for o in ordini[inizio : inizio + massimo]:
         residui = [
             {
                 "articolo": riga.product.code if riga.product_id else "",
@@ -842,11 +1086,21 @@ def ordini_fornitore_da_ricevere(solo_in_ritardo: bool = False, limite: int = 20
                 "righe_da_ricevere": residui,
             }
         )
-    return {"totale_ordini": ordini.count(), "ordini": elenco}
+    totale = ordini.count()
+    return {
+        **_metadati(len(elenco), totale, inizio, massimo),
+        "totale_ordini": totale,
+        "ordini": elenco,
+    }
 
 
-@_strumento
-def lista_listini(fornitore: str = "", solo_attivi: bool = True, limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_listini(
+    fornitore: Annotated[str, Field(description="Parte del nome del fornitore; vuoto = tutti.")] = "",
+    solo_attivi: Annotated[bool, Field(description="True per i soli listini attivi.")] = True,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca i listini prezzi dei fornitori, con validità e numero di voci."""
     from django.db.models import Count
 
@@ -857,7 +1111,9 @@ def lista_listini(fornitore: str = "", solo_attivi: bool = True, limite: int = 2
         listini = listini.filter(supplier__name__icontains=fornitore.strip())
     if solo_attivi:
         listini = listini.filter(is_active=True)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "nome": l.name,
             "fornitore": l.supplier.name,
@@ -867,13 +1123,74 @@ def lista_listini(fornitore: str = "", solo_attivi: bool = True, limite: int = 2
             "corrente": l.is_current,
             "voci": l.voci,
         }
-        for l in listini[: _limite(limite)]
+        for l in listini[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, listini.count(), inizio, massimo)
+
+
+def _risolvi_listino(testo, fornitore=""):
+    """Listino per nome esatto o, se univoco, per parte del nome."""
+    from apps.purchasing.models import SupplierPriceList
+
+    testo = (testo or "").strip()
+    if not testo:
+        raise ValueError("Specificare il listino (nome).")
+    listini = SupplierPriceList.objects.select_related("supplier").filter(name__icontains=testo)
+    if (fornitore or "").strip():
+        listini = listini.filter(supplier__name__icontains=fornitore.strip())
+    esatto = listini.filter(name__iexact=testo).first()
+    if esatto is not None:
+        return esatto
+    candidati = list(listini[:5])
+    if not candidati:
+        raise ValueError(f"Nessun listino che contiene {testo!r}.")
+    if len(candidati) > 1:
+        elenco = ", ".join(f"{l.name} ({l.supplier.name})" for l in candidati)
+        raise ValueError(f"Più listini trovati per {testo!r}: {elenco}. Usa il nome esatto o indica il fornitore.")
+    return candidati[0]
+
+
+@_strumento(annotazioni=LETTURA)
+def voci_listino(
+    listino: Annotated[str, Field(description="Nome del listino (anche parziale, se univoco).")],
+    fornitore: Annotated[str, Field(description="Parte del nome del fornitore per disambiguare; vuoto = nessun filtro.")] = "",
+    limite: Limite200 = 50,
+    offset: Offset = 0,
+) -> dict:
+    """Voci di un listino fornitore: prezzo, sconto e prezzo effettivo per articolo.
+    ``listino`` è il nome (anche parziale, se univoco); ``fornitore`` restringe la ricerca."""
+    prezzo_lista = _risolvi_listino(listino, fornitore)
+    inizio = _offset(offset)
+    massimo = _limite(limite, massimo=200)
+    voci = prezzo_lista.items.select_related("product").order_by("product__name")
+    elenco = [
+        {
+            "articolo": voce.product.code,
+            "nome": voce.product.name,
+            "codice_fornitore": voce.supplier_code,
+            "prezzo": _valore(voce.price),
+            "sconto_pct": _valore(voce.discount_pct),
+            "prezzo_effettivo": _valore(voce.effective_price),
+            "quantita_minima": _valore(voce.min_qty),
+            "note": voce.note,
+        }
+        for voce in voci[inizio : inizio + massimo]
+    ]
+    return {
+        "listino": prezzo_lista.name,
+        "fornitore": prezzo_lista.supplier.name,
+        "valido_dal": _valore(prezzo_lista.valid_from),
+        "valido_fino_al": _valore(prezzo_lista.valid_to),
+        "attivo": prezzo_lista.is_active,
+        "corrente": prezzo_lista.is_current,
+        "voci": elenco,
+        **_metadati(len(elenco), voci.count(), inizio, massimo),
+    }
 
 
 # ================================================================= magazzino
-@_strumento
-def lista_magazzini(solo_attivi: bool = True) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_magazzini(solo_attivi: Annotated[bool, Field(description="True per i soli magazzini attivi.")] = True) -> dict:
     """Elenca i magazzini con la quantità complessiva giacente."""
     from django.db.models import Sum
 
@@ -886,7 +1203,7 @@ def lista_magazzini(solo_attivi: bool = True) -> list:
         r["warehouse_id"]: r["totale"]
         for r in StockLevel.objects.values("warehouse_id").annotate(totale=Sum("quantity"))
     }
-    return [
+    elenco = [
         {
             "codice": w.code,
             "nome": w.name,
@@ -897,10 +1214,17 @@ def lista_magazzini(solo_attivi: bool = True) -> list:
         }
         for w in magazzini
     ]
+    return _pagina(elenco, len(elenco), 0, len(elenco))
 
 
-@_strumento
-def giacenze(magazzino: str = "", articolo: str = "", sotto_scorta: bool = False, limite: int = 50) -> list:
+@_strumento(annotazioni=LETTURA)
+def giacenze(
+    magazzino: Annotated[str, Field(description="Nome o codice del magazzino; vuoto = tutti.")] = "",
+    articolo: Annotated[str, Field(description="Nome o codice dell'articolo; vuoto = tutti.")] = "",
+    sotto_scorta: Annotated[bool, Field(description="True per i soli articoli sotto scorta minima.")] = False,
+    limite: Limite200 = 50,
+    offset: Offset = 0,
+) -> dict:
     """Giacenze per articolo e magazzino. Filtri opzionali per magazzino (nome o codice), articolo
     (nome o codice) e per i soli articoli sotto scorta minima."""
     from django.db.models import Q
@@ -918,27 +1242,35 @@ def giacenze(magazzino: str = "", articolo: str = "", sotto_scorta: bool = False
         livelli = livelli.filter(
             Q(product__name__icontains=testo_articolo) | Q(product__code__icontains=testo_articolo)
         )
+    inizio = _offset(offset)
     massimo = _limite(limite, massimo=200)
     elenco = []
+    totale = 0
     for livello in livelli:
         if sotto_scorta and not livello.product.is_low_stock:
             continue
-        elenco.append(
-            {
-                "articolo": livello.product.code,
-                "nome": livello.product.name,
-                "magazzino": livello.warehouse.name,
-                "quantita": _valore(livello.quantity),
-                "scorta_minima": _valore(livello.product.min_stock),
-            }
-        )
-        if len(elenco) >= massimo:
-            break
-    return elenco
+        if inizio <= totale < inizio + massimo:
+            elenco.append(
+                {
+                    "articolo": livello.product.code,
+                    "nome": livello.product.name,
+                    "magazzino": livello.warehouse.name,
+                    "quantita": _valore(livello.quantity),
+                    "scorta_minima": _valore(livello.product.min_stock),
+                }
+            )
+        totale += 1
+    return _pagina(elenco, totale, inizio, massimo)
 
 
-@_strumento
-def movimenti_magazzino(articolo: str = "", magazzino: str = "", tipo: str = "", limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def movimenti_magazzino(
+    articolo: Annotated[str, Field(description="Nome o codice dell'articolo; vuoto = tutti.")] = "",
+    magazzino: Annotated[str, Field(description="Nome o codice del magazzino; vuoto = tutti.")] = "",
+    tipo: Annotated[str, Field(description="Tipo di movimento (carico, scarico, rettifica); vuoto = tutti.")] = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Ultimi movimenti di magazzino. Filtri per articolo, magazzino e tipo (carico, scarico, rettifica)."""
     from django.db.models import Q
 
@@ -958,7 +1290,9 @@ def movimenti_magazzino(articolo: str = "", magazzino: str = "", tipo: str = "",
     codice_tipo = _stato_codice(tipo, StockMovement.TYPE_CHOICES, campo="tipo")
     if codice_tipo:
         movimenti = movimenti.filter(movement_type=codice_tipo)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "data": _valore(m.created_at),
             "articolo": m.product.code,
@@ -970,12 +1304,13 @@ def movimenti_magazzino(articolo: str = "", magazzino: str = "", tipo: str = "",
             "riferimento": m.reference,
             "note": m.note,
         }
-        for m in movimenti[: _limite(limite)]
+        for m in movimenti[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, movimenti.count(), inizio, massimo)
 
 
-@_strumento
-def articoli_sotto_scorta(limite: int = 50) -> list:
+@_strumento(annotazioni=LETTURA)
+def articoli_sotto_scorta(limite: Limite200 = 50, offset: Offset = 0) -> dict:
     """Articoli la cui giacenza è sotto la scorta minima, con le quantità mancanti."""
     from django.db.models import Sum
 
@@ -986,38 +1321,46 @@ def articoli_sotto_scorta(limite: int = 50) -> list:
         .annotate(giacenza=Sum("stock_levels__quantity"))
         .order_by("name")
     )
+    inizio = _offset(offset)
     massimo = _limite(limite, massimo=200)
     elenco = []
+    totale = 0
     for a in articoli:
         giacenza = a.giacenza or 0
         if giacenza >= a.min_stock:
             continue
-        elenco.append(
-            {
-                "codice": a.code,
-                "nome": a.name,
-                "giacenza": _valore(giacenza),
-                "scorta_minima": _valore(a.min_stock),
-                "mancanti": _valore(a.min_stock - giacenza),
-                "fornitore_abituale": a.main_supplier.name if a.main_supplier_id else "",
-            }
-        )
-        if len(elenco) >= massimo:
-            break
-    return elenco
+        if inizio <= totale < inizio + massimo:
+            elenco.append(
+                {
+                    "codice": a.code,
+                    "nome": a.name,
+                    "giacenza": _valore(giacenza),
+                    "scorta_minima": _valore(a.min_stock),
+                    "mancanti": _valore(a.min_stock - giacenza),
+                    "fornitore_abituale": a.main_supplier.name if a.main_supplier_id else "",
+                }
+            )
+        totale += 1
+    return _pagina(elenco, totale, inizio, massimo)
 
 
-@_strumento
-def cerca_articoli(testo: str, limite: int = 10) -> list:
+@_strumento(annotazioni=LETTURA)
+def cerca_articoli(
+    testo: Annotated[str, Field(description="Testo da cercare (nome, codice o barcode; almeno 2 caratteri).")],
+    limite: Limite50 = 10,
+    offset: Offset = 0,
+) -> dict:
     """Cerca articoli per nome, codice o codice a barre: prezzi e giacenza totale."""
     from apps.catalog.models import Product
     from apps.catalog.search import filtro_articoli
 
     testo = (testo or "").strip()
     if len(testo) < 2:
-        return [{"errore": "Scrivi almeno 2 caratteri."}]
-    articoli = Product.objects.filter(filtro_articoli(testo)).select_related("uom").order_by("name")[: _limite(limite)]
-    return [
+        return {"errore": "Scrivi almeno 2 caratteri."}
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    articoli = Product.objects.filter(filtro_articoli(testo)).select_related("uom").order_by("name")
+    elenco = [
         {
             "codice": a.code,
             "nome": a.name,
@@ -1025,12 +1368,13 @@ def cerca_articoli(testo: str, limite: int = 10) -> list:
             "prezzo_vendita": _valore(a.sale_price),
             "giacenza_totale": _valore(a.total_stock),
         }
-        for a in articoli
+        for a in articoli[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, articoli.count(), inizio, massimo)
 
 
-@_strumento
-def giacenza_articolo(codice: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def giacenza_articolo(codice: Annotated[str, Field(description="Codice esatto dell'articolo.")]) -> dict:
     """Giacenza di un articolo per magazzino e totale (per codice esatto)."""
     from apps.catalog.models import Product
     from apps.inventory.models import StockLevel
@@ -1049,8 +1393,8 @@ def giacenza_articolo(codice: str) -> dict:
     }
 
 
-@_strumento
-def dettaglio_articolo(codice: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_articolo(codice: Annotated[str, Field(description="Codice esatto dell'articolo.")]) -> dict:
     """Scheda completa di un articolo per codice: prezzi, IVA, fornitore, giacenze per magazzino,
     componenti se è un kit, varianti e ultimi movimenti."""
     from apps.catalog.models import Product
@@ -1104,8 +1448,42 @@ def dettaglio_articolo(codice: str) -> dict:
 
 
 # ================================================================= commesse
-@_strumento
-def lista_commesse(stato: str = "", cliente: str = "", solo_aperte: bool = False, limite: int = 20) -> list:
+def _fatturazione_commessa(job):
+    """Situazione della fatturazione di un cantiere (contratto, fatturato, residuo)."""
+    from apps.billing import services as billing_services
+
+    riepilogo = billing_services.job_billing_summary(job)
+    return {
+        "valore_contratto": _valore(riepilogo["contract"]),
+        "fatturato": _valore(riepilogo["invoiced"]),
+        "acconti": _valore(riepilogo["advances"]),
+        "sal": _valore(riepilogo["sal"]),
+        "saldo": _valore(riepilogo["balance"]),
+        "impegnato": _valore(riepilogo["committed"]),
+        "residuo_da_fatturare": _valore(riepilogo["residual"]),
+        "prossimo_numero_sal": riepilogo["next_sal_number"],
+        "bozze_in_corso": riepilogo["drafts"],
+        "documenti": [
+            {
+                "numero": d.number,
+                "data": _valore(d.date),
+                "tipo": d.kind_title,
+                "stato": d.get_status_display(),
+                "imponibile": _valore(d.subtotal),
+            }
+            for d in riepilogo["documents"][:20]
+        ],
+    }
+
+
+@_strumento(annotazioni=LETTURA)
+def lista_commesse(
+    stato: Annotated[str, Field(description="Stato della commessa (sopralluogo, in preventivazione, confermato, in esecuzione, collaudo, chiuso, annullato); vuoto = tutte.")] = "",
+    cliente: Annotated[str, Field(description="Parte del nome del cliente; vuoto = tutte.")] = "",
+    solo_aperte: Annotated[bool, Field(description="True per le sole commesse ancora in corso.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca i cantieri/commesse. Stato: sopralluogo, in preventivazione, confermato, in esecuzione,
     collaudo, chiuso, annullato (o vuoto). Con solo_aperte=True solo quelli ancora in corso."""
     from apps.jobs.models import Job
@@ -1118,7 +1496,9 @@ def lista_commesse(stato: str = "", cliente: str = "", solo_aperte: bool = False
         commesse = commesse.filter(status__in=Job.OPEN_STATUSES)
     if (cliente or "").strip():
         commesse = commesse.filter(customer__name__icontains=cliente.strip())
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "codice": j.code,
             "nome": j.name,
@@ -1129,12 +1509,13 @@ def lista_commesse(stato: str = "", cliente: str = "", solo_aperte: bool = False
             "inizio": _valore(j.start_date),
             "fine_prevista": _valore(j.end_date),
         }
-        for j in commesse[: _limite(limite)]
+        for j in commesse[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, commesse.count(), inizio, massimo)
 
 
-@_strumento
-def dettaglio_commessa(codice: str) -> dict:
+@_strumento(annotazioni=LETTURA)
+def dettaglio_commessa(codice: Annotated[str, Field(description="Codice esatto (o nome esatto) della commessa.")]) -> dict:
     """Dettaglio di un cantiere/commessa per codice (o nome esatto): dati, responsabile e riepilogo
     dei documenti collegati."""
     from django.db.models import Count, Sum
@@ -1173,11 +1554,17 @@ def dettaglio_commessa(codice: str) -> dict:
             "ordini_fornitore": _conteggio(PurchaseOrder.objects.filter(job=commessa)),
             "fatture_ricevute": _conteggio(PurchaseInvoice.objects.filter(job=commessa)),
         },
+        "fatturazione": _fatturazione_commessa(commessa),
     }
 
 
-@_strumento
-def manutenzioni_in_scadenza(giorni: int = 30, solo_scadute: bool = False, limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def manutenzioni_in_scadenza(
+    giorni: Annotated[int, Field(ge=0, le=365, description="Orizzonte in giorni da oggi (0-365).")] = 30,
+    solo_scadute: Annotated[bool, Field(description="True per le sole manutenzioni già oltre la data prevista.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Manutenzioni programmate attive in scadenza entro N giorni (default 30). Con
     solo_scadute=True solo quelle già oltre la data prevista."""
     from datetime import timedelta
@@ -1194,7 +1581,9 @@ def manutenzioni_in_scadenza(giorni: int = 30, solo_scadute: bool = False, limit
         piani = piani.filter(next_date__lt=oggi)
     else:
         piani = piani.filter(next_date__lte=oggi + timedelta(days=giorni))
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "descrizione": p.name,
             "cliente": p.customer.name,
@@ -1203,13 +1592,20 @@ def manutenzioni_in_scadenza(giorni: int = 30, solo_scadute: bool = False, limit
             "prossima_esecuzione": _valore(p.next_date),
             "scaduta": p.is_overdue(),
         }
-        for p in piani[: _limite(limite)]
+        for p in piani[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, piani.count(), inizio, massimo)
 
 
 # ====================================================================== CRM
-@_strumento
-def lista_lead(esito: str = "", fase: str = "", solo_azione_in_ritardo: bool = False, limite: int = 20) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_lead(
+    esito: Annotated[str, Field(description="Esito del lead (in corso, vinta, persa); vuoto = tutti.")] = "",
+    fase: Annotated[str, Field(description="Parte del nome della fase; vuoto = tutte.")] = "",
+    solo_azione_in_ritardo: Annotated[bool, Field(description="True per i soli lead con la prossima azione in ritardo.")] = False,
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
     """Elenca i lead commerciali. Esito: in corso, vinta, persa (o vuoto). Filtri per fase (parte del
     nome) e per i soli con la prossima azione in ritardo."""
     from apps.leads.models import Lead, LeadStage
@@ -1223,7 +1619,9 @@ def lista_lead(esito: str = "", fase: str = "", solo_azione_in_ritardo: bool = F
     oggi = _oggi()
     if solo_azione_in_ritardo:
         lead = lead.filter(next_action__lt=oggi)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "nome": l.name,
             "fase": l.stage.name,
@@ -1235,11 +1633,12 @@ def lista_lead(esito: str = "", fase: str = "", solo_azione_in_ritardo: bool = F
             "in_ritardo": bool(l.next_action and l.next_action < oggi),
             "responsabile": l.owner.username if l.owner_id else "",
         }
-        for l in lead[: _limite(limite)]
+        for l in lead[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, lead.count(), inizio, massimo)
 
 
-@_strumento
+@_strumento(annotazioni=LETTURA)
 def riepilogo_pipeline() -> dict:
     """Riepilogo della pipeline lead: numero e valore stimato per ogni fase."""
     from django.db.models import Count, Sum
@@ -1268,15 +1667,21 @@ def riepilogo_pipeline() -> dict:
 
 
 # ================================================================= personale
-@_strumento
-def lista_dipendenti(solo_attivi: bool = True, limite: int = 50) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_dipendenti(
+    solo_attivi: Annotated[bool, Field(description="True per i soli dipendenti attivi.")] = True,
+    limite: Limite50 = 50,
+    offset: Offset = 0,
+) -> dict:
     """Elenca i dipendenti con mansione, contatti e costo orario."""
     from apps.hr.models import Employee
 
     dipendenti = Employee.objects.all().order_by("last_name", "first_name")
     if solo_attivi:
         dipendenti = dipendenti.filter(active=True)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "codice": e.code,
             "nome": e.full_name,
@@ -1287,19 +1692,26 @@ def lista_dipendenti(solo_attivi: bool = True, limite: int = 50) -> list:
             "costo_orario": _valore(e.hourly_cost),
             "attivo": e.active,
         }
-        for e in dipendenti[: _limite(limite)]
+        for e in dipendenti[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, dipendenti.count(), inizio, massimo)
 
 
-@_strumento
-def lista_collaboratori(solo_attivi: bool = True, limite: int = 50) -> list:
+@_strumento(annotazioni=LETTURA)
+def lista_collaboratori(
+    solo_attivi: Annotated[bool, Field(description="True per i soli collaboratori attivi.")] = True,
+    limite: Limite50 = 50,
+    offset: Offset = 0,
+) -> dict:
     """Elenca i collaboratori esterni con specializzazione e tariffa oraria."""
     from apps.hr.models import Collaborator
 
     collaboratori = Collaborator.objects.all().order_by("name")
     if solo_attivi:
         collaboratori = collaboratori.filter(active=True)
-    return [
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
         {
             "codice": c.code,
             "nome": c.name,
@@ -1310,5 +1722,219 @@ def lista_collaboratori(solo_attivi: bool = True, limite: int = 50) -> list:
             "tariffa_oraria": _valore(c.hourly_rate),
             "attivo": c.active,
         }
-        for c in collaboratori[: _limite(limite)]
+        for c in collaboratori[inizio : inizio + massimo]
     ]
+    return _pagina(elenco, collaboratori.count(), inizio, massimo)
+
+
+# ============================================================ ore e assenze
+def _filtro_dipendente(testo):
+    """Filtro ORM su TimeEntry/LeaveRequest: codice, nome o cognome del dipendente."""
+    from django.db.models import Q
+
+    filtro = Q(employee__code__icontains=(testo or "").strip())
+    for parola in (testo or "").split():
+        filtro |= Q(employee__first_name__icontains=parola) | Q(employee__last_name__icontains=parola)
+    return filtro
+
+
+@_strumento(annotazioni=LETTURA)
+def lista_ore(
+    dipendente: Annotated[str, Field(description="Codice o nome del dipendente; vuoto = tutti.")] = "",
+    cantiere: Annotated[str, Field(description="Codice o nome del cantiere; vuoto = tutti.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    tipo: Annotated[str, Field(description="Tipo di ore (ordinario, straordinario, trasferta); vuoto = tutti.")] = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
+    """Ore registrate dai dipendenti, più recenti prima. Filtri per dipendente (codice o nome),
+    cantiere (codice o nome), tipo (ordinario, straordinario, trasferta) e intervallo date."""
+    from django.db.models import Q
+
+    from apps.hr.models import TimeEntry
+
+    da, a = _intervallo(da_data, a_data)
+    voci = TimeEntry.objects.select_related("employee", "job").order_by("-date", "-pk")
+    if (dipendente or "").strip():
+        voci = voci.filter(_filtro_dipendente(dipendente))
+    if (cantiere or "").strip():
+        testo = cantiere.strip()
+        voci = voci.filter(Q(job__code__iexact=testo) | Q(job__name__icontains=testo))
+    codice_tipo = _stato_codice(tipo, TimeEntry.KIND_CHOICES, campo="tipo")
+    if codice_tipo:
+        voci = voci.filter(kind=codice_tipo)
+    if da:
+        voci = voci.filter(date__gte=da)
+    if a:
+        voci = voci.filter(date__lte=a)
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
+        {
+            "data": _valore(v.date),
+            "dipendente": v.employee.full_name,
+            "codice": v.employee.code,
+            "ore": _valore(v.hours),
+            "tipo": v.get_kind_display(),
+            "cantiere": v.job.name if v.job_id else "",
+            "descrizione": v.description,
+            "addebitabile": v.billable,
+            "costo": _valore(v.cost) if v.cost is not None else "",
+        }
+        for v in voci[inizio : inizio + massimo]
+    ]
+    return _pagina(elenco, voci.count(), inizio, massimo)
+
+
+@_strumento(annotazioni=LETTURA)
+def riepilogo_ore(da_data: DataDa = "", a_data: DataA = "") -> dict:
+    """Ore e costo per dipendente nel periodo (default: mese corrente), con i totali per tipo."""
+    from django.db.models import Count, Q, Sum
+
+    from apps.hr.models import Employee, TimeEntry
+
+    oggi = _oggi()
+    da, a = _intervallo(da_data, a_data)
+    if da is None and a is None:
+        da, a = oggi.replace(day=1), oggi
+    filtri = {}
+    if da:
+        filtri["date__gte"] = da
+    if a:
+        filtri["date__lte"] = a
+    costi = {e.pk: e.hourly_cost for e in Employee.objects.all()}
+    righe = (
+        TimeEntry.objects.filter(**filtri)
+        .values("employee_id", "employee__code", "employee__first_name", "employee__last_name")
+        .annotate(
+            ore=Sum("hours"),
+            registrazioni=Count("pk"),
+            ordinarie=Sum("hours", filter=Q(kind=TimeEntry.KIND_ORDINARY)),
+            straordinarie=Sum("hours", filter=Q(kind=TimeEntry.KIND_OVERTIME)),
+            trasferte=Sum("hours", filter=Q(kind=TimeEntry.KIND_TRAVEL)),
+        )
+        .order_by("employee__last_name", "employee__first_name")
+    )
+    elenco = []
+    totale_ore = 0
+    totale_costo = 0
+    for r in righe:
+        ore = r["ore"] or 0
+        costo_orario = costi.get(r["employee_id"])
+        costo = (costo_orario or 0) * ore
+        totale_ore += ore
+        totale_costo += costo
+        elenco.append(
+            {
+                "dipendente": f"{r['employee__last_name']} {r['employee__first_name']}".strip(),
+                "codice": r["employee__code"],
+                "ore": _valore(ore),
+                "ordinarie": _valore(r["ordinarie"] or 0),
+                "straordinarie": _valore(r["straordinarie"] or 0),
+                "trasferte": _valore(r["trasferte"] or 0),
+                "registrazioni": r["registrazioni"],
+                "costo": _valore(costo) if costo_orario is not None else "",
+            }
+        )
+    return {
+        "periodo": {"da": _valore(da) if da else "", "a": _valore(a) if a else ""},
+        "dipendenti": elenco,
+        "totale_ore": _valore(totale_ore),
+        "totale_costo": _valore(totale_costo),
+    }
+
+
+@_strumento(annotazioni=LETTURA)
+def lista_assenze(
+    dipendente: Annotated[str, Field(description="Codice o nome del dipendente; vuoto = tutti.")] = "",
+    stato: Annotated[str, Field(description="Stato dell'assenza (richiesta, approvata, rifiutata, annullata); vuoto = tutte.")] = "",
+    da_data: DataDa = "",
+    a_data: DataA = "",
+    limite: Limite50 = 20,
+    offset: Offset = 0,
+) -> dict:
+    """Ferie, permessi e altre assenze dei dipendenti, dalla più recente. Filtri per dipendente,
+    stato (richiesta, approvata, rifiutata, annullata) e intervallo date (assenze che lo toccano)."""
+    from apps.hr.models import LeaveRequest
+
+    da, a = _intervallo(da_data, a_data)
+    assenze = LeaveRequest.objects.select_related("employee").order_by("-start_date", "-pk")
+    if (dipendente or "").strip():
+        assenze = assenze.filter(_filtro_dipendente(dipendente))
+    codice_stato = _stato_codice(stato, LeaveRequest.STATUS_CHOICES)
+    if codice_stato:
+        assenze = assenze.filter(status=codice_stato)
+    if da:
+        assenze = assenze.filter(end_date__gte=da)
+    if a:
+        assenze = assenze.filter(start_date__lte=a)
+    inizio = _offset(offset)
+    massimo = _limite(limite)
+    elenco = [
+        {
+            "id": a_.pk,
+            "dipendente": a_.employee.full_name,
+            "codice": a_.employee.code,
+            "tipo": a_.get_kind_display(),
+            "dal": _valore(a_.start_date),
+            "al": _valore(a_.end_date),
+            "durata": a_.duration_label,
+            "giorni": a_.days,
+            "ore": _valore(a_.hours) if a_.hours is not None else "",
+            "stato": a_.get_status_display(),
+            "motivo": a_.reason,
+        }
+        for a_ in assenze[inizio : inizio + massimo]
+    ]
+    return _pagina(elenco, assenze.count(), inizio, massimo)
+
+
+@_strumento(annotazioni=LETTURA)
+def scheda_dipendente(codice: Annotated[str, Field(description="Codice esatto del dipendente.")]) -> dict:
+    """Scheda di un dipendente per codice: anagrafica, saldi ferie/permessi dell'anno,
+    ore dell'anno per tipo e ultime assenze."""
+    from datetime import date
+
+    from django.utils import timezone
+
+    from apps.hr.models import Employee, TimeEntry
+
+    dipendente = Employee.objects.select_related("user").filter(code=(codice or "").strip()).first()
+    if dipendente is None:
+        return {"errore": f"Nessun dipendente con codice {codice!r}."}
+    anno = timezone.localdate().year
+    inizio, fine = date(anno, 1, 1), date(anno, 12, 31)
+    assenze = dipendente.leave_requests.order_by("-start_date", "-pk")[:5]
+    return {
+        "codice": dipendente.code,
+        "nome": dipendente.full_name,
+        "mansione": dipendente.qualification,
+        "email": dipendente.email,
+        "telefono": dipendente.phone,
+        "utente_collegato": dipendente.user.username if dipendente.user_id else "",
+        "assunto_il": _valore(dipendente.hired_on),
+        "cessato_il": _valore(dipendente.terminated_on),
+        "attivo": dipendente.active,
+        "costo_orario": _valore(dipendente.hourly_cost) if dipendente.hourly_cost is not None else "",
+        "ore_settimanali": _valore(dipendente.contract_weekly_hours),
+        "saldi": {
+            "anno": anno,
+            "ferie_residue": _valore(dipendente.holiday_balance(anno)),
+            "permessi_residui_ore": _valore(dipendente.rol_balance(anno)),
+            "ore_anno": {
+                etichetta: _valore(dipendente.hours_between(inizio, fine, kind=codice_tipo))
+                for codice_tipo, etichetta in TimeEntry.KIND_CHOICES
+            },
+        },
+        "ultime_assenze": [
+            {
+                "tipo": a.get_kind_display(),
+                "dal": _valore(a.start_date),
+                "al": _valore(a.end_date),
+                "durata": a.duration_label,
+                "stato": a.get_status_display(),
+            }
+            for a in assenze
+        ],
+    }

@@ -16,6 +16,7 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
 - [Webapp su telefono (PWA)](#webapp-su-telefono-pwa)
 - [Avvio in locale](#avvio-in-locale)
 - [Test](#test)
+- [Assistente AI in linguaggio naturale (MCP, locale)](#assistente-ai-in-linguaggio-naturale-mcp-locale)
 - [Deploy su VPS Linux (Docker)](#deploy-su-vps-linux-docker)
 - [Sicurezza, backup e prestazioni](#sicurezza-backup-e-prestazioni)
 - [Struttura del progetto](#struttura-del-progetto)
@@ -62,9 +63,10 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
   converti in ordine.
 - **Chi ha creato il documento** – l'elenco dei preventivi mostra chi l'ha inserito, con un
   filtro per utente e il pulsante «Solo i miei».
-- **Invio email** – dalla scheda di preventivo, ordine o fattura invii al cliente l'email
-  con il **PDF in allegato** (generato dal gestionale) e il messaggio che preferisci; l'invio
-  porta automaticamente il documento allo stato successivo («Inviato»).
+- **Invio email** – dalla scheda di un preventivo o di una fattura invii al cliente l'email
+  con il **PDF in allegato** (generato dal gestionale) e il messaggio che preferisci. L'invio
+  viene accodato e parte entro pochi minuti; lo stato «Inviato» si segna con l'apposito
+  pulsante.
 
 ### Acquisti e magazzino
 
@@ -80,14 +82,28 @@ Gestionale su misura in **Python + Django**, pensato per essere eseguito in loca
 ### Cantieri e assistenza
 
 - **Cantieri/commesse** – raggruppano preventivi, ordini, ordini fornitore, manutenzioni,
-  seriali e allegati di un lavoro (es. una piscina), con stato, responsabile, date e indirizzo.
+  foto e allegati di un lavoro (es. una piscina), con stato, responsabile, date e indirizzo.
 - **Manutenzioni programmate** – canoni e interventi ricorrenti (apertura/chiusura piscina,
   tagliandi): promemoria in dashboard a 30 giorni, «Eseguita» calcola la prossima scadenza,
   «Preventivo» crea il preventivo dal modello collegato.
-- **Seriali e garanzie** – registro dei numeri di serie installati (pompe, filtri, robot) con
-  cliente, cantiere, data di installazione e garanzia (stato in garanzia/scaduta).
 - **Foto di cantieri e bolle** – i collaboratori caricano foto dal cantiere; l'ufficio le
   consulta tutte in un'unica sezione.
+
+### CRM e galleria
+
+- **Lead (CRM)** – bacheca a colonne per fase della trattativa (fasi personalizzabili in
+  *Impostazioni → Fasi lead*), con valore stimato, prossima azione e responsabile; in
+  evidenza gli affari aperti, i vinti e le azioni in ritardo. Dal lead si crea il
+  **preventivo in bozza** e la trattativa avanza da sola alla fase «Preventivo mandato».
+- **Lead dal sito web** – il modulo contatti di aquaforma.it inoltra ogni richiesta a
+  questo gestionale (endpoint `POST /lead/da-sito/`, autenticato con il token condiviso
+  `LEAD_SITO_TOKEN`). Il lead arriva con *Riferimento* «Cognome Nome — Servizio»,
+  *Provenienza* «Sito web — …», messaggio e campagna pubblicitaria nelle note, e la
+  prossima azione fissata al giorno successivo. Gli invii ripetuti della stessa
+  richiesta non creano duplicati (campo `external_id`).
+- **Galleria fotografica** – archivio di foto con **etichette** (es. «piscina grigia»,
+  «scala ad angolo»), filtri per etichetta e collegamento al cantiere; le foto caricate
+  vengono raddrizzate e compresse e sono consultabili dall'ufficio.
 
 ### Amministrazione e fatturazione
 
@@ -260,7 +276,8 @@ fornitore.
 
 Dalla scheda di una fattura emessa, il riquadro **«Fattura elettronica (SDI)»** permette di:
 
-1. **Generare l'XML FatturaPA** (versione FPR12, tipo documento TD01): il sistema controlla
+1. **Generare l'XML FatturaPA** (versione FPR12; tipo documento TD01, con TD02 per gli
+   acconti): il sistema controlla
    prima i dati obbligatori (P.IVA e indirizzo azienda, P.IVA/CF del cliente, codice
    destinatario o PEC, codice natura per le aliquote a 0%) e segnala cosa manca.
 2. **Scaricare l'XML** per caricarlo su un intermediario o sul portale del commercialista.
@@ -344,28 +361,62 @@ python manage.py test apps
 I test coprono il flusso completo (preventivo → ordine → ordine fornitore → ricezione →
 consegna), DDT e fatture emesse/ricevute, email e XML FatturaPA (SDI), il calcolo di totali e
 IVA mista, l'adeguamento dei listini, l'importazione CSV/Excel, la creazione rapida, i modelli
-di preventivo, cantieri, manutenzioni, seriali, allegati, varianti, kit, sezioni, statistiche
+di preventivo, cantieri, manutenzioni, allegati, varianti, kit, sezioni, statistiche
 di marginalità, il personale (dipendenti, ore, ferie e registro presenze), l'invio dei
 preventivi per email, le provvigioni, l'esportazione Excel, i collaboratori esterni con la
-loro area riservata, le PWA (manifest e service worker), le protezioni anti-abuso e i
-permessi dei ruoli.
+loro area riservata, la galleria fotografica, la pipeline dei lead, le PWA (manifest e service
+worker), le protezioni anti-abuso, i permessi dei ruoli e gli strumenti MCP
+(`apps/core/tests_mcp.py`, saltati se il pacchetto `mcp` non è installato).
 
 Il repository include un workflow **GitHub Actions** (`.github/workflows/tests.yml`) che
 esegue tutti i test a ogni push o pull request (scheda **Actions** del repository).
 
 ## Assistente AI in linguaggio naturale (MCP, locale)
 
-Il file `scripts/mcp_server.py` espone i dati del gestionale in sola lettura
-(clienti, preventivi, articoli, giacenze, fatture da incassare) agli assistenti
-AI tramite protocollo MCP (trasporto stdio, niente rete). Esempio di domande:
-«che preventivi aperti ha il cliente X?», «quanti bidet bianchi in giacenza?».
+Il file `scripts/mcp_server.py` espone il gestionale agli assistenti AI tramite
+protocollo MCP (trasporto stdio, niente rete), con **89 strumenti** (46 di
+lettura in `scripts/mcp_read.py` e 43 di scrittura in `scripts/mcp_write.py`).
+Le scritture riusano i servizi dell'applicazione (`apps/*/services.py`), così
+le regole di business restano in un unico punto.
+
+**Lettura** — anagrafiche (clienti, articoli, azienda), preventivi (elenco,
+dettaglio, scadenze), ordini cliente (elenco, dettaglio, da consegnare), DDT
+(elenco, dettaglio, da fatturare), fatture emesse e ricevute (elenchi,
+dettagli, scadenzario, fatturato per periodo), ordini fornitore (elenco,
+dettaglio, da ricevere), listini (elenco e voci), magazzino (giacenze,
+movimenti, sotto scorta), commesse (con la fatturazione del cantiere),
+manutenzioni, lead, statistiche di vendita (margini e classifiche),
+provvigioni, dipendenti, collaboratori, ore registrate e assenze.
+
+**Scrittura** — creazione e aggiornamento di clienti e articoli, creazione di
+preventivi, ordini cliente, DDT, fatture emesse e ricevute, ordini fornitore,
+cantieri e lead; conversione
+preventivo in ordine, conferma e consegna ordini, emissione DDT, ricezione
+merce, acconti e saldi, fatture di cantiere (acconto, SAL, saldo),
+registrazioni di pagamento, movimenti di magazzino, cambi di fase dei lead,
+variazioni dei listini, invio/conferma/annullamento degli ordini fornitore,
+annullamento di ordini cliente e DDT in bozza, dipendenti, collaboratori, ore
+e assenze. Le cancellazioni restano esclusive dell'interfaccia del
+gestionale.
+
+Gli **elenchi** sono paginati: la risposta contiene `totale`, `offset`,
+`limite`, `has_more`, `prossimo_offset` e i `risultati`; per scorrere basta
+ripetere la chiamata passando `offset=prossimo_offset` (o `None` quando non
+c'è altro). I dettagli e i report restano singole risposte.
+
+Esempio di domande: che preventivi aperti ha il cliente X?, quanti bidet bianchi
+in giacenza?, quali ordini devo ancora consegnare?, fatturato del mese?, crea un
+preventivo per Rossi con due lavabi.
 
 ```bash
 pip install -r requirements-mcp.txt
 .venv\Scripts\python.exe scripts\mcp_server.py
 ```
 
-Va collegato come server stdio del client MCP. Non scrive mai sul database.
+Nel client MCP si configura come server **stdio** con il comando
+`.venv\Scripts\python.exe` e argomento `scripts\mcp_server.py` (meglio se con
+percorsi assoluti). Gli strumenti sono verificati da `apps/core/tests_mcp.py`
+(saltati se il pacchetto `mcp` non è installato).
 
 ## Deploy su VPS Linux (Docker)
 
@@ -431,8 +482,8 @@ Backup e ripristino hanno script dedicati: vedi [Sicurezza, backup e prestazioni
   `Referrer-Policy`, `Permissions-Policy`, `Content-Security-Policy`, HSTS quando HTTPS è
   attivo, header `Server` rimosso.
 - **HTTPS obbligatorio** con Caddy (certificato Let's Encrypt automatico) quando c'è un dominio.
-- **Cookie** di sessione `Secure` + `HttpOnly` + `SameSite=Lax`; cookie CSRF `Secure` +
-  `SameSite=Lax` (leggibile da JavaScript, come richiede Django).
+- **Cookie** di sessione e CSRF `Secure` + `SameSite=Lax`, e `HttpOnly`: il token CSRF
+  viaggia negli input nascosti dei form, quindi nessuno script può leggerlo dal cookie.
 - **File caricati**: i tipi eseguibili vengono rifiutati al caricamento e serviti come
   scaricamento; le note formattate e le email sono ripulite da una lista bianca.
 - **Limiti di caricamento**: 25 MB per richiesta in Caddy, 10 MB in Django (import Excel).
@@ -515,16 +566,19 @@ apps/
   inventory/            giacenze e movimenti di magazzino
   sales/                preventivi, ordini cliente, statistiche (fatturato/marginalità)
   purchasing/           ordini fornitore e listini
-  jobs/                 cantieri, manutenzioni programmate, seriali/garanzie, foto
+  jobs/                 cantieri, manutenzioni programmate, foto
   hr/                   dipendenti, registrazione ore, ferie/permessi, presenze, collaboratori
   billing/              DDT, fatture emesse/ricevute, XML FatturaPA
+  leads/                lead e pipeline commerciale (bacheca per fasi)
+  gallery/              galleria fotografica con etichette
 templates/              interfaccia (Bootstrap 5, in italiano) e documenti stampabili
 static/js/
   quick_create.js       creazione al volo di contatti e articoli
   autocomplete.js       ricerca a digitazione
   quote_template.js     caricamento dei modelli di preventivo
   rich_notes.js         editor semplice per le note formattabili
-scripts/                backup.sh, restore.sh, controllo_sito.sh
+scripts/                mcp_server.py, mcp_read.py, mcp_write.py, mcp_common.py,
+                        backup.sh, restore.sh, controllo_sito.sh, generate_icons.py
 docker/                 entrypoint e configurazione Caddy
 docs/                   note operative (es. sicurezza-e-backup.md)
 ```

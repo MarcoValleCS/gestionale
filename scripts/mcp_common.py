@@ -5,37 +5,77 @@ Gli strumenti vivono in ``mcp_read.py`` (sola lettura) e ``mcp_write.py``
 sull'istanza ``mcp`` di questo modulo. Nessun import di Django a livello di
 modulo: i modelli si importano dentro le singole funzioni, così lo setup di
 Django resta centralizzato in ``mcp_server.py``.
+
+Ogni strumento dichiara l'annotazione MCP più adatta (``LETTURA``,
+``CREAZIONE``, ``MODIFICA`` o ``MODIFICA_RIPETIBILE``) e descrive i parametri
+con ``Annotated`` e ``Field``: sono le informazioni che finiscono nello schema
+dei tool che vedono gli assistenti.
 """
 import functools
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Annotated
 
 from asgiref.sync import sync_to_async
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from pydantic import Field
 
 mcp = FastMCP("gestionale")
 
+# --------------------------------------------------------------- annotazioni
+# Hint MCP per i client: readOnlyHint, destructiveHint, idempotentHint,
+# openWorldHint. Il server è locale e parla solo col database del gestionale:
+# openWorldHint è sempre False e non ci sono mai cancellazioni.
+LETTURA = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
+CREAZIONE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+)
+MODIFICA = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+)
+MODIFICA_RIPETIBILE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
+)
 
-def _strumento(fn):
+# ---------------------------------------------------------- parametri comuni
+Limite50 = Annotated[int, Field(ge=1, le=50, description="Numero massimo di righe restituite (1-50).")]
+Limite200 = Annotated[int, Field(ge=1, le=200, description="Numero massimo di righe restituite (1-200).")]
+DataDa = Annotated[str, Field(description="Data iniziale (AAAA-MM-GG o GG/MM/AAAA); vuota per nessun limite.")]
+DataA = Annotated[str, Field(description="Data finale (AAAA-MM-GG o GG/MM/AAAA); vuota per nessun limite.")]
+Offset = Annotated[int, Field(ge=0, description="Righe da saltare per la paginazione (0 = dall'inizio); la risposta riporta totale, has_more e prossimo_offset.")]
+
+
+def _strumento(fn=None, *, annotazioni=None):
     """Registra una funzione sincrona come tool MCP.
 
     ``functools.wraps`` preserva la firma tipizzata della funzione originale:
     è da lì che FastMCP costruisce lo schema dei parametri che vedono gli
     assistenti. Gli errori previsti (validazioni, campi mancanti) tornano come
-    dict ``{"errore": ...}`` invece di far fallire la chiamata.
+    dict ``{"errore": ...}`` invece di far fallire la chiamata. Uso:
+    ``@_strumento(annotazioni=LETTURA)`` oppure ``@_strumento`` senza
+    annotazioni.
     """
 
-    @functools.wraps(fn)
-    async def esegui(*args, **kwargs):
-        return await sync_to_async(_sicuro, thread_sensitive=True)(fn, *args, **kwargs)
+    def registra(fn):
+        @functools.wraps(fn)
+        async def esegui(*args, **kwargs):
+            return await sync_to_async(_sicuro, thread_sensitive=True)(fn, *args, **kwargs)
 
-    return mcp.tool()(esegui)
+        return mcp.tool(annotations=annotazioni)(esegui)
+
+    if fn is None:
+        return registra
+    return registra(fn)
 
 
 # ---------------------------------------------------------------- conversioni
 def _valore(value):
     if isinstance(value, Decimal):
-        return str(value)
+        # format "f" evita la notazione esponenziale di str() su Decimal
+        return format(value, "f")
     if isinstance(value, (date, datetime)):
         return value.isoformat()
     return value if value is not None else ""
@@ -51,6 +91,31 @@ def _limite(n, massimo=50):
     except (TypeError, ValueError):
         n = 10
     return max(1, min(n, massimo))
+
+
+def _offset(n):
+    """Numero di righe da saltare (mai negativo)."""
+    try:
+        return max(0, int(n))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _metadati(restituiti, totale, offset, limite):
+    """Metadati di paginazione di un elenco (usati anche dai report a bucket)."""
+    successivo = offset + restituiti if offset + restituiti < totale else None
+    return {
+        "totale": totale,
+        "offset": offset,
+        "limite": limite,
+        "has_more": successivo is not None,
+        "prossimo_offset": successivo,
+    }
+
+
+def _pagina(elenco, totale, offset, limite):
+    """Risposta di un elenco: metadati di paginazione più i risultati."""
+    return {**_metadati(len(elenco), totale, offset, limite), "risultati": elenco}
 
 
 def _dec(valore, default=0):
