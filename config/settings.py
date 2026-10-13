@@ -70,6 +70,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 ABUSE_THROTTLE = {
     "login": {"limit": 8, "window": 300},   # 8 tentativi di accesso ogni 5 minuti per IP
     "search": {"limit": 120, "window": 60},  # 120 ricerche al minuto per IP
+    "lead": {"limit": 30, "window": 60},     # 30 lead dal sito al minuto per IP
 }
 
 # ------------------------------------------------------------ Email (SMTP)
@@ -90,6 +91,13 @@ EMAIL_IS_CONFIGURED = bool(EMAIL_HOST)
 # Indirizzo che riceve gli avvisi automatici (backup fallito, sito irraggiungibile,
 # disco quasi pieno). Se vuoto si usa l'email dell'azienda.
 AVVISO_EMAIL = env("AVVISO_EMAIL", "")
+
+# --------------------------------------------- Integrazione col sito web
+# Token condiviso con il sito aquaforma.it per l'invio automatico dei lead
+# dal modulo contatti (endpoint /lead/da-sito/). Generare una stringa
+# esadecimale casuale (es. `openssl rand -hex 32`). Se vuoto, l'endpoint
+# risponde 503 e nessun lead viene accettato: si chiude, non si apre.
+LEAD_SITO_TOKEN = env("LEAD_SITO_TOKEN", "")
 
 
 

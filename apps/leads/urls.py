@@ -6,6 +6,7 @@ app_name = "leads"
 
 urlpatterns = [
     path("", views.board, name="board"),
+    path("da-sito/", views.lead_da_sito, name="lead_da_sito"),
     path("nuovo/", views.LeadCreateView.as_view(), name="lead_create"),
     path("fasi/", views.StageListView.as_view(), name="stage_list"),
     path("fasi/nuova/", views.StageCreateView.as_view(), name="stage_create"),

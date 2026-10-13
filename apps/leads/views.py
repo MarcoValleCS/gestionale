@@ -1,11 +1,19 @@
 """Pipeline dei lead: bacheca per fasi, scheda e gestione delle fasi."""
+import hmac
+import json
+from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.accounts.permissions import ROLE_ADMIN, ROLE_SALES, RoleRequiredMixin, role_required
@@ -254,3 +262,99 @@ class StageUpdateView(RoleRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Fase aggiornata.")
         return super().form_valid(form)
+
+
+# ------------------------------------------------- lead dal sito web (API)
+@csrf_exempt
+@require_POST
+@login_not_required
+def lead_da_sito(request):
+    """Riceve un lead dal sito web (POST JSON, autenticato con token).
+
+    La chiama il sito aquaforma.it quando arriva una richiesta dal modulo
+    contatti. Il token condiviso viaggia nell'header ``X-Lead-Token`` e si
+    configura con la variabile d'ambiente ``LEAD_SITO_TOKEN``: se il token non
+    è configurato l'endpoint risponde 503 (chiuso, non aperto).
+
+    Il campo ``external_id`` rende la ricezione idempotente: se la stessa
+    richiesta arriva due volte (es. un nuovo tentativo dopo un timeout), il
+    lead non viene duplicato.
+    """
+    atteso = getattr(settings, "LEAD_SITO_TOKEN", "")
+    if not atteso:
+        return JsonResponse(
+            {"ok": False, "errore": "Endpoint non configurato (LEAD_SITO_TOKEN mancante)."},
+            status=503,
+        )
+
+    ricevuto = request.headers.get("X-Lead-Token", "")
+    if not hmac.compare_digest(ricevuto, atteso):
+        return JsonResponse({"ok": False, "errore": "Token non valido."}, status=403)
+
+    if len(request.body) > 64 * 1024:
+        return JsonResponse({"ok": False, "errore": "Richiesta troppo grande."}, status=413)
+
+    try:
+        dati = json.loads(request.body or b"{}")
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "errore": "JSON non valido."}, status=400)
+    if not isinstance(dati, dict):
+        return JsonResponse({"ok": False, "errore": "Formato non valido."}, status=400)
+
+    nome = str(dati.get("nome", "")).strip()[:150]
+    telefono = str(dati.get("telefono", "")).strip()[:40]
+    email = str(dati.get("email", "")).strip()[:160]
+    if not nome:
+        return JsonResponse({"ok": False, "errore": "Il nome è obbligatorio."}, status=422)
+    if not telefono and not email:
+        return JsonResponse(
+            {"ok": False, "errore": "Serve almeno un recapito (telefono o email)."},
+            status=422,
+        )
+
+    esterno = str(dati.get("external_id", "")).strip()[:64]
+    if esterno:
+        esistente = Lead.objects.filter(external_id=esterno).first()
+        if esistente is not None:
+            return JsonResponse({"ok": True, "creato": False, "duplicato": True, "id": esistente.pk})
+
+    fase = LeadStage.objects.filter(kind=LeadStage.KIND_OPEN).order_by("order").first()
+    if fase is None:
+        fase = LeadStage.objects.order_by("order").first()
+    if fase is None:
+        return JsonResponse({"ok": False, "errore": "Nessuna fase lead configurata."}, status=500)
+
+    servizio = str(dati.get("servizio", "")).strip()[:80]
+    messaggio = str(dati.get("messaggio", "")).strip()[:4000]
+    marketing = bool(dati.get("marketing", False))
+    provenienza = f"Sito web — {servizio}" if servizio else "Sito web"
+
+    note = [f"Richiesta dal sito aquaforma.it del {timezone.localtime():%d/%m/%Y %H:%M}"]
+    if servizio:
+        note.append(f"Servizio: {servizio}")
+    if messaggio:
+        note += ["", "Messaggio:", messaggio]
+    note.append(f"Consenso marketing: {'sì' if marketing else 'no'}")
+    campagna = dati.get("attribution")
+    if isinstance(campagna, dict):
+        pezzi = [
+            str(campagna.get(chiave, "") or "").strip()
+            for chiave in ("source", "medium", "campaign", "content", "term", "gclid", "fbclid")
+        ]
+        pezzi = [pezzo for pezzo in pezzi if pezzo]
+        if pezzi:
+            note.append("Campagna: " + " · ".join(pezzi))
+    if esterno:
+        note.append(f"ID richiesta sito: {esterno}")
+
+    lead = Lead.objects.create(
+        name=nome,
+        phone=telefono,
+        email=email,
+        source=provenienza[:80],
+        stage=fase,
+        next_action=timezone.localdate() + timedelta(days=1),
+        notes="\n".join(note),
+        external_id=esterno,
+    )
+    return JsonResponse({"ok": True, "creato": True, "id": lead.pk, "nome": lead.name})

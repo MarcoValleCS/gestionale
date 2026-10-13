@@ -1,7 +1,9 @@
 """Test della pipeline lead."""
+import json
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from apps.contacts.models import Contact
@@ -117,3 +119,75 @@ class LeadTest(TestCase):
         self.assertIsNotNone(lead.contact)
         self.assertEqual(lead.contact.phone, "3331234567")
         self.assertTrue(lead.contact.is_customer)
+
+
+class LeadDaSitoTest(TestCase):
+    """Endpoint /lead/da-sito/: ricezione dei lead dal modulo del sito web."""
+
+    TOKEN = "token-di-prova-per-i-test"
+
+    def setUp(self):
+        self.url = reverse("leads:lead_da_sito")
+
+    def _post(self, payload, token=None):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_LEAD_TOKEN=self.TOKEN if token is None else token,
+        )
+
+    @override_settings(LEAD_SITO_TOKEN="token-di-prova-per-i-test")
+    def test_crea_lead_completo(self):
+        risposta = self._post(
+            {
+                "external_id": "uuid-123",
+                "nome": "Giuseppe Verdi — Piscina",
+                "telefono": "3331112222",
+                "email": "giuseppe.verdi@example.com",
+                "servizio": "Piscina",
+                "messaggio": "Vorrei un preventivo per una piscina 9x4.",
+                "marketing": True,
+                "attribution": {"source": "google", "medium": "cpc", "campaign": "piscine-bg"},
+            }
+        )
+        self.assertEqual(risposta.status_code, 200)
+        self.assertEqual(risposta.json()["creato"], True)
+        lead = Lead.objects.get(external_id="uuid-123")
+        self.assertEqual(lead.phone, "3331112222")
+        self.assertEqual(lead.source, "Sito web — Piscina")
+        self.assertEqual(lead.stage.kind, LeadStage.KIND_OPEN)
+        self.assertIn("9x4", lead.notes)
+        self.assertIn("google", lead.notes)
+        self.assertIsNotNone(lead.next_action)
+
+    @override_settings(LEAD_SITO_TOKEN="token-di-prova-per-i-test")
+    def test_token_errato(self):
+        risposta = self._post({"nome": "X", "email": "x@example.com"}, token="sbagliato")
+        self.assertEqual(risposta.status_code, 403)
+        self.assertEqual(Lead.objects.count(), 0)
+
+    @override_settings(LEAD_SITO_TOKEN="")
+    def test_endpoint_chiuso_senza_token_configurato(self):
+        risposta = self._post({"nome": "X", "email": "x@example.com"})
+        self.assertEqual(risposta.status_code, 503)
+
+    @override_settings(LEAD_SITO_TOKEN="token-di-prova-per-i-test")
+    def test_nessun_duplicato_con_stesso_external_id(self):
+        payload = {"external_id": "uuid-456", "nome": "Anna Bianchi", "email": "anna@example.com"}
+        prima = self._post(payload)
+        seconda = self._post(payload)
+        self.assertEqual(prima.status_code, 200)
+        self.assertEqual(seconda.status_code, 200)
+        self.assertEqual(seconda.json()["creato"], False)
+        self.assertEqual(Lead.objects.filter(external_id="uuid-456").count(), 1)
+
+    @override_settings(LEAD_SITO_TOKEN="token-di-prova-per-i-test")
+    def test_recapito_obbligatorio(self):
+        risposta = self._post({"nome": "Solo Nome"})
+        self.assertEqual(risposta.status_code, 422)
+        self.assertEqual(Lead.objects.count(), 0)
+
+    def test_get_non_ammesso(self):
+        risposta = self.client.get(self.url)
+        self.assertEqual(risposta.status_code, 405)

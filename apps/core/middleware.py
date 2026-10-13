@@ -13,6 +13,7 @@ from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
 
 LOGIN_PATHS = {"/accounts/login/", "/admin/login/"}
+LEAD_INGEST_PATH = "/lead/da-sito/"
 SEARCH_PREFIXES = ("/contatti/cerca/", "/articoli/cerca/")
 SEARCH_PATTERNS = (
     re.compile(r"^/articoli/\d+/default/$"),
@@ -38,6 +39,9 @@ class AbuseThrottleMiddleware:
         if request.method == "POST" and request.path in LOGIN_PATHS:
             rule = config.get("login", {})
             return ("login", int(rule.get("limit", 8)), int(rule.get("window", 300)))
+        if request.method == "POST" and request.path == LEAD_INGEST_PATH:
+            rule = config.get("lead", {})
+            return ("lead", int(rule.get("limit", 30)), int(rule.get("window", 60)))
         if request.method == "GET" and self.is_search_path(request.path):
             rule = config.get("search", {})
             return ("search", int(rule.get("limit", 120)), int(rule.get("window", 60)))

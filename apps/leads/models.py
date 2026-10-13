@@ -78,6 +78,14 @@ class Lead(TimeStampedModel):
         related_name="leads_created",
         verbose_name="Creato da",
     )
+    external_id = models.CharField(
+        "ID esterno",
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Identificativo della richiesta originale (es. l'id generato dal modulo del sito web).",
+    )
 
     class Meta:
         verbose_name = "Lead"
