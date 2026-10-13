@@ -2,6 +2,7 @@
   <td class="d-none">
     {{ lineform.id }}{{ lineform.position }}{{ lineform.line_type }}
     {% if lineform.section.is_hidden %}{{ lineform.section }}{% endif %}
+    {% if lineform.discount_pct.is_hidden %}{{ lineform.discount_pct }}{% endif %}
   </td>
   <td class="text-center text-nowrap cell-sposta">
     {% if lineform.position %}
@@ -40,7 +41,7 @@
   <td class="cell-qta">{{ lineform.qty }}</td>
   <td class="cell-um">{{ lineform.uom }}</td>
   <td class="cell-prezzo">{{ lineform.unit_price }}</td>
-  <td class="cell-sconto">{{ lineform.discount_pct }}</td>
+  {% if not lineform.discount_pct.is_hidden %}<td class="cell-sconto">{{ lineform.discount_pct }}</td>{% endif %}
   <td class="cell-iva">{{ lineform.vat_rate }}</td>
   <td class="text-end line-total text-nowrap cell-totale">—</td>
   <td class="text-end line-margin text-nowrap cell-margine">

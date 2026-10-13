@@ -95,6 +95,10 @@ class SalesInvoiceLineForm(LineFormMixin, BaseBootstrapModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_line_fields()
+        # Nelle fatture emesse non si gestiscono né sezioni né sconti di riga:
+        # viaggiano nascosti così i valori già salvati restano intatti.
+        self.fields["section"].widget = forms.HiddenInput()
+        self.fields["discount_pct"].widget = forms.HiddenInput()
 
 
 class PurchaseInvoiceForm(PurchaseSupplierFormMixin, BaseBootstrapModelForm):

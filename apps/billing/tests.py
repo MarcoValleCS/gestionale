@@ -625,3 +625,61 @@ class AccontoFissoTest(BillingTestBase):
         self.assertEqual(acconto.subtotal, Decimal("1000.00"))
         pagina = self.client.get(reverse("sales:order_detail", args=[self.order.pk])).content.decode("utf-8")
         self.assertIn("Acconto da scalare", pagina)
+
+
+class SalesInvoiceFormColonneTest(BillingTestBase):
+    """Nelle fatture emesse non si gestiscono né sezioni né sconti di riga."""
+
+    def test_niente_sezione_sconto_nel_form(self):
+        self.login()
+        pagina = self.client.get(reverse("billing:salesinvoice_create")).content.decode("utf-8")
+        self.assertNotIn('<th class="col-sezione">', pagina)
+        self.assertNotIn('<th class="col-sconto">', pagina)
+        self.assertNotIn('<td class="cell-sezione"', pagina)
+        self.assertNotIn('<td class="cell-sconto"', pagina)
+        # i campi viaggiano nascosti così i valori già salvati non si perdono
+        self.assertIn('name="lines-__prefix__-section"', pagina)
+        self.assertIn('name="lines-__prefix__-discount_pct"', pagina)
+
+    def test_valori_esistenti_preservati(self):
+        self.login()
+        fattura = SalesInvoice.objects.create(customer=self.customer, date="2026-01-10")
+        riga = fattura.lines.create(
+            section="Bagno 1", product=self.product, description="x", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("100"), discount_pct=Decimal("10"), vat_rate=self.vat22,
+        )
+        fattura.recalculate()
+        pagina = self.client.get(reverse("billing:salesinvoice_update", args=[fattura.pk])).content.decode("utf-8")
+        self.assertIn("Bagno 1", pagina)
+        risposta = self.client.post(
+            reverse("billing:salesinvoice_update", args=[fattura.pk]),
+            {
+                "customer": self.customer.pk,
+                "job": "",
+                "kind": SalesInvoice.KIND_INVOICE,
+                "date": "2026-01-10",
+                "due_date": "",
+                "payment_term": "",
+                "reference": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "1",
+                "lines-INITIAL_FORMS": "1",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-id": riga.pk,
+                "lines-0-section": "Bagno 1",
+                "lines-0-product": self.product.pk,
+                "lines-0-description": "x",
+                "lines-0-qty": "1",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "100",
+                "lines-0-discount_pct": "10",
+                "lines-0-vat_rate": self.vat22.pk,
+            },
+        )
+        self.assertEqual(risposta.status_code, 302)
+        riga.refresh_from_db()
+        self.assertEqual(riga.section, "Bagno 1")
+        self.assertEqual(riga.discount_pct, Decimal("10"))
+        fattura.refresh_from_db()
+        self.assertEqual(fattura.subtotal, Decimal("90.00"))
