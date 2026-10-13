@@ -165,6 +165,7 @@
           <dt class="col-6 text-muted">Data</dt><dd class="col-6">{{ order.date|date:"d/m/Y" }}</dd>
           <dt class="col-6 text-muted">Consegna prevista</dt><dd class="col-6">{{ order.expected_date|date:"d/m/Y"|default:"—" }}</dd>
           <dt class="col-6 text-muted">Pagamento</dt><dd class="col-6">{{ order.payment_term.name|default:"—" }}</dd>
+          {% if order.supplier_ddt %}<dt class="col-6 text-muted">DDT fornitore</dt><dd class="col-6">{{ order.supplier_ddt }}</dd>{% endif %}
           <dt class="col-6 text-muted">Creato da</dt><dd class="col-6">{{ order.created_by|default:"—" }}</dd>
         </dl>
       </div>

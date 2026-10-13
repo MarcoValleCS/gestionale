@@ -32,6 +32,8 @@ def quote_print_context(quote, *, back_url=None):
         signature_label="Per accettazione (data e firma)",
         # lo sconto è una trattativa interna: al cliente va il prezzo già scontato
         show_discount=False,
+        # il codice articolo è un dato interno: nella stampa al cliente non serve
+        show_product_code=False,
         # al cliente si mostrano gli importi già comprensivi di IVA
         gross_amounts=True,
     )

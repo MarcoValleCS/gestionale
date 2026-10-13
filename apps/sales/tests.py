@@ -1266,6 +1266,40 @@ class BugVariTest(FlowTestBase):
         # riga: 2 × 45 = 90,00 imponibile (il lordo 109,80 sta solo nel totale)
         self.assertIn('<td class="num">90,00 €</td>', pagina)
 
+    def test_il_preventivo_stampato_non_mostra_il_codice_articolo(self):
+        """Il codice articolo è un dato interno: al cliente non serve."""
+        quote = Quote.objects.create(customer=self.customer)
+        quote.lines.create(
+            product=self.product, description="Bullone", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        pagina = self.client.get(reverse("sales:quote_print", args=[quote.pk])).content.decode("utf-8")
+        self.assertIn("Bullone", pagina)
+        self.assertNotIn(self.product.code, pagina, "il codice articolo non deve comparire nel preventivo")
+
+    def test_ordine_e_fattura_stampati_mostrano_il_codice_articolo(self):
+        """Conferme d'ordine e fatture restano col codice: servono in ufficio."""
+        from apps.billing.models import SalesInvoice
+
+        ordine = SalesOrder.objects.create(customer=self.customer)
+        ordine.lines.create(
+            product=self.product, description="Bullone", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        ordine.recalculate()
+        pagina = self.client.get(reverse("sales:order_print", args=[ordine.pk])).content.decode("utf-8")
+        self.assertIn(self.product.code, pagina, "la conferma d'ordine mostra il codice articolo")
+
+        fattura = SalesInvoice.objects.create(customer=self.customer, date=timezone.localdate())
+        fattura.lines.create(
+            product=self.product, description="Bullone", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        fattura.recalculate()
+        pagina = self.client.get(reverse("billing:salesinvoice_print", args=[fattura.pk])).content.decode("utf-8")
+        self.assertIn(self.product.code, pagina, "la fattura mostra il codice articolo")
+
     def test_stampa_senza_logo_niente_doppione(self):
         """Senza logo non c'è nessuna immagine: il nome compare una sola volta in testata."""
         company = CompanySettings.load()

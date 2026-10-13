@@ -531,7 +531,8 @@ def po_receive(request, pk):
         else:
             quantities = {key.removeprefix("qty_"): value for key, value in request.POST.items() if key.startswith("qty_")}
 
-        received, errors = services.receive_purchase_order(order, quantities, user=request.user)
+        ddt = request.POST.get("supplier_ddt", "").strip()
+        received, errors = services.receive_purchase_order(order, quantities, user=request.user, ddt=ddt)
         for error in errors:
             messages.error(request, error)
         if received:

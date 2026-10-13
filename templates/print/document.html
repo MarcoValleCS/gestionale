@@ -320,7 +320,7 @@
         <tr>
           <td>{{ line.row_number }}</td>
           <td>
-            {% if line.product %}<span class="item-code">{{ line.product.code }}</span><br>{% endif %}
+            {% if show_product_code and line.product %}<span class="item-code">{{ line.product.code }}</span><br>{% endif %}
             <span class="item-desc">{{ line.description|default:"—" }}</span>
           </td>
           <td class="num">{{ line.qty|qty }}</td>

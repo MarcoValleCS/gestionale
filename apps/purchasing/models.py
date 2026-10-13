@@ -133,6 +133,12 @@ class PurchaseOrder(TotalsDocument, TimeStampedModel):
         verbose_name="Da ordine cliente",
     )
     notes = models.TextField("Note", blank=True)
+    supplier_ddt = models.CharField(
+        "DDT fornitore",
+        max_length=50,
+        blank=True,
+        help_text="Numero del documento di trasporto del fornitore, indicato alla ricezione della merce.",
+    )
     status = models.CharField("Stato", max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="purchase_orders", verbose_name="Creato da"

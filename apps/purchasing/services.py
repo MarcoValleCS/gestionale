@@ -39,13 +39,21 @@ def apply_pricelist_adjustment(pricelist, percent, user=None):
     return adjustment
 
 
-def receive_purchase_order(po, quantities, user=None, warehouse=None):
+def receive_purchase_order(po, quantities, user=None, warehouse=None, ddt=""):
     """Registra la ricezione merce per le righe indicate.
 
-    ``quantities``: dict {line_id: qty}. Restituisce (righe_ricevute, errori).
+    ``quantities``: dict {line_id: qty}; ``ddt`` è il numero del DDT del
+    fornitore (facoltativo, resta scritto sull'ordine e nei movimenti di
+    magazzino). Restituisce (righe_ricevute, errori).
     """
     received_lines = []
     errors = []
+    ddt = (ddt or "").strip()[:50]
+    if ddt and ddt != po.supplier_ddt:
+        po.supplier_ddt = ddt
+    nota = f"Ricezione {po.number}"
+    if ddt:
+        nota += f" – DDT {ddt}"
     for line in po.lines.select_related("product"):
         raw = quantities.get(str(line.pk))
         if raw in (None, ""):
@@ -70,19 +78,24 @@ def receive_purchase_order(po, quantities, user=None, warehouse=None):
                     movement_type=StockMovement.TYPE_LOAD,
                     user=user,
                     reference=po.number,
-                    note=f"Ricezione {po.number}",
+                    note=nota,
                     unit_cost=line.unit_cost,
                 )
             line.qty_received = line.qty_received + qty
             line.save(update_fields=["qty_received"])
         received_lines.append(line)
 
+    campi = []
     if received_lines:
         if po.all_received:
             po.status = PurchaseOrder.STATUS_RECEIVED
         else:
             po.status = PurchaseOrder.STATUS_PARTIAL
-        po.save(update_fields=["status"])
+        campi.append("status")
+    if ddt:
+        campi.append("supplier_ddt")
+    if campi:
+        po.save(update_fields=campi)
 
     return received_lines, errors
 

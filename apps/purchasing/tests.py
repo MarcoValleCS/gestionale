@@ -5,13 +5,19 @@ from io import StringIO
 from pathlib import Path
 
 import openpyxl
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
-from apps.purchasing.models import PriceListItem, SupplierPriceList
+from apps.core.models import UnitOfMeasure, VatRate
+from apps.inventory.models import StockMovement
+from apps.purchasing.models import PriceListItem, PurchaseOrder, SupplierPriceList
+
+User = get_user_model()
 
 
 def _file_axor(finiture=False):
@@ -121,3 +127,57 @@ class ImportaListiniAxorTest(TestCase):
         voce = listino.items.get(supplier_code="10303180")
         self.assertNotEqual(voce.product.code, "10303180")
         self.assertEqual(voce.product.main_supplier.name, "Hansgrohe srl")
+
+
+class RicezioneConDdtFornitoreTest(TestCase):
+    """Alla ricezione merce si può indicare il DDT del fornitore."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser("admin", "admin@example.com", "password123!")
+        self.client.force_login(self.user)
+        self.uom = UnitOfMeasure.objects.get(code="PZ")
+        self.iva = VatRate.objects.get(code="22")
+        self.fornitore = Contact.objects.create(name="Fornitore DDT S.p.A.", is_customer=False, is_supplier=True)
+        self.articolo = Product.objects.create(
+            name="Piatto doccia test",
+            uom=self.uom,
+            sale_price=Decimal("100.00"),
+            sale_vat=self.iva,
+            purchase_price=Decimal("50.00"),
+            purchase_vat=self.iva,
+        )
+        self.ordine = PurchaseOrder.objects.create(
+            supplier=self.fornitore, status=PurchaseOrder.STATUS_CONFIRMED
+        )
+        self.riga = self.ordine.lines.create(
+            product=self.articolo, description="Riga", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("50.00"), vat_rate=self.iva,
+        )
+
+    def test_pagina_ricezione_mostra_il_campo_ddt(self):
+        pagina = self.client.get(
+            reverse("purchasing:po_receive", args=[self.ordine.pk])
+        ).content.decode("utf-8")
+        self.assertIn('name="supplier_ddt"', pagina)
+
+    def test_ricezione_salva_ddt_sullordine_e_nel_movimento(self):
+        response = self.client.post(
+            reverse("purchasing:po_receive", args=[self.ordine.pk]),
+            {f"qty_{self.riga.pk}": "2", "supplier_ddt": "DDT 123/2026"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.ordine.refresh_from_db()
+        self.assertEqual(self.ordine.supplier_ddt, "DDT 123/2026")
+        self.assertEqual(self.ordine.status, PurchaseOrder.STATUS_RECEIVED)
+        movimento = StockMovement.objects.get(reference=self.ordine.number)
+        self.assertIn("DDT 123/2026", movimento.note)
+        pagina = self.client.get(
+            reverse("purchasing:po_detail", args=[self.ordine.pk])
+        ).content.decode("utf-8")
+        self.assertIn("DDT 123/2026", pagina)
+
+    def test_stampa_ordine_fornitore_mostra_il_codice_articolo(self):
+        pagina = self.client.get(
+            reverse("purchasing:po_print", args=[self.ordine.pk])
+        ).content.decode("utf-8")
+        self.assertIn(self.articolo.code, pagina, "l'ordine fornitore mostra il codice articolo")
