@@ -66,6 +66,16 @@ DEFAULTS = {
             "{azienda}"
         ),
     },
+    EmailTemplate.KIND_PURCHASE_ORDER: {
+        "subject": "Ordine {numero} – {azienda}",
+        "body": (
+            "Buongiorno,\n"
+            "in allegato il nostro ordine {numero} del {data} di {totale} €.\n\n"
+            "Restiamo in attesa di conferma.\n\n"
+            "Cordiali saluti\n"
+            "{azienda}"
+        ),
+    },
 }
 
 

@@ -27,6 +27,10 @@ def sales_invoice_print_context(invoice):
         back_url=reverse("billing:salesinvoice_detail", args=[invoice.pk]),
         notes=invoice.notes,
         show_prices=True,
+        # fattura pulita per il cliente: niente righe di sezione né colonna
+        # sconto (il prezzo mostrato è già al netto)
+        show_discount=False,
+        show_sections=False,
     )
     context["company"] = company
     context["logo_src"] = logo_data_uri() or (company.logo.url if company.logo else "")

@@ -245,7 +245,7 @@
                   <i class="bi bi-phone me-2"></i>Installa app sul telefono
                 </button>
               </li>
-              <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}"><i class="bi bi-key me-2"></i>Cambia password</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}"><i class="bi bi-key me-2"></i>Password ed email</a></li>
               {% if user.is_superuser %}
               <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-tools me-2"></i>Amministrazione Django</a></li>
               {% endif %}

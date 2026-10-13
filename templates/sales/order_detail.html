@@ -150,6 +150,7 @@
               <th>Articolo / Descrizione</th>
               <th class="text-end">Q.tà</th>
               <th class="text-end">Consegnata</th>
+              <th class="text-end" title="Ricevuta dal fornitore e non ancora consegnata">Ricevuta</th>
               <th>U.d.M.</th>
               <th class="text-end">Prezzo</th>
               <th class="text-end">Sc. %</th>
@@ -161,19 +162,19 @@
             {% for group in line_groups %}
             {% if group.section %}
             <tr class="table-light">
-              <td colspan="9" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
+              <td colspan="10" class="fw-semibold small text-uppercase text-muted">{{ group.section }}</td>
             </tr>
             {% endif %}
             {% for block in group.blocks %}
             {% if block.subsection %}
             <tr class="table-light">
-              <td colspan="9" class="fw-semibold small ps-4">{{ block.subsection }}</td>
+              <td colspan="10" class="fw-semibold small ps-4">{{ block.subsection }}</td>
             </tr>
             {% endif %}
             {% for line in block.lines %}
             {% if line.line_type == "note" %}
             <tr>
-              <td colspan="9" class="fst-italic text-muted small ps-4">{{ line.description }}</td>
+              <td colspan="10" class="fst-italic text-muted small ps-4">{{ line.description }}</td>
             </tr>
             {% else %}
             <tr>
@@ -186,6 +187,7 @@
               <td class="text-end {% if line.qty_delivered >= line.qty %}text-success{% elif line.qty_delivered > 0 %}text-warning{% endif %}">
                 {{ line.qty_delivered|qty }}
               </td>
+              <td class="text-end text-info">{{ received_map|lookup:line.pk|qty }}</td>
               <td>{{ line.uom.code|default:"—" }}</td>
               <td class="text-end">{{ line.unit_price|money }} €</td>
               <td class="text-end">{{ line.discount_pct|qty }}%</td>
@@ -196,19 +198,19 @@
             {% endfor %}
             {% if block.subsection and block.has_articles %}
             <tr class="table-light">
-              <td colspan="8" class="text-end small text-muted">Totale {{ block.subsection }}</td>
+              <td colspan="9" class="text-end small text-muted">Totale {{ block.subsection }}</td>
               <td class="text-end fw-semibold">{{ block.subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% endfor %}
             {% if group.section and group.has_articles %}
             <tr class="table-light">
-              <td colspan="8" class="text-end small text-muted">Totale {{ group.section }}</td>
+              <td colspan="9" class="text-end small text-muted">Totale {{ group.section }}</td>
               <td class="text-end fw-semibold">{{ group.subtotal|money }} €</td>
             </tr>
             {% endif %}
             {% empty %}
-            <tr><td colspan="9" class="text-center text-muted py-3">Nessuna riga</td></tr>
+            <tr><td colspan="10" class="text-center text-muted py-3">Nessuna riga</td></tr>
             {% endfor %}
           </tbody>
         </table>

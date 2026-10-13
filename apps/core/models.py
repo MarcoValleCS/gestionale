@@ -640,9 +640,11 @@ class EmailInCoda(models.Model):
     MODELLO_PREVENTIVO = "preventivo"
     MODELLO_FATTURA = "fattura"
     MODELLO_FATTURA_SDI = "fattura_sdi"
+    MODELLO_ORDINE_FORNITORE = "ordine_fornitore"
     MODELLO_LIBERA = "libera"
 
     to_email = models.EmailField("Destinatario", max_length=254)
+    from_email = models.EmailField("Mittente", max_length=254, blank=True, default="")
     subject = models.CharField("Oggetto", max_length=300)
     body = models.TextField("Testo")
     attachment = models.BinaryField("Allegato", null=True, blank=True)
@@ -752,11 +754,13 @@ class EmailTemplate(models.Model):
     KIND_INVOICE = "invoice"
     KIND_QUOTE_REMINDER = "quote_reminder"
     KIND_INVOICE_REMINDER = "invoice_reminder"
+    KIND_PURCHASE_ORDER = "purchase_order"
     KIND_CHOICES = [
         (KIND_QUOTE, "Invio preventivo"),
         (KIND_INVOICE, "Invio fattura"),
         (KIND_QUOTE_REMINDER, "Sollecito preventivo"),
         (KIND_INVOICE_REMINDER, "Sollecito fattura"),
+        (KIND_PURCHASE_ORDER, "Invio ordine fornitore"),
     ]
 
     kind = models.CharField("Tipo", max_length=20, unique=True, choices=KIND_CHOICES)

@@ -743,6 +743,7 @@ def posta_rispondi(request, pk):
                 message=testo,
                 descrizione=f"Risposta a {email_ricevuta.sender_email}",
                 modello=EmailInCoda.MODELLO_LIBERA,
+                from_email=(request.user.email or ""),
             )
         except Exception as exc:
             messages.error(request, f"Risposta non accodata: {exc}")

@@ -44,11 +44,14 @@ class EmailTemplateTest(TestCase):
                 "body_quote_reminder": "Buongiorno {cliente}",
                 "subject_invoice_reminder": "Sollecito {numero}",
                 "body_invoice_reminder": "Buongiorno {cliente}",
+                "subject_purchase_order": "Ordine {numero}",
+                "body_purchase_order": "Buongiorno {cliente}",
             },
         )
         self.assertEqual(risposta.status_code, 302)
         self.assertTrue(EmailTemplate.objects.filter(kind="quote", subject="Preventivo {numero}").exists())
         self.assertTrue(EmailTemplate.objects.filter(kind="invoice_reminder").exists())
+        self.assertTrue(EmailTemplate.objects.filter(kind="purchase_order").exists())
 
     def test_oggetto_obbligatorio(self):
         self.client.post(
@@ -62,6 +65,8 @@ class EmailTemplateTest(TestCase):
                 "body_quote_reminder": "x",
                 "subject_invoice_reminder": "S",
                 "body_invoice_reminder": "x",
+                "subject_purchase_order": "O",
+                "body_purchase_order": "x",
             },
         )
         self.assertFalse(EmailTemplate.objects.exists())

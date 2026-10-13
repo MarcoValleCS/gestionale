@@ -141,3 +141,12 @@ def multiply(value, arg):
         return value * arg
     except Exception:
         return ""
+
+
+@register.filter
+def lookup(mappa, chiave):
+    """Valore di un dizionario per chiave (manca nei template Django)."""
+    try:
+        return (mappa or {}).get(chiave, "")
+    except Exception:
+        return ""

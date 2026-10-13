@@ -1187,11 +1187,12 @@ class BugVariTest(FlowTestBase):
         self.assertIn("800,00", pagina)
         self.assertIn("976,00", pagina)
 
-    def test_la_fattura_continua_a_mostrare_lo_sconto(self):
-        """Alla fattura non è stato chiesto: resta com'era."""
+    def test_la_fattura_stampata_e_pulita(self):
+        """Fattura al cliente: niente sezioni né colonna sconto, prezzo già al netto."""
         from apps.billing.models import SalesInvoice
 
         fattura = SalesInvoice.objects.create(customer=self.customer, date=timezone.localdate())
+        fattura.lines.create(line_type="section", description="Bagno")
         fattura.lines.create(
             product=self.product, description="Riga", qty=Decimal("2"),
             uom=self.uom, unit_price=Decimal("50.00"), discount_pct=Decimal("10"),
@@ -1200,7 +1201,25 @@ class BugVariTest(FlowTestBase):
         fattura.recalculate()
         response = self.client.get(reverse("billing:salesinvoice_print", args=[fattura.pk]))
         pagina = response.content.decode("utf-8")
-        self.assertIn("Sc. %", pagina, "la fattura mostra ancora lo sconto")
+        self.assertNotIn("Sc. %", pagina, "la fattura non mostra la colonna sconto")
+        self.assertNotIn("Bagno", pagina, "la fattura non mostra le sezioni")
+        self.assertIn("90,00", pagina, "prezzo già al netto dello sconto")
+
+    def test_la_scheda_fattura_mostra_ancora_tutto(self):
+        """La scheda interna resta completa: sezioni e sconto servono in ufficio."""
+        from apps.billing.models import SalesInvoice
+
+        fattura = SalesInvoice.objects.create(customer=self.customer, date=timezone.localdate())
+        fattura.lines.create(line_type="section", description="Bagno")
+        fattura.lines.create(
+            product=self.product, description="Riga", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("50.00"), discount_pct=Decimal("10"),
+            vat_rate=self.vat22,
+        )
+        fattura.recalculate()
+        pagina = self.client.get(reverse("billing:salesinvoice_detail", args=[fattura.pk])).content.decode("utf-8")
+        self.assertIn("Sc. %", pagina)
+        self.assertIn("Bagno", pagina)
 
     def test_le_colonne_della_stampa_sono_coerenti(self):
         """Con lo sconto nascosto i colspan delle sezioni devono tornare."""
@@ -1794,6 +1813,40 @@ class RigheStileOdooTest(FlowTestBase):
             self.assertIn("nota blabla", pagina)
             self.assertNotIn("Totale P", pagina)
             self.assertNotIn("Totale S", pagina)
+
+    def test_colonna_ricevuta_da_fornitore(self):
+        """La scheda ordine mostra per riga il ricevuto dai fornitori non ancora consegnato."""
+        from apps.purchasing.models import PurchaseOrder
+
+        order = SalesOrder.objects.create(customer=self.customer)
+        prima = order.lines.create(
+            product=self.product, description="a", qty=Decimal("10"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22, qty_delivered=Decimal("4"),
+        )
+        seconda = order.lines.create(
+            product=self.product, description="b", qty=Decimal("5"), uom=self.uom,
+            unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        order.recalculate()
+        po = PurchaseOrder.objects.create(supplier=self.supplier, source_sales_order=order)
+        po.lines.create(
+            product=self.product, description="a", qty=Decimal("8"), uom=self.uom,
+            unit_price=Decimal("5"), vat_rate=self.vat22, qty_received=Decimal("8"),
+        )
+        po.recalculate()
+        annullato = PurchaseOrder.objects.create(
+            supplier=self.supplier, source_sales_order=order, status=PurchaseOrder.STATUS_CANCELLED,
+        )
+        annullato.lines.create(
+            product=self.product, description="a", qty=Decimal("100"), uom=self.uom,
+            unit_price=Decimal("5"), vat_rate=self.vat22, qty_received=Decimal("100"),
+        )
+
+        risposta = self.client.get(reverse("sales:order_detail", args=[order.pk]))
+        self.assertEqual(risposta.status_code, 200)
+        self.assertContains(risposta, "Ricevuta")
+        # riga 1: 6 non consegnate coperte da 8 ricevute; riga 2: restano 2
+        self.assertEqual(risposta.context["received_map"], {prima.pk: Decimal("6"), seconda.pk: Decimal("2")})
 
     def test_convertire_in_ordine_mantiene_le_sezioni(self):
         quote = Quote.objects.create(customer=self.customer)

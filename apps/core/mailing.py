@@ -3,9 +3,13 @@
 L'invio vero avviene in background (vedi ``EmailInCoda``): la pagina accoda
 e risponde subito, così un server SMTP lento non blocca il gestionale.
 """
+import logging
+
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 TENTATIVI_MASSIMI = 3
 
@@ -15,26 +19,38 @@ def email_configured():
     return bool(getattr(settings, "EMAIL_IS_CONFIGURED", False))
 
 
-def send_document_email(*, to_email, subject, message, attachment=None, attachment_name=""):
+def _intestazioni_mittente(from_email):
+    """Mittente effettivo e intestazioni: se l'utente ha una sua email la si
+    usa come mittente (con Reply-To uguale), altrimenti quella aziendale."""
+    mittente = (from_email or "").strip() or settings.DEFAULT_FROM_EMAIL
+    intestazioni = {"Reply-To": mittente} if (from_email or "").strip() else {}
+    return mittente, intestazioni
+
+
+def send_document_email(*, to_email, subject, message, attachment=None, attachment_name="", from_email=""):
     """Invia subito un documento per email. Restituisce True se il PDF è stato allegato.
 
     Usata solo dal comando di background e nei test: le viste usano
     ``accoda_email`` per non bloccare la pagina.
     """
+    mittente, intestazioni = _intestazioni_mittente(from_email)
     email = EmailMessage(
         subject=subject,
         body=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=mittente,
         to=[to_email],
+        headers=intestazioni or None,
     )
     if attachment:
         email.attach(attachment_name, attachment, "application/pdf")
     email.send(fail_silently=False)
+    archivia_in_inviati(email.message().as_bytes())
     return bool(attachment)
 
 
 def accoda_email(*, to_email, subject, message, attachment=None, attachment_name="",
-                 attachment_type="application/pdf", descrizione="", modello="libera", oggetto_id=None):
+                 attachment_type="application/pdf", descrizione="", modello="libera", oggetto_id=None,
+                 from_email=""):
     """Mette un'email in coda (un INSERT: millisecondi, niente rete)."""
     from .models import EmailInCoda
 
@@ -42,6 +58,7 @@ def accoda_email(*, to_email, subject, message, attachment=None, attachment_name
         attachment_name = ""
     return EmailInCoda.objects.create(
         to_email=to_email,
+        from_email=(from_email or "").strip(),
         subject=subject,
         body=message,
         attachment=attachment,
@@ -60,11 +77,13 @@ def invia_voce_coda(voce):
     """
     from .models import EmailInCoda
 
+    mittente, intestazioni = _intestazioni_mittente(voce.from_email)
     email = EmailMessage(
         subject=voce.subject,
         body=voce.body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=mittente,
         to=[voce.to_email],
+        headers=intestazioni or None,
     )
     if voce.attachment is not None:
         email.attach(voce.attachment_name or "allegato", bytes(voce.attachment), voce.attachment_type)
@@ -81,8 +100,65 @@ def invia_voce_coda(voce):
     voce.sent_at = timezone.now()
     voce.ultimo_errore = ""
     voce.save(update_fields=["stato", "sent_at", "ultimo_errore"])
+    archivia_in_inviati(email.message().as_bytes())
     _aggiorna_documento(voce)
     return True
+
+
+CARTELLE_INVIATI_CANDIDATE = ("Sent", "INBOX.Sent", "Posta inviata", "Sent Items", "Posta-inviata")
+
+
+def _cartella_posta_inviata(client):
+    """Nome della cartella Inviati: SPECIAL-USE \\Sent se esposto, altrimenti candidati noti."""
+    try:
+        stato, righe = client.list()
+    except Exception:
+        return ""
+    if stato != "OK" or not righe:
+        return ""
+    candidati = []
+    for riga in righe:
+        testo = riga.decode("utf-8", "replace") if isinstance(riga, bytes) else str(riga)
+        if "\\Sent" in testo:
+            nome = testo.rsplit('"', 2)[-2] if testo.count('"') >= 2 else testo.split()[-1]
+            return nome.strip()
+        if testo.count('"') >= 2:
+            candidati.append(testo.rsplit('"', 2)[-2].strip())
+    for nome in candidati:
+        if nome.lower() in {candidato.lower() for candidato in CARTELLE_INVIATI_CANDIDATE}:
+            return nome
+    return ""
+
+
+def archivia_in_inviati(raw_message):
+    """Copia il messaggio appena inviato nella cartella Inviati via IMAP.
+
+    Così la mail si ritrova anche in Outlook/webmail. Non solleva mai errori:
+    se la copia fallisce, l'invio resta comunque valido.
+    """
+    from . import imap as posta_imap
+
+    try:
+        if not posta_imap.posta_configurata():
+            return False
+        client = posta_imap.connetti()
+        try:
+            cartella = _cartella_posta_inviata(client)
+            if not cartella:
+                return False
+            import imaplib
+            import time
+
+            stato, _ = client.append(cartella, "\\Seen", imaplib.Time2Internaldate(time.time()), raw_message)
+            return stato == "OK"
+        finally:
+            try:
+                client.logout()
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.warning("Copia in Inviati non riuscita: %s", exc)
+        return False
 
 
 def _aggiorna_documento(voce):

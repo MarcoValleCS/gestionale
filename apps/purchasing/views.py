@@ -11,7 +11,7 @@ from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_WAREHOUS
 from apps.core.concurrency import ConflictAwareUpdateView
 from apps.contacts.models import Contact
 from apps.core.models import VatRate
-from apps.sales.views import build_print_context, fdate, save_document_lines
+from apps.sales.views import save_document_lines
 from apps.sales.models import group_lines_by_section
 
 from . import services
@@ -326,6 +326,20 @@ class PurchaseOrderDetailView(RoleRequiredMixin, DetailView):
         context["lines"] = self.object.lines.select_related("product", "uom", "vat_rate")
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
+        from apps.core.email_templates import contenuto
+        from apps.core.mailing import email_configured
+        from apps.core.models import CompanySettings, EmailTemplate
+        from apps.core.utils import format_money
+
+        contesto = {
+            "cliente": self.object.supplier.name,
+            "numero": self.object.number,
+            "data": f"{self.object.date:%d/%m/%Y}",
+            "totale": format_money(self.object.grand_total),
+            "azienda": CompanySettings.load().name,
+        }
+        context["email_subject"], context["email_body"] = contenuto(EmailTemplate.KIND_PURCHASE_ORDER, contesto)
+        context["email_configured"] = email_configured()
         return context
 
 
@@ -407,25 +421,75 @@ class PurchaseOrderPrintView(RoleRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         doc = self.object
-        context.update(
-            build_print_context(
-                doc,
-                title="Ordine fornitore",
-                counterparty=doc.supplier,
-                counterparty_label="Spett.le fornitore",
-                meta_rows=[
-                    ("Data", fdate(doc.date)),
-                    ("Consegna prevista", fdate(doc.expected_date)),
-                    ("Pagamento", doc.payment_term.name if doc.payment_term else ""),
-                    ("Nostro riferimento", doc.source_sales_order.number if doc.source_sales_order else doc.number),
-                    ("Cantiere", str(doc.job) if doc.job_id else ""),
-                ],
-                back_url=reverse("purchasing:po_detail", args=[doc.pk]),
-                notes=doc.notes,
-                show_signature=False,
-            )
-        )
+        from .printing import po_print_context
+
+        context.update(po_print_context(doc))
         return context
+
+
+@role_required(*PO_VIEW_ROLES)
+def po_pdf_download(request, pk):
+    """Scarica il PDF dell'ordine fornitore generato dal gestionale."""
+    from io import BytesIO
+
+    from django.http import FileResponse
+
+    from .pdf import render_po_pdf
+
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    pdf = render_po_pdf(order)
+    if pdf is None:
+        messages.warning(request, "PDF non disponibile su questo sistema: usa «Stampa / Salva PDF» del browser.")
+        return redirect("purchasing:po_print", pk=order.pk)
+    return FileResponse(BytesIO(pdf), as_attachment=True, filename=f"{order.number}.pdf", content_type="application/pdf")
+
+
+@role_required(*PO_EDIT_ROLES)
+def po_email(request, pk):
+    """Accoda l'ordine fornitore per l'invio email al fornitore (con PDF in allegato).
+
+    L'invio vero avviene in background ogni 2 minuti.
+    """
+    from apps.core.email_templates import contenuto
+    from apps.core.mailing import accoda_email, email_configured
+    from apps.core.models import CompanySettings, EmailInCoda, EmailTemplate
+    from apps.core.utils import format_money
+
+    from .pdf import render_po_pdf
+
+    order = get_object_or_404(PurchaseOrder.objects.select_related("supplier"), pk=pk)
+    if request.method == "POST":
+        to_email = (request.POST.get("to") or order.supplier.email or "").strip()
+        subject = (request.POST.get("subject") or f"Ordine {order.number}").strip()
+        message_body = (request.POST.get("message") or "").strip()
+
+        if not to_email:
+            messages.error(request, "Indica l'indirizzo email del fornitore.")
+        elif not email_configured():
+            messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        else:
+            try:
+                pdf = render_po_pdf(order)
+                accoda_email(
+                    to_email=to_email,
+                    subject=subject,
+                    message=message_body,
+                    attachment=pdf,
+                    attachment_name=f"Ordine_{order.number}.pdf",
+                    descrizione=f"Ordine fornitore {order.number} a {to_email}",
+                    modello=EmailInCoda.MODELLO_ORDINE_FORNITORE,
+                    oggetto_id=order.pk,
+                    from_email=(request.user.email or ""),
+                )
+            except Exception as exc:
+                messages.error(request, f"Accodamento non riuscito: {exc}")
+            else:
+                extra = "" if pdf else " (senza allegato PDF: non disponibile su questo sistema)"
+                messages.success(
+                    request,
+                    f"Ordine {order.number} accodato per {to_email}{extra}: verrà inviato entro pochi minuti.",
+                )
+    return redirect("purchasing:po_detail", pk=order.pk)
 
 
 @role_required(*PO_EDIT_ROLES)

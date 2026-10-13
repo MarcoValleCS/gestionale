@@ -166,6 +166,7 @@ def salesinvoice_reminder(request, pk):
             descrizione=f"Sollecito {invoice.number} a {invoice.customer.email}",
             modello=EmailInCoda.MODELLO_FATTURA,
             oggetto_id=invoice.pk,
+            from_email=(request.user.email or ""),
         )
     except Exception as exc:
         messages.error(request, f"Sollecito non accodato: {exc}")
@@ -709,6 +710,7 @@ def salesinvoice_email(request, pk):
                     descrizione=f"Fattura {invoice.number} a {to_email}",
                     modello=EmailInCoda.MODELLO_FATTURA,
                     oggetto_id=invoice.pk,
+                    from_email=(request.user.email or ""),
                 )
             except Exception as exc:
                 messages.error(request, f"Accodamento non riuscito: {exc}")

@@ -18,6 +18,7 @@
   </div>
   <div class="d-flex gap-2 flex-wrap no-print">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:po_print' order.pk %}"><i class="bi bi-printer"></i> Stampa</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'purchasing:po_pdf' order.pk %}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
     {% if roles.is_admin or roles.is_purchasing %}
     <form method="post" action="{% url 'billing:purchaseinvoice_from_po' order.pk %}">{% csrf_token %}
       <button class="btn btn-outline-primary btn-sm" type="submit" title="Registra la fattura ricevuta da questo ordine (in bozza)">
@@ -166,6 +167,37 @@
           <dt class="col-6 text-muted">Pagamento</dt><dd class="col-6">{{ order.payment_term.name|default:"—" }}</dd>
           <dt class="col-6 text-muted">Creato da</dt><dd class="col-6">{{ order.created_by|default:"—" }}</dd>
         </dl>
+      </div>
+    </div>
+    <div class="card mb-3 no-print">
+      <div class="card-header"><i class="bi bi-envelope me-1"></i> Invia al fornitore</div>
+      <div class="card-body">
+        {% if not email_configured %}
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="bi bi-exclamation-triangle"></i> Invio email non configurato: imposta le variabili <code>EMAIL_*</code> nel file <code>.env</code>.
+        </div>
+        {% endif %}
+        <form method="post" action="{% url 'purchasing:po_email' order.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label" for="email-to">Email del fornitore</label>
+            <input class="form-control form-control-sm" type="email" id="email-to" name="to" value="{{ order.supplier.email }}" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="email-subject">Oggetto</label>
+            <input class="form-control form-control-sm" type="text" id="email-subject" name="subject" value="{{ email_subject }}">
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="email-message">Messaggio</label>
+            <textarea class="form-control form-control-sm" id="email-message" name="message" rows="6">{{ email_body }}</textarea>
+          </div>
+          <button class="btn btn-outline-primary btn-sm w-100" type="submit">
+            <i class="bi bi-send"></i> Invia l'ordine
+          </button>
+          <p class="text-muted small mt-2 mb-0">
+            L'ordine viaggia in allegato PDF.
+          </p>
+        </form>
       </div>
     </div>
     <div class="card">

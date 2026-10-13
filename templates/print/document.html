@@ -300,13 +300,13 @@
       </thead>
       <tbody>
         {% for group in line_groups %}
-        {% if group.section %}
+        {% if show_sections and group.section %}
         <tr class="section-row">
           <td colspan="{{ table_columns }}">{{ group.section }}</td>
         </tr>
         {% endif %}
         {% for block in group.blocks %}
-        {% if block.subsection %}
+        {% if show_sections and block.subsection %}
         <tr class="subsection-row">
           <td colspan="{{ table_columns }}">{{ block.subsection }}</td>
         </tr>
@@ -334,14 +334,14 @@
         </tr>
         {% endif %}
         {% endfor %}
-        {% if block.subsection and block.has_articles and show_prices %}
+        {% if show_sections and block.subsection and block.has_articles and show_prices %}
         <tr class="section-total subsection-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ block.subsection }}</td>
           <td class="num">{% if gross_amounts %}{{ block.total|money }}{% else %}{{ block.subtotal|money }}{% endif %} €</td>
         </tr>
         {% endif %}
         {% endfor %}
-        {% if group.section and group.has_articles and show_prices %}
+        {% if show_sections and group.section and group.has_articles and show_prices %}
         <tr class="section-total">
           <td colspan="{{ table_columns|add:'-1' }}" class="num">Totale {{ group.section }}</td>
           <td class="num">{% if gross_amounts %}{{ group.total|money }}{% else %}{{ group.subtotal|money }}{% endif %} €</td>

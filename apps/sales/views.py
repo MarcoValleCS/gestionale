@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -209,6 +209,7 @@ def quote_reminder(request, pk):
             descrizione=f"Sollecito {preventivo.number} a {preventivo.customer.email}",
             modello=EmailInCoda.MODELLO_PREVENTIVO,
             oggetto_id=preventivo.pk,
+            from_email=(request.user.email or ""),
         )
     except Exception as exc:
         messages.error(request, f"Sollecito non accodato: {exc}")
@@ -285,6 +286,7 @@ def build_print_context(
     signature_label="",
     show_prices=True,
     show_discount=True,
+    show_sections=True,
     extra_fields=None,
     gross_amounts=False,
 ):
@@ -292,6 +294,8 @@ def build_print_context(
 
     Con ``gross_amounts=True`` gli importi di riga e i totali di sezione
     includono l'IVA (stampe al cliente: preventivi e conferme d'ordine).
+    Con ``show_sections=False`` si nascondono intestazioni e subtotali di
+    sezione e sottosezione (stampe pulite: fatture).
     """
     lines = document.lines.select_related("product", "uom", "vat_rate")
     # numero di colonne della tabella righe: serve ai colspan delle sezioni.
@@ -316,6 +320,7 @@ def build_print_context(
         "signature_label": signature_label,
         "show_prices": show_prices,
         "show_discount": show_discount,
+        "show_sections": show_sections,
         "gross_amounts": gross_amounts,
         "table_columns": colonne,
         # Le viste di stampa lo valorizzano (download del PDF generato dal
@@ -621,6 +626,7 @@ def quote_email(request, pk):
                     descrizione=f"Preventivo {quote.number} a {to_email}",
                     modello=EmailInCoda.MODELLO_PREVENTIVO,
                     oggetto_id=quote.pk,
+                    from_email=(request.user.email or ""),
                 )
             except Exception as exc:
                 messages.error(request, f"Accodamento non riuscito: {exc}")
@@ -740,12 +746,47 @@ class SalesOrderDetailView(RoleRequiredMixin, DetailView):
         context["line_groups"] = group_lines_by_section(context["lines"])
         context["vat_rows"] = self.object.vat_breakdown()
         context["purchase_orders"] = self.object.purchase_orders.select_related("supplier").order_by("pk")
+        context["received_map"] = _received_from_suppliers(self.object)
         from apps.billing.services import order_billing_summary
         from apps.core.pdf import pdf_available
 
         context["billing"] = order_billing_summary(self.object)
         context["pdf_available"] = pdf_available()
         return context
+
+
+def _received_from_suppliers(order):
+    """Merce ricevuta dai fornitori e non ancora consegnata, per riga d'ordine.
+
+    Somma il ricevuto dalle righe degli ordini fornitore collegati
+    (stesso articolo, ordini non annullati) e lo ripartisce sulle righe
+    nell'ordine in cui compaiono, solo sulla parte non consegnata. Restituisce
+    ``{pk_riga: quantita}``.
+    """
+    from apps.purchasing.models import PurchaseOrder, PurchaseOrderLine
+
+    pool = {}
+    righe_fornitore = (
+        PurchaseOrderLine.objects.filter(
+            po__source_sales_order=order,
+            product__isnull=False,
+        )
+        .exclude(po__status=PurchaseOrder.STATUS_CANCELLED)
+        .values("product_id")
+        .annotate(totale=Sum("qty_received"))
+    )
+    for voce in righe_fornitore:
+        pool[voce["product_id"]] = Decimal(voce["totale"] or 0)
+    mappa = {}
+    for riga in order.lines.order_by("position", "pk"):
+        if riga.is_display or not riga.product_id:
+            continue
+        non_consegnata = max(Decimal("0"), Decimal(riga.qty or 0) - Decimal(riga.qty_delivered or 0))
+        disponibile = max(Decimal("0"), pool.get(riga.product_id, Decimal("0")))
+        quota = min(non_consegnata, disponibile)
+        pool[riga.product_id] = disponibile - quota
+        mappa[riga.pk] = quota
+    return mappa
 
 
 class SalesOrderCreateView(RoleRequiredMixin, CreateView):

@@ -13,7 +13,24 @@ class LoginForm(BootstrapFormMixin, AuthenticationForm):
 
 
 class StyledPasswordChangeForm(BootstrapFormMixin, PasswordChangeForm):
-    pass
+    email = forms.EmailField(
+        label="La tua email",
+        required=False,
+        help_text="Mittente delle email che invii dal gestionale. Se vuota si usa quella aziendale.",
+    )
+    field_order = ["email", "old_password", "new_password1", "new_password2"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.user is not None:
+            self.fields["email"].initial = self.user.email
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = (self.cleaned_data.get("email") or "").strip()
+        if commit:
+            user.save(update_fields=["email", "password"])
+        return user
 
 
 class UserForm(BootstrapFormMixin, forms.ModelForm):
