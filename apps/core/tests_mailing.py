@@ -28,7 +28,9 @@ class FakeImap:
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class MittenteTest(TestCase):
-    def test_mittente_personale_e_reply_to(self):
+    def test_mittente_aziendale_e_reply_to_personale(self):
+        """Aruba rifiuta i From diversi dalla casella: si spedisce come
+        azienda e l'email dell'utente diventa il Reply-To."""
         voce = accoda_email(
             to_email="cliente@example.it", subject="Ordine", message="Testo",
             descrizione="test", from_email="simone@aquaforma.it",
@@ -36,7 +38,9 @@ class MittenteTest(TestCase):
         self.assertEqual(voce.from_email, "simone@aquaforma.it")
         invia_voce_coda(voce)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].from_email, "simone@aquaforma.it")
+        from django.conf import settings
+
+        self.assertEqual(mail.outbox[0].from_email, settings.DEFAULT_FROM_EMAIL)
         self.assertEqual(mail.outbox[0].extra_headers.get("Reply-To"), "simone@aquaforma.it")
 
     def test_senza_mittente_si_usa_quello_aziendale(self):
@@ -70,6 +74,22 @@ class ArchiviaInviatiTest(TestCase):
         ):
             self.assertTrue(archivia_in_inviati(b"test"))
         self.assertEqual(fake.append_chiamate[0][0], "Posta inviata")
+
+    def test_cartelle_aruba_senza_virgolette(self):
+        """Aruba espone le cartelle come atomi: (\\HasNoChildren \\Sent) "." INBOX.Sent."""
+        fake = FakeImap(
+            cartelle=(
+                b'(\\HasChildren ".") "." INBOX',
+                b'(\\HasNoChildren \\Sent) "." INBOX.Sent',
+                b'(\\HasNoChildren \\Junk) "." INBOX.SPAM',
+            )
+        )
+        with (
+            mock.patch("apps.core.imap.posta_configurata", return_value=True),
+            mock.patch("apps.core.imap.connetti", return_value=fake),
+        ):
+            self.assertTrue(archivia_in_inviati(b"test"))
+        self.assertEqual(fake.append_chiamate[0][0], "INBOX.Sent")
 
     def test_senza_imap_nessun_errore(self):
         with mock.patch("apps.core.imap.posta_configurata", return_value=False):

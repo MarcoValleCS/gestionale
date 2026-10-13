@@ -20,10 +20,16 @@ def email_configured():
 
 
 def _intestazioni_mittente(from_email):
-    """Mittente effettivo e intestazioni: se l'utente ha una sua email la si
-    usa come mittente (con Reply-To uguale), altrimenti quella aziendale."""
-    mittente = (from_email or "").strip() or settings.DEFAULT_FROM_EMAIL
-    intestazioni = {"Reply-To": mittente} if (from_email or "").strip() else {}
+    """Mittente effettivo e intestazioni.
+
+    Il mittente è sempre la casella aziendale: Aruba rifiuta i messaggi con
+    un From diverso dall'account autenticato («Mittente non consentito»).
+    L'email personale dell'utente finisce in Reply-To, così le risposte
+    tornano a chi ha spedito.
+    """
+    mittente = settings.DEFAULT_FROM_EMAIL
+    risposta = (from_email or "").strip()
+    intestazioni = {"Reply-To": risposta} if risposta else {}
     return mittente, intestazioni
 
 
@@ -108,6 +114,29 @@ def invia_voce_coda(voce):
 CARTELLE_INVIATI_CANDIDATE = ("Sent", "INBOX.Sent", "Posta inviata", "Sent Items", "Posta-inviata")
 
 
+def _nome_cartella(testo):
+    """Nome della cartella da una riga LIST di IMAP.
+
+    Formato: ``(flag) "delimitatore" nome``. Il nome può essere quotato
+    (``"Sent"``) oppure un atomo senza virgolette (``INBOX.Sent``: è così che
+    Aruba espone le sue cartelle).
+    """
+    resto = testo.split(")", 1)[-1].strip()
+    if not resto:
+        return ""
+    if resto.startswith('"'):
+        chiusa = resto.find('"', 1)
+        resto = resto[chiusa + 1:].strip()
+    else:
+        pezzi = resto.split(" ", 1)
+        resto = pezzi[1].strip() if len(pezzi) > 1 else ""
+    if not resto:
+        return ""
+    if resto.startswith('"') and resto.endswith('"') and len(resto) >= 2:
+        return resto[1:-1]
+    return resto
+
+
 def _cartella_posta_inviata(client):
     """Nome della cartella Inviati: SPECIAL-USE \\Sent se esposto, altrimenti candidati noti."""
     try:
@@ -116,15 +145,16 @@ def _cartella_posta_inviata(client):
         return ""
     if stato != "OK" or not righe:
         return ""
-    candidati = []
+    nomi = []
     for riga in righe:
         testo = riga.decode("utf-8", "replace") if isinstance(riga, bytes) else str(riga)
+        nome = _nome_cartella(testo)
+        if not nome:
+            continue
         if "\\Sent" in testo:
-            nome = testo.rsplit('"', 2)[-2] if testo.count('"') >= 2 else testo.split()[-1]
-            return nome.strip()
-        if testo.count('"') >= 2:
-            candidati.append(testo.rsplit('"', 2)[-2].strip())
-    for nome in candidati:
+            return nome
+        nomi.append(nome)
+    for nome in nomi:
         if nome.lower() in {candidato.lower() for candidato in CARTELLE_INVIATI_CANDIDATE}:
             return nome
     return ""
