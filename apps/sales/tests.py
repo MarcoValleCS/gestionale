@@ -1995,3 +1995,15 @@ class MargineSchedeTest(FlowTestBase):
         quote.commission_pct = Decimal("10")
         quote.save()
         self.assertEqual(quote.margin_after_commission, Decimal("8"))
+
+    def test_il_margine_delle_schede_e_al_netto_della_provvigione(self):
+        """Imponibile 20, costo 10, provvigione 10% = 2: in scheda il margine è 8."""
+        from apps.contacts.models import Contact
+
+        quote = self._preventivo()
+        quote.commission_contact = Contact.objects.create(name="Geom. Bianchi", is_customer=False)
+        quote.commission_pct = Decimal("10")
+        quote.save()
+        pagina = self.client.get(reverse("sales:quote_detail", args=[quote.pk])).content.decode("utf-8")
+        self.assertIn("Provvigione", pagina)
+        self.assertIn("8,00", pagina, "il margine mostrato deve essere al netto della provvigione")

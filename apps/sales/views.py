@@ -408,22 +408,22 @@ def save_document_lines(document, formset, fk_field):
 
 # --------------------------------------------------------------- preventivi
 def _margine_documento(documento, righe):
-    """Costo, margine e marginalità per la scheda del documento.
+    """Costo, provvigione, margine e marginalità per la scheda del documento.
 
-    Stessa logica del pannello live del form: costo da listino fornitore
-    (o costo fissato alla conferma), margine sull'imponibile, provvigione
-    scorporata a parte.
+    Il margine è al netto della provvigione (e la percentuale si calcola
+    sull'imponibile): è quello che resta davvero, non il dato prima della
+    provvigione. La provvigione resta indicata a parte, come informazione.
     """
     from apps.core.rounding import round2
 
     costo = sum((riga.line_cost for riga in righe if not riga.is_display), ZERO)
     imponibile = Decimal(documento.subtotal or 0)
-    margine = round2(imponibile - costo)
-    percentuale = round2(margine / imponibile * 100) if imponibile else None
-    dopo_provvigione = None
+    provvigione = None
     if getattr(documento, "has_commission", False):
-        dopo_provvigione = round2(margine - documento.commission_amount)
-    return {"costo": costo, "margine": margine, "percentuale": percentuale, "dopo_provvigione": dopo_provvigione}
+        provvigione = documento.commission_amount
+    margine = round2(imponibile - costo - (provvigione or 0))
+    percentuale = round2(margine / imponibile * 100) if imponibile else None
+    return {"costo": costo, "provvigione": provvigione, "margine": margine, "percentuale": percentuale}
 
 
 class QuoteListView(RoleRequiredMixin, ListView):
