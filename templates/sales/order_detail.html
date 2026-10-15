@@ -46,6 +46,8 @@
     {% endif %}
     {% if order.is_editable %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales:order_update' order.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
+    {% endif %}
+    {% if order.status == "draft" %}
     <form method="post" action="{% url 'sales:order_confirm' order.pk %}" class="d-flex gap-2">{% csrf_token %}
       <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg"></i> Conferma ordine</button>
       <button class="btn btn-outline-primary btn-sm" type="submit" name="replenish" value="1"

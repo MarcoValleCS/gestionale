@@ -876,7 +876,7 @@ class SalesOrderUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateVie
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
         if not self.object.is_editable:
-            messages.warning(request, "L'ordine non è modificabile nello stato attuale.")
+            messages.warning(request, "Un ordine consegnato o annullato non è modificabile.")
             return redirect("sales:order_detail", pk=self.object.pk)
         return super().dispatch(request, *args, **kwargs)
 

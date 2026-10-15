@@ -6,6 +6,17 @@
 <form method="post" novalidate id="document-form">
   {% csrf_token %}
   {{ line_formset.management_form }}
+  {% if object.status == "confirmed" %}
+  <div class="alert alert-warning d-flex gap-2 align-items-start mb-3" role="alert" id="avviso-ordine-confermato">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <div>
+      <strong>Attenzione: l'ordine è già stato confermato.</strong>
+      Modificare ora righe, quantità, prezzi o sconti è <strong>pericoloso</strong>: gli ordini
+      fornitore e le consegne già registrate non vengono aggiornati e potrebbero non essere più
+      coerenti con l'ordine. Procedi solo se sai cosa stai facendo.
+    </div>
+  </div>
+  {% endif %}
   <div class="row g-3">
     <div class="col-lg-8">
       <div class="card">
@@ -144,6 +155,25 @@
 
 {% block extra_js %}
 {% include "sales/_lines_script.html" %}
+{% if object.status == "confirmed" %}
+<script>
+  (function () {
+    /* L'ordine è già confermato: prima di salvare si chiede conferma, perché
+       le modifiche possono rendere incoerenti ordini fornitore e consegne. */
+    const form = document.getElementById("document-form");
+    if (!form) return;
+    form.addEventListener("submit", function (evento) {
+      const avviso =
+        "Attenzione: l'ordine è già stato confermato.\n" +
+        "Le modifiche fatte adesso sono pericolose: ordini fornitore e consegne\n" +
+        "potrebbero non essere più coerenti con l'ordine.\n\nSalvare comunque?";
+      if (!window.confirm(avviso)) {
+        evento.preventDefault();
+      }
+    });
+  })();
+</script>
+{% endif %}
 <script src="{% static 'js/rich_notes.js' %}"></script>
 <script src="{% static 'js/quick_create.js' %}"></script>
 <script src="{% static 'js/autocomplete.js' %}"></script>

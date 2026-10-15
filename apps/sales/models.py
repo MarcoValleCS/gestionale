@@ -422,7 +422,13 @@ class SalesOrder(CommissionedDocument, TotalsDocument, TimeStampedModel):
 
     @property
     def is_editable(self):
-        return self.status == self.STATUS_DRAFT
+        """Modificabile in bozza e anche da confermato.
+
+        Dopo la conferma il documento si può ancora correggere (con l'avviso
+        che le modifiche sono pericolose): consegnato e annullato restano
+        bloccati.
+        """
+        return self.status in {self.STATUS_DRAFT, self.STATUS_CONFIRMED}
 
     @property
     def all_delivered(self):
