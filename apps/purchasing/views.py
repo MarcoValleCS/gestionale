@@ -459,7 +459,11 @@ def po_email(request, pk):
 
     order = get_object_or_404(PurchaseOrder.objects.select_related("supplier"), pk=pk)
     if request.method == "POST":
+        destinatario = (request.POST.get("destinatario") or "fornitore").strip()
         to_email = (request.POST.get("to") or order.supplier.email or "").strip()
+        if destinatario == "agenzia" and order.supplier.agent_email:
+            # la richiesta d'ordine parte direttamente all'agenzia del fornitore
+            to_email = order.supplier.agent_email
         subject = (request.POST.get("subject") or f"Ordine {order.number}").strip()
         message_body = (request.POST.get("message") or "").strip()
 

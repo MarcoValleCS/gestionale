@@ -43,6 +43,20 @@
           </div>
         </div>
       </div>
+      <div class="card mt-3">
+        <div class="card-header">Agenzia</div>
+        <div class="card-body">
+          <div class="row">
+            {% include "partials/field.html" with field=form.agent_name col=6 %}
+            {% include "partials/field.html" with field=form.agent_number col=6 %}
+            {% include "partials/field.html" with field=form.agent_phone col=6 %}
+            {% include "partials/field.html" with field=form.agent_email col=6 %}
+          </div>
+          <p class="text-muted small mb-0">
+            Se compilata, le richieste d'ordine al fornitore possono partire direttamente all'agenzia.
+          </p>
+        </div>
+      </div>
     </div>
     <div class="col-lg-4">
       <div class="card mb-3">

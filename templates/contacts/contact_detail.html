@@ -62,6 +62,20 @@
         </dl>
       </div>
     </div>
+    {% if contact.has_agency or contact.is_supplier %}
+    <div class="card mb-3">
+      <div class="card-header">Agenzia</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Agente</dt><dd class="col-7">{{ contact.agent_name|default:"—" }}</dd>
+          <dt class="col-5 text-muted">Numero</dt><dd class="col-7">{{ contact.agent_number|default:"—" }}</dd>
+          <dt class="col-5 text-muted">Telefono</dt><dd class="col-7">{{ contact.agent_phone|default:"—" }}</dd>
+          <dt class="col-5 text-muted">Email</dt>
+          <dd class="col-7">{% if contact.agent_email %}<a href="mailto:{{ contact.agent_email }}">{{ contact.agent_email }}</a>{% else %}—{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+    {% endif %}
     <div class="card mb-3">
       <div class="card-header">Indirizzo</div>
       <div class="card-body small">
