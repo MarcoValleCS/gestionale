@@ -2007,3 +2007,89 @@ class MargineSchedeTest(FlowTestBase):
         pagina = self.client.get(reverse("sales:quote_detail", args=[quote.pk])).content.decode("utf-8")
         self.assertIn("Provvigione", pagina)
         self.assertIn("8,00", pagina, "il margine mostrato deve essere al netto della provvigione")
+
+
+class OrdineConfermatoModificabileTest(FlowTestBase):
+    """Un ordine confermato si può ancora correggere, ma con l'avviso di pericolo.
+
+    Consegnato e annullato restano bloccati.
+    """
+
+    def setUp(self):
+        self.login()
+        from apps.inventory.models import StockMovement
+
+        register_movement(
+            product=self.product,
+            delta=Decimal("20"),
+            movement_type=StockMovement.TYPE_LOAD,
+            note="Carico di prova",
+        )
+        quote = Quote.objects.create(customer=self.customer, status=Quote.STATUS_ACCEPTED)
+        quote.lines.create(
+            product=self.product, description="Bullone", qty=Decimal("2"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        quote.recalculate()
+        self.order = services.convert_quote_to_order(quote, user=self.user)
+        services.confirm_sales_order(self.order, user=self.user)
+        self.order.refresh_from_db()
+
+    def _post_riga(self, qty="5"):
+        riga = self.order.lines.get()
+        return self.client.post(
+            reverse("sales:order_update", args=[self.order.pk]),
+            {
+                "customer": self.customer.pk,
+                "date": self.order.date.isoformat(),
+                "expected_date": "",
+                "payment_term": "",
+                "reference": "",
+                "commission_contact": "",
+                "commission_pct": "0",
+                "terms_text": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "1",
+                "lines-INITIAL_FORMS": "1",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-id": riga.pk,
+                "lines-0-position": "1",
+                "lines-0-line_type": "article",
+                "lines-0-section": "",
+                "lines-0-product": self.product.pk,
+                "lines-0-description": "Bullone",
+                "lines-0-qty": qty,
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "10.00",
+                "lines-0-discount_pct": "0",
+                "lines-0-vat_rate": self.vat22.pk,
+            },
+        )
+
+    def test_il_modulo_confermato_si_apre_con_lavviso(self):
+        risposta = self.client.get(reverse("sales:order_update", args=[self.order.pk]))
+        self.assertEqual(risposta.status_code, 200)
+        pagina = risposta.content.decode("utf-8")
+        self.assertIn("avviso-ordine-confermato", pagina)
+        self.assertIn("pericoloso", pagina)
+
+    def test_salvare_da_confermato_aggiorna_righe_e_totali(self):
+        risposta = self._post_riga(qty="5")
+        self.assertEqual(risposta.status_code, 302)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, SalesOrder.STATUS_CONFIRMED, "lo stato resta confermato")
+        self.assertEqual(self.order.subtotal, Decimal("50.00"))
+        self.assertEqual(self.order.lines.get().qty, Decimal("5.000"))
+
+    def test_un_ordine_consegnato_resta_bloccato(self):
+        services.deliver_sales_order(self.order, user=self.user)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, SalesOrder.STATUS_DELIVERED)
+        risposta = self.client.get(reverse("sales:order_update", args=[self.order.pk]))
+        self.assertEqual(risposta.status_code, 302)
+
+    def test_la_scheda_confermata_offre_modifica_ma_non_la_ri_conferma(self):
+        pagina = self.client.get(reverse("sales:order_detail", args=[self.order.pk])).content.decode("utf-8")
+        self.assertIn(reverse("sales:order_update", args=[self.order.pk]), pagina)
+        self.assertNotIn(reverse("sales:order_confirm", args=[self.order.pk]), pagina)
