@@ -20,5 +20,19 @@ def filtro_codice_fornitore(termine):
 
 
 def filtro_articoli(termine):
-    """Filtro completo per la ricerca articoli (nome, codici, codice fornitore)."""
-    return Q(name__icontains=termine) | Q(code__icontains=termine) | Q(barcode__icontains=termine) | filtro_codice_fornitore(termine)
+    """Filtro completo per la ricerca articoli (nome, codici, codice fornitore).
+
+    Ogni parola digitata deve trovare riscontro in almeno uno fra nome,
+    codice interno, barcode o codice fornitore: così «sifone 540388» trova
+    l'articolo scritto col codice e la descrizione anche in ordine diverso,
+    senza dover indovinare il campo giusto.
+    """
+    filtro = Q()
+    for parola in (termine or "").split():
+        filtro &= (
+            Q(name__icontains=parola)
+            | Q(code__icontains=parola)
+            | Q(barcode__icontains=parola)
+            | filtro_codice_fornitore(parola)
+        )
+    return filtro
