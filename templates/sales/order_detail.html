@@ -288,16 +288,16 @@
       <div class="card-body">
         <dl class="doc-totals mb-0">
           <div class="d-flex justify-content-between"><dt>Costo merce</dt><dd>{{ margine.costo|money }} €</dd></div>
+          {% if margine.provvigione %}
+          <div class="d-flex justify-content-between"><dt>Provvigione</dt><dd>{{ margine.provvigione|money }} €</dd></div>
+          {% endif %}
           <div class="d-flex justify-content-between"><dt>Margine</dt><dd>{{ margine.margine|money }} €</dd></div>
           <div class="d-flex justify-content-between">
             <dt>Marginalità</dt><dd>{{ margine.percentuale|qty|default:"—" }}{% if margine.percentuale != None %} %{% endif %}</dd>
           </div>
-          {% if margine.dopo_provvigione != None %}
-          <div class="d-flex justify-content-between"><dt>Dopo provvigione</dt><dd>{{ margine.dopo_provvigione|money }} €</dd></div>
-          {% endif %}
         </dl>
         <p class="text-muted small mb-0 mt-2">
-          {% if order.status == "draft" %}Il margine usa il costo di acquisto in anagrafica{% else %}Costo fissato alla conferma{% endif %}:
+          {% if order.status == "draft" %}Il margine è al netto della provvigione e usa il costo di acquisto in anagrafica{% else %}Costo fissato alla conferma, al netto della provvigione{% endif %}:
           è un'indicazione, non un dato contabile.
         </p>
       </div>

@@ -169,11 +169,13 @@
     if (vatEl) vatEl.textContent = currency.format(vatTotal) + " €";
     if (grandEl) grandEl.textContent = currency.format(subtotal + vatTotal) + " €";
 
-    // riepilogo margine del documento
+    // riepilogo margine del documento: al netto della provvigione, come nella scheda
     const costEl = document.getElementById("totals-cost");
     const marginEl = document.getElementById("totals-margin");
     const marginPctEl = document.getElementById("totals-margin-pct");
-    const margineTotale = subtotal - costoTotale;
+    const commissionField = document.getElementById("id_commission_pct");
+    const provvigione = commissionField ? subtotal * parseNumber(commissionField.value) / 100 : 0;
+    const margineTotale = subtotal - costoTotale - provvigione;
     if (costEl) costEl.textContent = currency.format(costoTotale) + " €";
     if (marginEl) {
       marginEl.textContent = currency.format(margineTotale) + " €";
@@ -186,10 +188,8 @@
         : "—";
     }
     const commissionEl = document.getElementById("totals-commission");
-    const commissionField = document.getElementById("id_commission_pct");
     if (commissionEl && commissionField) {
-      const pct = parseNumber(commissionField.value);
-      commissionEl.textContent = currency.format(subtotal * pct / 100) + " €";
+      commissionEl.textContent = currency.format(provvigione) + " €";
     }
 
     const breakdown = document.getElementById("vat-breakdown");
