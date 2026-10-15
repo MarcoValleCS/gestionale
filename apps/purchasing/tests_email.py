@@ -52,6 +52,55 @@ class PoEmailTest(TestCase):
         self.assertIn("Invia al fornitore", pagina)
         self.assertIn(f"Ordine {order.number}", pagina)
 
+    def _fornitore_con_agenzia(self):
+        self.supplier.agent_name = "Mario Rossi"
+        self.supplier.agent_number = "AG-77"
+        self.supplier.agent_phone = "035 123456"
+        self.supplier.agent_email = "agente@agenzia.it"
+        self.supplier.save(update_fields=["agent_name", "agent_number", "agent_phone", "agent_email"])
+
+    def test_scheda_offre_la_scelta_dellagenzia(self):
+        """Con i dati agenzia compare la scelta tra agenzia e fornitore."""
+        self._fornitore_con_agenzia()
+        order = self._ordine()
+        pagina = self.client.get(reverse("purchasing:po_detail", args=[order.pk])).content.decode("utf-8")
+        self.assertIn('name="destinatario"', pagina)
+        self.assertIn('value="agenzia"', pagina)
+        self.assertIn("agente@agenzia.it", pagina)
+
+    @override_settings(EMAIL_IS_CONFIGURED=True)
+    def test_email_allagenzia_quando_scelta(self):
+        self._fornitore_con_agenzia()
+        order = self._ordine()
+        risposta = self.client.post(
+            reverse("purchasing:po_email", args=[order.pk]),
+            {
+                "destinatario": "agenzia",
+                "to": "ordini@fornitore.it",
+                "subject": "Ordine prova",
+                "message": "In allegato.",
+            },
+        )
+        self.assertEqual(risposta.status_code, 302)
+        voce = EmailInCoda.objects.get(oggetto_id=order.pk, modello=EmailInCoda.MODELLO_ORDINE_FORNITORE)
+        self.assertEqual(voce.to_email, "agente@agenzia.it")
+
+    @override_settings(EMAIL_IS_CONFIGURED=True)
+    def test_scelta_fornitore_anche_con_agenzia_compilata(self):
+        self._fornitore_con_agenzia()
+        order = self._ordine()
+        self.client.post(
+            reverse("purchasing:po_email", args=[order.pk]),
+            {
+                "destinatario": "fornitore",
+                "to": "ordini@fornitore.it",
+                "subject": "Ordine prova",
+                "message": "In allegato.",
+            },
+        )
+        voce = EmailInCoda.objects.get(oggetto_id=order.pk, modello=EmailInCoda.MODELLO_ORDINE_FORNITORE)
+        self.assertEqual(voce.to_email, "ordini@fornitore.it")
+
     @override_settings(EMAIL_IS_CONFIGURED=True)
     def test_email_accodata_con_pdf_e_mittente(self):
         order = self._ordine()

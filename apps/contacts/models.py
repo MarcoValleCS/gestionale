@@ -52,6 +52,12 @@ class Contact(TimeStampedModel):
         blank=True,
         help_text="Applicato ai prezzi di acquisto degli articoli del fornitore che non hanno un listino dedicato.",
     )
+    # Agenzia/agente del fornitore: le richieste d'ordine possono partire
+    # direttamente all'agenzia invece che alla sede del fornitore.
+    agent_name = models.CharField("Nome agente", max_length=100, blank=True)
+    agent_number = models.CharField("Numero agente", max_length=50, blank=True)
+    agent_phone = models.CharField("Telefono agente", max_length=40, blank=True)
+    agent_email = models.EmailField("Email agenzia", blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name="contacts", verbose_name="Etichette")
     notes = models.TextField("Note", blank=True)
     active = models.BooleanField("Attivo", default=True)
@@ -92,3 +98,8 @@ class Contact(TimeStampedModel):
         if self.is_customer:
             return "Cliente"
         return "Fornitore"
+
+    @property
+    def has_agency(self):
+        """True se almeno un dato dell'agenzia è compilato."""
+        return bool(self.agent_name or self.agent_number or self.agent_phone or self.agent_email)
