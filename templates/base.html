@@ -112,6 +112,7 @@
       </a>
       <a class="nav-link {% if request.resolver_match.namespace == 'leads' %}active{% endif %}" href="{% url 'leads:board' %}">
         <i class="bi bi-funnel"></i> Lead
+        {% if leads_non_visti %}<span class="badge text-bg-danger ms-auto">{{ leads_non_visti }}</span>{% endif %}
       </a>
       {% endif %}
 

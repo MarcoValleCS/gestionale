@@ -77,6 +77,12 @@ class LeadDetailView(RoleRequiredMixin, DetailView):
     def get_queryset(self):
         return Lead.objects.select_related("contact", "stage", "owner", "quote", "job", "created_by")
 
+    def get_object(self, queryset=None):
+        lead = super().get_object(queryset)
+        # aprire la scheda vale come «visualizzato»: il pallino sparisce dal menu
+        lead.segna_visto()
+        return lead
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["page_title"] = self.object.name
@@ -140,6 +146,8 @@ def lead_stage(request, pk):
     """Sposta un lead in un'altra fase (o alla successiva)."""
     lead = get_object_or_404(Lead.objects.select_related("stage"), pk=pk)
     if request.method == "POST":
+        # agire sul lead (anche solo spostarlo di fase) vale come visualizzato
+        lead.segna_visto()
         scelta = request.POST.get("stage", "")
         if scelta == "avanti":
             nuova = lead.next_stage()
@@ -165,6 +173,8 @@ def lead_create_quote(request, pk):
     lead = get_object_or_404(Lead.objects.select_related("contact", "stage"), pk=pk)
     if request.method != "POST":
         return redirect("leads:lead_detail", pk=lead.pk)
+    # il preventivo si crea «dal» lead: da qui in poi è stato guardato di sicuro
+    lead.segna_visto()
     if lead.quote_id:
         messages.info(request, f"Questo lead ha già il preventivo {lead.quote.number}.")
         return redirect("sales:quote_detail", pk=lead.quote_id)
@@ -357,4 +367,8 @@ def lead_da_sito(request):
         notes="\n".join(note),
         external_id=esterno,
     )
+    # il pallino nel menu lo mostra subito, senza aspettare la scadenza della cache
+    from apps.core.cache import dimentica
+
+    dimentica("badge_lead")
     return JsonResponse({"ok": True, "creato": True, "id": lead.pk, "nome": lead.name})

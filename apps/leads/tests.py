@@ -191,3 +191,58 @@ class LeadDaSitoTest(TestCase):
     def test_get_non_ammesso(self):
         risposta = self.client.get(self.url)
         self.assertEqual(risposta.status_code, 405)
+
+    @override_settings(LEAD_SITO_TOKEN="token-di-prova-per-i-test")
+    def test_il_lead_dal_sito_arriva_da_visualizzare(self):
+        """Il lead appena arrivato dal sito è «nuovo»: pallino acceso finché
+        qualcuno in ufficio non apre la scheda."""
+        risposta = self._post({"external_id": "uuid-999", "nome": "Nuovo dal sito", "email": "nuovo@example.com"})
+        self.assertEqual(risposta.status_code, 200)
+        lead = Lead.objects.get(external_id="uuid-999")
+        self.assertIsNone(lead.viewed_at)
+        self.assertTrue(lead.is_unseen)
+
+
+class LeadNonVistiTest(TestCase):
+    """Pallino dei lead non ancora aperti, come per posta e messaggi."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser("admin", "admin@example.com", "password123!")
+        cls.fase = LeadStage.objects.filter(kind=LeadStage.KIND_OPEN).order_by("order").first()
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _lead_nuovo(self, nome="Lead dal sito"):
+        return Lead.objects.create(name=nome, email="nuovo@example.com", stage=self.fase)
+
+    def test_il_badge_conta_i_lead_non_visualizzati(self):
+        self._lead_nuovo()
+        risposta = self.client.get(reverse("leads:board"))
+        self.assertEqual(risposta.context["leads_non_visti"], 1)
+        self.assertContains(risposta, 'class="badge text-bg-danger ms-auto">1</span>')
+
+    def test_aprire_la_scheda_spegne_il_badge(self):
+        lead = self._lead_nuovo()
+        risposta = self.client.get(reverse("leads:lead_detail", args=[lead.pk]))
+        self.assertEqual(risposta.status_code, 200)
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.viewed_at)
+        self.assertEqual(risposta.context["leads_non_visti"], 0)
+
+    def test_spostare_di_fase_dal_menu_vale_come_visualizzato(self):
+        lead = self._lead_nuovo()
+        risposta = self.client.post(
+            reverse("leads:lead_stage", args=[lead.pk]),
+            {"stage": "avanti", "next": reverse("leads:board")},
+        )
+        self.assertEqual(risposta.status_code, 302)
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.viewed_at)
+
+    def test_creare_un_preventivo_vale_come_visualizzato(self):
+        lead = self._lead_nuovo()
+        self.client.post(reverse("leads:lead_create_quote", args=[lead.pk]))
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.viewed_at)
