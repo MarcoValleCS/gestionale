@@ -1,4 +1,5 @@
 """Viste di vendite: preventivi e ordini cliente."""
+import re
 from decimal import Decimal
 
 from django.contrib import messages
@@ -274,6 +275,17 @@ def plain_number(value):
     return text or "0"
 
 
+# Le righe dei componenti aperte da un kit portano la firma del kit:
+# «Nome componente (componente CODICE-KIT)». È così che il file le riconosce.
+_COMPONENTE_KIT_RE = re.compile(r"\(componente ([^()]+)\)")
+
+
+def _e_componente_di_kit(riga, codici_kit):
+    """True se la riga è un componente generato dall'apertura di un kit del documento."""
+    trovato = _COMPONENTE_KIT_RE.search(riga.description or "")
+    return bool(trovato and trovato.group(1).strip() in codici_kit)
+
+
 def build_print_context(
     document,
     *,
@@ -289,6 +301,7 @@ def build_print_context(
     show_discount=True,
     show_sections=True,
     show_product_code=True,
+    hide_kit_components=False,
     extra_fields=None,
     gross_amounts=False,
 ):
@@ -300,8 +313,16 @@ def build_print_context(
     sezione e sottosezione (stampe pulite: fatture).
     Con ``show_product_code=False`` si nasconde il codice articolo (preventivi:
     è un dato interno, non serve al cliente).
+    Con ``hide_kit_components=True`` le righe dei componenti aperte dai kit
+    non si stampano: resta solo la voce del kit (nel documento restano, perché
+    servono a magazzino e consegne).
     """
-    lines = document.lines.select_related("product", "uom", "vat_rate")
+    lines = list(document.lines.select_related("product", "uom", "vat_rate"))
+    if hide_kit_components:
+        codici_kit = {
+            riga.product.code for riga in lines if riga.product_id and riga.product.is_kit
+        }
+        lines = [riga for riga in lines if not _e_componente_di_kit(riga, codici_kit)]
     # numero di colonne della tabella righe: serve ai colspan delle sezioni.
     # Viene calcolato qui per non lasciare aritmetica fragile nel template.
     if show_prices:

@@ -195,3 +195,23 @@ class MargineNelModuloTest(KitTestBase):
         self.assertIn("line-margin", response.content.decode())
 
 
+class StampaKitTest(KitTestBase):
+    """Nei preventivi stampati il kit è una voce sola; negli ordini c'è tutto."""
+
+    def test_preventivo_stampato_nasconde_i_componenti_del_kit(self):
+        self.login()
+        services.espandi_kit(self.quote, "quote")
+        pagina = self.client.get(reverse("sales:quote_print", args=[self.quote.pk])).content.decode()
+        self.assertIn("Kit bagno completo", pagina)
+        self.assertNotIn("(componente", pagina, "i componenti aperti dai kit non si stampano nel preventivo")
+        self.assertNotIn("Vaso sospeso", pagina)
+
+    def test_ordine_stampato_mostra_i_componenti_del_kit(self):
+        self.login()
+        services.espandi_kit(self.quote, "quote")
+        ordine = services.convert_quote_to_order(self.quote)
+        pagina = self.client.get(reverse("sales:order_print", args=[ordine.pk])).content.decode()
+        self.assertIn("(componente", pagina, "in conferma d'ordine i componenti servono")
+        self.assertIn("Vaso sospeso", pagina)
+
+

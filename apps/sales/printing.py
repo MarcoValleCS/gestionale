@@ -34,6 +34,9 @@ def quote_print_context(quote, *, back_url=None):
         show_discount=False,
         # il codice articolo è un dato interno: nella stampa al cliente non serve
         show_product_code=False,
+        # il kit al cliente si presenta come una voce sola (i componenti
+        # restano nel documento per magazzino e consegne)
+        hide_kit_components=True,
         # al cliente si mostrano gli importi già comprensivi di IVA
         gross_amounts=True,
     )
