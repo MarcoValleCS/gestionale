@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.contacts.models import Contact
 from apps.core.models import Tag, TimeStampedModel
@@ -86,6 +87,12 @@ class Lead(TimeStampedModel):
         db_index=True,
         help_text="Identificativo della richiesta originale (es. l'id generato dal modulo del sito web).",
     )
+    viewed_at = models.DateTimeField(
+        "Visualizzato il",
+        null=True,
+        blank=True,
+        help_text="Quando la scheda è stata aperta la prima volta: finché è vuoto il lead appare da visualizzare.",
+    )
 
     class Meta:
         verbose_name = "Lead"
@@ -94,10 +101,27 @@ class Lead(TimeStampedModel):
         indexes = [
             models.Index(fields=["stage", "-created_at"], name="lead_stage_date_idx"),
             models.Index(fields=["next_action"], name="lead_next_action_idx"),
+            models.Index(fields=["viewed_at"], name="lead_viewed_idx"),
         ]
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_unseen(self):
+        """True finché il lead non è mai stato aperto in ufficio."""
+        return self.viewed_at is None
+
+    def segna_visto(self):
+        """Segna il lead come visualizzato: spegne il pallino nel menu."""
+        if self.viewed_at is not None:
+            return self.viewed_at
+        self.viewed_at = timezone.now()
+        self.save(update_fields=["viewed_at", "updated_at"])
+        from apps.core.cache import dimentica
+
+        dimentica("badge_lead")
+        return self.viewed_at
 
     @property
     def is_open(self):

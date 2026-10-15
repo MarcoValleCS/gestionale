@@ -63,7 +63,7 @@ def roles(request):
     spento["is_collaborator_only"] = False
 
     if not user or not user.is_authenticated:
-        return {"roles": spento, "messaggi_non_letti": 0, "posta_non_lette": 0}
+        return {"roles": spento, "messaggi_non_letti": 0, "posta_non_lette": 0, "leads_non_visti": 0}
 
     if user.is_superuser:
         # l'amministratore ha tutti i ruoli e non è mai limitato
@@ -71,6 +71,7 @@ def roles(request):
             "roles": {**{flag: True for flag in ROLE_FLAGS}, "is_collaborator_only": False},
             "messaggi_non_letti": _messaggi_non_letti(user),
             "posta_non_lette": _posta_non_letta(user),
+            "leads_non_visti": _leads_non_visti(),
         }
 
     names = getattr(request, "_ruoli_cache", None)
@@ -92,6 +93,7 @@ def roles(request):
         },
         "messaggi_non_letti": _messaggi_non_letti(user),
         "posta_non_lette": _posta_non_letta(user),
+        "leads_non_visti": _leads_non_visti(),
     }
 
 
@@ -121,5 +123,24 @@ def _posta_non_letta(utente):
         # Il conteggio è globale (non dipende dall'utente): una chiave sola.
         return memoizza("badge_posta", conta, 60)
     except Exception:
+        return 0
+
+
+def _leads_non_visti():
+    """Quanti lead non sono ancora stati aperti (per il pallino nel menu).
+
+    Vale per l'ufficio intero, come la casella posta: appena qualcuno apre la
+    scheda del lead, il pallino si spegne per tutti.
+    """
+    try:
+        from apps.leads.models import Lead
+
+        from .cache import memoizza
+
+        def conta():
+            return Lead.objects.filter(viewed_at__isnull=True).count()
+
+        return memoizza("badge_lead", conta, 60)
+    except Exception:  # tabelle non ancora migrate
         return 0
 
