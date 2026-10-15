@@ -410,3 +410,52 @@ class QuickCreateTest(TestCase):
 
         no_results = self.client.get(reverse("catalog:search"), {"q": "inesistente"})
         self.assertEqual(no_results.json()["results"], [])
+
+    def test_ricerca_combinata_codice_e_descrizione(self):
+        """Ogni parola cerca in tutti i campi: «sifone 540388» trova l'articolo,
+        anche invertendo l'ordine; basta che ogni parola trovi riscontro."""
+        sifone = Product.objects.create(
+            name="Sifone lavabo salvaspazio",
+            code="540388",
+            uom=self.uom,
+            sale_price="10.00",
+            sale_vat=self.vat,
+            purchase_price="5.00",
+            purchase_vat=self.vat,
+        )
+        Product.objects.create(
+            name="Bullone M10 zincato",
+            code="ARTM10",
+            uom=self.uom,
+            sale_price="0.50",
+            sale_vat=self.vat,
+            purchase_price="0.25",
+            purchase_vat=self.vat,
+        )
+
+        per_descrizione = self.client.get(reverse("catalog:search"), {"q": "sifone 540388"})
+        self.assertEqual(
+            [r["id"] for r in per_descrizione.json()["results"]], [sifone.pk],
+            "descrizione e codice digitati insieme devono trovare l'articolo",
+        )
+        invertito = self.client.get(reverse("catalog:search"), {"q": "540388 sifone"})
+        self.assertEqual(invertito.json()["results"][0]["id"], sifone.pk)
+
+        contrastante = self.client.get(reverse("catalog:search"), {"q": "sifone M10"})
+        self.assertEqual(
+            contrastante.json()["results"], [],
+            "le parole di articoli diversi non devono mescolarsi",
+        )
+
+    def test_ricerca_preferisce_il_codice_esatto(self):
+        """Digitando un codice esatto la voce giusta arriva per prima."""
+        esatto = Product.objects.create(
+            name="Sifone lavabo", code="540388", uom=self.uom,
+            sale_price="10.00", sale_vat=self.vat, purchase_price="5.00", purchase_vat=self.vat,
+        )
+        Product.objects.create(
+            name="Ricambio sifone", code="540388-B", uom=self.uom,
+            sale_price="4.00", sale_vat=self.vat, purchase_price="2.00", purchase_vat=self.vat,
+        )
+        risultati = self.client.get(reverse("catalog:search"), {"q": "540388"}).json()["results"]
+        self.assertEqual(risultati[0]["id"], esatto.pk)

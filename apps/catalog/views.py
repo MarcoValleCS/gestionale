@@ -2,7 +2,7 @@ from decimal import Decimal
 import re
 
 from django.contrib import messages
-from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum, Value
+from django.db.models import Case, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -296,8 +296,21 @@ def product_search(request):
 
         queryset = queryset.filter(filtro_articoli(query))
 
+    if query:
+        # Chi cerca un codice lo trova subito: prima il codice esatto, poi
+        # i codici che iniziano col testo digitato, poi il resto.
+        ordinamento = Case(
+            When(code__iexact=query, then=Value(0)),
+            When(barcode=query, then=Value(0)),
+            When(code__istartswith=query, then=Value(1)),
+            default=Value(2),
+            output_field=IntegerField(),
+        )
+        queryset = queryset.order_by(ordinamento, "name")
+    else:
+        queryset = queryset.order_by("name")
     results = []
-    for product in queryset.order_by("name")[:12]:
+    for product in queryset[:12]:
         price = product.purchase_price if context_type == "purchase" else product.sale_price
         extra_parts = [f"{format_money(price)} €"]
         if product.category_id:
