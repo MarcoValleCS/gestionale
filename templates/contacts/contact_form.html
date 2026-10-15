@@ -47,8 +47,8 @@
         <div class="card-header">Agenzia</div>
         <div class="card-body">
           <div class="row">
+            {% include "partials/field.html" with field=form.agency_name col=6 %}
             {% include "partials/field.html" with field=form.agent_name col=6 %}
-            {% include "partials/field.html" with field=form.agent_number col=6 %}
             {% include "partials/field.html" with field=form.agent_phone col=6 %}
             {% include "partials/field.html" with field=form.agent_email col=6 %}
           </div>
