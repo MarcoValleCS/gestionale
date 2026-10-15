@@ -54,10 +54,12 @@ class Contact(TimeStampedModel):
     )
     # Agenzia/agente del fornitore: le richieste d'ordine possono partire
     # direttamente all'agenzia invece che alla sede del fornitore.
-    agent_name = models.CharField("Nome agente", max_length=100, blank=True)
-    agent_number = models.CharField("Numero agente", max_length=50, blank=True)
-    agent_phone = models.CharField("Telefono agente", max_length=40, blank=True)
-    agent_email = models.EmailField("Email agenzia", blank=True)
+    agency_name = models.CharField("Agenzia", max_length=100, blank=True)
+    agent_name = models.CharField("Agente", max_length=100, blank=True)
+    agent_phone = models.CharField("Telefono", max_length=40, blank=True)
+    agent_email = models.EmailField(
+        "Email", blank=True, help_text="Email a cui inviare le richieste d'ordine all'agenzia."
+    )
     tags = models.ManyToManyField(Tag, blank=True, related_name="contacts", verbose_name="Etichette")
     notes = models.TextField("Note", blank=True)
     active = models.BooleanField("Attivo", default=True)
@@ -102,4 +104,4 @@ class Contact(TimeStampedModel):
     @property
     def has_agency(self):
         """True se almeno un dato dell'agenzia è compilato."""
-        return bool(self.agent_name or self.agent_number or self.agent_phone or self.agent_email)
+        return bool(self.agency_name or self.agent_name or self.agent_phone or self.agent_email)

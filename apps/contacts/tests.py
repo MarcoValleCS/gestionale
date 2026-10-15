@@ -164,8 +164,8 @@ class AgenziaContattoTest(TestCase):
                 "name": self.fornitore.name,
                 "is_supplier": "on",
                 "country": "Italia",
+                "agency_name": "Rappresentanze Rossi",
                 "agent_name": "Mario Rossi",
-                "agent_number": "AG-77",
                 "agent_phone": "035 123456",
                 "agent_email": "agente@agenzia.it",
                 "active": "on",
@@ -173,22 +173,24 @@ class AgenziaContattoTest(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.fornitore.refresh_from_db()
+        self.assertEqual(self.fornitore.agency_name, "Rappresentanze Rossi")
         self.assertEqual(self.fornitore.agent_name, "Mario Rossi")
-        self.assertEqual(self.fornitore.agent_number, "AG-77")
         self.assertEqual(self.fornitore.agent_phone, "035 123456")
         self.assertEqual(self.fornitore.agent_email, "agente@agenzia.it")
         self.assertTrue(self.fornitore.has_agency)
 
     def test_modulo_mostra_i_campi_dellagenzia(self):
         pagina = self.client.get(reverse("contacts:update", args=[self.fornitore.pk])).content.decode("utf-8")
-        for campo in ("agent_name", "agent_number", "agent_phone", "agent_email"):
+        for campo in ("agency_name", "agent_name", "agent_phone", "agent_email"):
             self.assertIn(f'name="{campo}"', pagina)
 
     def test_scheda_mostra_la_sezione_agenzia(self):
+        self.fornitore.agency_name = "Rappresentanze Rossi"
         self.fornitore.agent_name = "Mario Rossi"
         self.fornitore.agent_email = "agente@agenzia.it"
-        self.fornitore.save(update_fields=["agent_name", "agent_email"])
+        self.fornitore.save(update_fields=["agency_name", "agent_name", "agent_email"])
         pagina = self.client.get(reverse("contacts:detail", args=[self.fornitore.pk])).content.decode("utf-8")
         self.assertIn("Agenzia", pagina)
+        self.assertIn("Rappresentanze Rossi", pagina)
         self.assertIn("Mario Rossi", pagina)
         self.assertIn("agente@agenzia.it", pagina)

@@ -53,11 +53,11 @@ class PoEmailTest(TestCase):
         self.assertIn(f"Ordine {order.number}", pagina)
 
     def _fornitore_con_agenzia(self):
+        self.supplier.agency_name = "Rappresentanze Rossi"
         self.supplier.agent_name = "Mario Rossi"
-        self.supplier.agent_number = "AG-77"
         self.supplier.agent_phone = "035 123456"
         self.supplier.agent_email = "agente@agenzia.it"
-        self.supplier.save(update_fields=["agent_name", "agent_number", "agent_phone", "agent_email"])
+        self.supplier.save(update_fields=["agency_name", "agent_name", "agent_phone", "agent_email"])
 
     def test_scheda_offre_la_scelta_dellagenzia(self):
         """Con i dati agenzia compare la scelta tra agenzia e fornitore."""
@@ -66,6 +66,7 @@ class PoEmailTest(TestCase):
         pagina = self.client.get(reverse("purchasing:po_detail", args=[order.pk])).content.decode("utf-8")
         self.assertIn('name="destinatario"', pagina)
         self.assertIn('value="agenzia"', pagina)
+        self.assertIn("Rappresentanze Rossi", pagina)
         self.assertIn("agente@agenzia.it", pagina)
 
     @override_settings(EMAIL_IS_CONFIGURED=True)
