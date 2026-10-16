@@ -80,3 +80,22 @@ class AbuseThrottleMiddleware:
         if name == "search":
             return JsonResponse({"error": message, "results": []}, status=429)
         return HttpResponse(f"<h1>429 — Troppe richieste</h1><p>{message}</p>", status=429, content_type="text/html; charset=utf-8")
+
+
+class NoIndexMiddleware:
+    """Vieta l'indicizzazione del gestionale da parte dei motori di ricerca.
+
+    Ogni risposta porta l'intestazione ``X-Robots-Tag: noindex, nofollow``: è
+    il modo affidabile per tenere fuori tutto (pagine, PDF, file) dai
+    risultati di ricerca. Le pagine HTML hanno anche il tag
+    ``<meta name="robots">`` e Caddy ripete l'intestazione su ciò che serve
+    senza passare da Django.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response.setdefault("X-Robots-Tag", "noindex, nofollow")
+        return response

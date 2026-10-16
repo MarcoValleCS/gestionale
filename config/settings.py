@@ -190,6 +190,7 @@ MIDDLEWARE = [
     "apps.core.middleware.AbuseThrottleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.NoIndexMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
