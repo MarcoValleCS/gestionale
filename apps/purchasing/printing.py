@@ -26,6 +26,10 @@ def po_print_context(order, *, back_url=None):
         ],
         back_url=back_url or reverse("purchasing:po_detail", args=[order.pk]),
         notes=order.notes,
+        # stampa essenziale per il fornitore: niente righe di sezione; le
+        # colonne mostrano prezzo di listino, sconto applicato e prezzo netto
+        show_sections=False,
+        show_net_price=True,
         show_signature=False,
     )
     context["company"] = company
