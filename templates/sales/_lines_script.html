@@ -228,6 +228,13 @@
         if (uom && data.uom_id) uom.value = data.uom_id;
         const price = row.querySelector('[name$="-unit_price"]');
         if (price) price.value = data.price;
+        // Acquisti: il prezzo arriva di listino e lo sconto dal listino del
+        // fornitore, così in riga si legge listino − sconto. Nelle vendite il
+        // campo sconto resta com'è (lo decide chi compila).
+        const sconto = row.querySelector('[name$="-discount_pct"]');
+        if (sconto && productSelect.dataset.context === "purchase" && data.discount !== undefined && data.discount !== null) {
+          sconto.value = data.discount;
+        }
         const vat = row.querySelector('[name$="-vat_rate"]');
         if (vat && data.vat_id) vat.value = data.vat_id;
         // La quantità non arriva dall'articolo: se la riga è vuota

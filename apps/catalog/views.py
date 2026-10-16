@@ -161,10 +161,19 @@ def product_defaults(request, pk):
 
     if context_type == "purchase":
         vat = product.purchase_vat
-        price = product.purchase_unit_price(supplier)
+        voce = product.supplier_list_item(supplier)
+        if voce is not None:
+            # prezzo di listino e sconto del listino: il netto lo calcola la riga
+            price = voce.price
+            discount = voce.discount_pct
+        else:
+            # nessun listino: il prezzo di acquisto dell'articolo è già netto
+            price = product.purchase_price
+            discount = Decimal("0")
     else:
         vat = product.sale_vat
         price = product.sale_price
+        discount = Decimal("0")
 
     components = []
     if product.is_kit:
@@ -188,6 +197,7 @@ def product_defaults(request, pk):
             "vat_id": vat.pk if vat else "",
             "vat_label": str(vat) if vat else "",
             "price": str(price or Decimal("0")),
+            "discount": str(discount or Decimal("0")),
             "cost": str(product.purchase_price or Decimal("0")),
             "supplier_id": supplier.id if supplier else "",
             "is_kit": product.is_kit,
