@@ -13,6 +13,7 @@ from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, R
 from apps.contacts.models import Contact
 from apps.core.models import Tag
 from apps.core.utils import format_money, to_decimal
+from apps.core.rounding import round2
 from apps.inventory.models import StockLevel
 
 from . import importer
@@ -152,6 +153,20 @@ class ProductUpdateView(RoleRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
+def sconto_per_prezzo_acquisto(prezzo_vendita, prezzo_acquisto):
+    """Sconto % da applicare al prezzo di vendita per ottenere il prezzo di acquisto.
+
+    Es. vendita 1.341,00 e acquisto 603,45 → 55%: la riga d'acquisto mostra il
+    prezzo di vendita con lo sconto, e il netto torna il prezzo di acquisto.
+    """
+    vendita = Decimal(prezzo_vendita or 0)
+    acquisto = Decimal(prezzo_acquisto or 0)
+    if vendita <= 0 or acquisto <= 0:
+        return Decimal("0")
+    sconto = round2((1 - acquisto / vendita) * 100)
+    return max(Decimal("0"), min(Decimal("100"), sconto))
+
+
 def product_defaults(request, pk):
     """Dati per il riempimento automatico delle righe documento (JSON)."""
     product = get_object_or_404(Product, pk=pk)
@@ -161,15 +176,11 @@ def product_defaults(request, pk):
 
     if context_type == "purchase":
         vat = product.purchase_vat
-        voce = product.supplier_list_item(supplier)
-        if voce is not None:
-            # prezzo di listino e sconto del listino: il netto lo calcola la riga
-            price = voce.price
-            discount = voce.discount_pct
-        else:
-            # nessun listino: il prezzo di acquisto dell'articolo è già netto
-            price = product.purchase_price
-            discount = Decimal("0")
+        # Righe d'acquisto: si parte dal prezzo di vendita dell'articolo e lo
+        # sconto si calcola in automatico per arrivare al prezzo di acquisto
+        # (il netto da pagare).
+        price = product.sale_price
+        discount = sconto_per_prezzo_acquisto(product.sale_price, product.purchase_price)
     else:
         vat = product.sale_vat
         price = product.sale_price
@@ -321,8 +332,14 @@ def product_search(request):
         queryset = queryset.order_by("name")
     results = []
     for product in queryset[:12]:
-        price = product.purchase_price if context_type == "purchase" else product.sale_price
-        extra_parts = [f"{format_money(price)} €"]
+        if context_type == "purchase":
+            # nelle righe d'acquisto servono entrambi i prezzi dell'articolo
+            extra_parts = [
+                f"Vendita {format_money(product.sale_price)} €",
+                f"Acquisto {format_money(product.purchase_price)} €",
+            ]
+        else:
+            extra_parts = [f"{format_money(product.sale_price)} €"]
         if product.category_id:
             extra_parts.append(product.category.name)
         extra_parts.append(product.uom.code)
