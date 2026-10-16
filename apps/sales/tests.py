@@ -1950,6 +1950,121 @@ class RigheStileOdooTest(FlowTestBase):
         self.assertEqual(dati["lines"][0]["line_type"], "section")
         self.assertEqual(dati["lines"][1]["line_type"], "article")
 
+    # ------------------------------------------------ spostamento delle righe
+    def _riga_payload(self, numero, riga, posizione, descrizione):
+        return {
+            f"lines-{numero}-id": riga.pk,
+            f"lines-{numero}-position": str(posizione),
+            f"lines-{numero}-line_type": "article",
+            f"lines-{numero}-section": "",
+            f"lines-{numero}-product": self.product.pk,
+            f"lines-{numero}-description": descrizione,
+            f"lines-{numero}-qty": "1",
+            f"lines-{numero}-uom": self.uom.pk,
+            f"lines-{numero}-unit_price": "10.00",
+            f"lines-{numero}-discount_pct": "0",
+            f"lines-{numero}-vat_rate": self.vat22.pk,
+        }
+
+    def _payload_documento(self, campi, righe):
+        """``righe``: lista di (riga, posizione, descrizione) nell'ordine voluto."""
+        payload = dict(campi)
+        payload.update(
+            {
+                "lines-TOTAL_FORMS": str(len(righe)),
+                "lines-INITIAL_FORMS": str(len(righe)),
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+            }
+        )
+        for numero, (riga, posizione, descrizione) in enumerate(righe):
+            payload.update(self._riga_payload(numero, riga, posizione, descrizione))
+        return payload
+
+    def _campi_ordine(self):
+        return {
+            "customer": self.customer.pk, "date": "2026-10-16", "expected_date": "",
+            "payment_term": "", "reference": "", "commission_contact": "",
+            "commission_pct": "0", "terms_text": "", "notes": "",
+        }
+
+    def test_spostare_le_righe_dellordine_viene_salvato(self):
+        """Le frecce su/giù cambiano solo la posizione: il salvataggio deve
+        riscriverla anche quando nessun altro campo è cambiato."""
+        ordine = SalesOrder.objects.create(customer=self.customer)
+        prima = ordine.lines.create(
+            product=self.product, description="Prima", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22, position=1,
+        )
+        seconda = ordine.lines.create(
+            product=self.product, description="Seconda", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22, position=2,
+        )
+        ordine.recalculate()
+
+        # il JavaScript manda la riga spostata in cima con posizione 1
+        risposta = self.client.post(
+            reverse("sales:order_update", args=[ordine.pk]),
+            self._payload_documento(self._campi_ordine(), [(seconda, 1, "Seconda"), (prima, 2, "Prima")]),
+        )
+        self.assertEqual(risposta.status_code, 302)
+        descrizioni = list(
+            SalesOrder.objects.get(pk=ordine.pk)
+            .lines.order_by("position", "pk")
+            .values_list("description", flat=True)
+        )
+        self.assertEqual(descrizioni, ["Seconda", "Prima"], "l'ordine scelto con le frecce deve restare")
+
+    def test_spostare_le_righe_di_un_ordine_confermato_viene_salvato(self):
+        """Vale anche per gli ordini già confermati (modificabili con avviso)."""
+        ordine = SalesOrder.objects.create(customer=self.customer, status=SalesOrder.STATUS_CONFIRMED)
+        prima = ordine.lines.create(
+            product=self.product, description="Prima", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22, position=1,
+        )
+        seconda = ordine.lines.create(
+            product=self.product, description="Seconda", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22, position=2,
+        )
+        ordine.recalculate()
+
+        risposta = self.client.post(
+            reverse("sales:order_update", args=[ordine.pk]),
+            self._payload_documento(self._campi_ordine(), [(seconda, 1, "Seconda"), (prima, 2, "Prima")]),
+        )
+        self.assertEqual(risposta.status_code, 302)
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.status, SalesOrder.STATUS_CONFIRMED)
+        descrizioni = list(ordine.lines.order_by("position", "pk").values_list("description", flat=True))
+        self.assertEqual(descrizioni, ["Seconda", "Prima"])
+
+    def test_spostare_le_righe_del_preventivo_viene_salvato(self):
+        quote = Quote.objects.create(customer=self.customer)
+        prima = quote.lines.create(
+            product=self.product, description="Prima", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22, position=1,
+        )
+        seconda = quote.lines.create(
+            product=self.product, description="Seconda", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22, position=2,
+        )
+        quote.recalculate()
+        campi = {
+            "customer": self.customer.pk, "date": "2026-10-16", "valid_until": "",
+            "payment_term": "", "reference": "", "commission_contact": "",
+            "commission_pct": "0", "terms_text": "", "notes": "",
+        }
+        risposta = self.client.post(
+            reverse("sales:quote_update", args=[quote.pk]),
+            self._payload_documento(campi, [(seconda, 1, "Seconda"), (prima, 2, "Prima")]),
+        )
+        self.assertEqual(risposta.status_code, 302)
+        descrizioni = list(
+            Quote.objects.get(pk=quote.pk).lines.order_by("position", "pk")
+            .values_list("description", flat=True)
+        )
+        self.assertEqual(descrizioni, ["Seconda", "Prima"])
+
 
 class MargineSchedeTest(FlowTestBase):
     """Il margine si vede nelle schede in ogni stato, non solo nel form."""

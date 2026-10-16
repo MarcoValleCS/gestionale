@@ -395,12 +395,21 @@ def save_document_lines(document, formset, fk_field):
     if "position" in getattr(formset.form, "base_fields", {}):
         righe = [f.instance for f in formset.forms if f.instance.pk and f.instance.pk not in eliminati]
         righe.sort(key=lambda riga: (riga.position or 0, riga.pk))
+        # La posizione va confrontata con quella salvata nel database, non con
+        # quella in memoria: quando l'utente sposta soltanto le righe i form non
+        # risultano «cambiati» (posizione e tipo riga sono campi di servizio) e
+        # il salvataggio verrebbe saltato, perdendo lo spostamento.
+        posizioni_salvate = dict(document.lines.values_list("pk", "position"))
+        for position, line in enumerate(righe, start=1):
+            if posizioni_salvate.get(line.pk) != position:
+                line.position = position
+                line.save(update_fields=["position"])
     else:
         righe = list(document.lines.order_by("pk"))
-    for position, line in enumerate(righe, start=1):
-        if line.position != position:
-            line.position = position
-            line.save(update_fields=["position"])
+        for position, line in enumerate(righe, start=1):
+            if line.position != position:
+                line.position = position
+                line.save(update_fields=["position"])
     services.espandi_kit(document, fk_field)
     if hasattr(document, "recalculate"):
         document.recalculate()
