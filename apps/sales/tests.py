@@ -1170,6 +1170,7 @@ class BugVariTest(FlowTestBase):
         pagina = response.content.decode("utf-8")
         self.assertNotIn("Sc. %", pagina, "lo sconto non deve comparire nel preventivo per il cliente")
         self.assertNotIn("20%", pagina, "la percentuale di sconto non deve comparire")
+        self.assertNotIn("Netto", pagina, "il preventivo non ha la colonna del prezzo netto")
 
     def test_il_preventivo_stampato_mostra_il_prezzo_gia_scontato(self):
         quote = self._preventivo_scontato()

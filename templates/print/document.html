@@ -290,6 +290,7 @@
           <th style="width:12mm">U.d.M.</th>
           <th class="num" style="width:20mm">Prezzo</th>
           {% if show_discount %}<th class="num" style="width:14mm">Sc. %</th>{% endif %}
+          {% if show_net_price %}<th class="num" style="width:20mm">Netto</th>{% endif %}
           <th class="num" style="width:14mm">IVA</th>
           <th class="num" style="width:22mm">Importo</th>
           {% else %}
@@ -328,6 +329,7 @@
           {% if show_prices %}
           <td class="num">{% if show_discount %}{{ line.unit_price|money }} €{% else %}{{ line.net_unit_price|net_price }} €{% endif %}</td>
           {% if show_discount %}<td class="num">{{ line.discount_pct|qty }}%</td>{% endif %}
+          {% if show_net_price %}<td class="num">{{ line.net_unit_price|net_price }} €</td>{% endif %}
           <td class="num">{{ line.vat_rate.rate|qty }}%</td>
           <td class="num">{% if gross_amounts %}{{ line.line_total|money }}{% else %}{{ line.line_subtotal|money }}{% endif %} €</td>
           {% endif %}

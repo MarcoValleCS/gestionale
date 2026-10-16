@@ -181,3 +181,45 @@ class RicezioneConDdtFornitoreTest(TestCase):
             reverse("purchasing:po_print", args=[self.ordine.pk])
         ).content.decode("utf-8")
         self.assertIn(self.articolo.code, pagina, "l'ordine fornitore mostra il codice articolo")
+
+
+class StampaOrdineFornitoreTest(TestCase):
+    """La stampa per il fornitore: niente sezioni; lordo, sconto e netto."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_superuser("admin", "admin@example.com", "password123!")
+        cls.uom = UnitOfMeasure.objects.get(code="PZ")
+        cls.vat = VatRate.objects.get(code="22")
+        cls.fornitore = Contact.objects.create(name="Fornitore Stampa S.p.A.", is_customer=False, is_supplier=True)
+        cls.articolo = Product.objects.create(
+            name="Articolo stampa", uom=cls.uom, sale_price=Decimal("150"),
+            sale_vat=cls.vat, purchase_price=Decimal("100"), purchase_vat=cls.vat,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+        self.ordine = PurchaseOrder.objects.create(supplier=self.fornitore)
+        self.ordine.lines.create(line_type="section", description="SEZIONE DA NASCONDERE")
+        self.ordine.lines.create(
+            product=self.articolo, description="Riga con sconto", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("100.00"), discount_pct=Decimal("20"),
+            vat_rate=self.vat,
+        )
+        self.ordine.recalculate()
+
+    def _pagina(self):
+        return self.client.get(
+            reverse("purchasing:po_print", args=[self.ordine.pk])
+        ).content.decode("utf-8")
+
+    def test_niente_sezioni_nella_stampa(self):
+        pagina = self._pagina()
+        self.assertNotIn("SEZIONE DA NASCONDERE", pagina, "le sezioni non si stampano nell'ordine fornitore")
+
+    def test_colonne_lordo_sconto_e_netto(self):
+        pagina = self._pagina()
+        self.assertIn("Netto", pagina, "deve esserci la colonna del prezzo netto")
+        self.assertIn('<td class="num">100,00 €</td>', pagina, "il prezzo di listino (lordo)")
+        self.assertIn('<td class="num">20%</td>', pagina, "lo sconto applicato")
+        self.assertIn('<td class="num">80,00 €</td>', pagina, "il prezzo netto")

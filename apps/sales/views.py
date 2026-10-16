@@ -301,6 +301,7 @@ def build_print_context(
     show_discount=True,
     show_sections=True,
     show_product_code=True,
+    show_net_price=False,
     hide_kit_components=False,
     extra_fields=None,
     gross_amounts=False,
@@ -310,9 +311,11 @@ def build_print_context(
     Con ``gross_amounts=True`` gli importi di riga e i totali di sezione
     includono l'IVA (stampe al cliente: preventivi e conferme d'ordine).
     Con ``show_sections=False`` si nascondono intestazioni e subtotali di
-    sezione e sottosezione (stampe pulite: fatture).
+    sezione e sottosezione (stampe pulite: fatture, ordini fornitore).
     Con ``show_product_code=False`` si nasconde il codice articolo (preventivi:
     è un dato interno, non serve al cliente).
+    Con ``show_net_price=True`` si aggiunge la colonna del prezzo netto accanto
+    a prezzo di listino e sconto (ordini fornitore: si vede subito il netto).
     Con ``hide_kit_components=True`` le righe dei componenti aperte dai kit
     non si stampano: resta solo la voce del kit (nel documento restano, perché
     servono a magazzino e consegne).
@@ -327,6 +330,8 @@ def build_print_context(
     # Viene calcolato qui per non lasciare aritmetica fragile nel template.
     if show_prices:
         colonne = 8 if show_discount else 7
+        if show_net_price:
+            colonne += 1
     else:
         colonne = 4
     return {
@@ -347,6 +352,7 @@ def build_print_context(
         "show_discount": show_discount,
         "show_sections": show_sections,
         "show_product_code": show_product_code,
+        "show_net_price": show_net_price,
         "gross_amounts": gross_amounts,
         "table_columns": colonne,
         # Le viste di stampa lo valorizzano (download del PDF generato dal
