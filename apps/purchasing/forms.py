@@ -97,3 +97,6 @@ class PurchaseOrderLineForm(LineFormMixin, BaseBootstrapModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_line_fields()
+        # L'ordine fornitore non gestisce le sezioni: il campo resta nascosto
+        # (i valori già salvati nelle righe restano intatti).
+        self.fields["section"].widget = forms.HiddenInput()

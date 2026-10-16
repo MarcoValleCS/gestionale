@@ -223,3 +223,20 @@ class StampaOrdineFornitoreTest(TestCase):
         self.assertIn('<td class="num">100,00 €</td>', pagina, "il prezzo di listino (lordo)")
         self.assertIn('<td class="num">20%</td>', pagina, "lo sconto applicato")
         self.assertIn('<td class="num">80,00 €</td>', pagina, "il prezzo netto")
+
+
+class ColonneModuliAcquistiTest(TestCase):
+    """I moduli di acquisto non mostrano più la colonna Sezione."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_superuser("admin", "admin@example.com", "password123!")
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def test_niente_colonna_sezione_in_ordine_e_fattura(self):
+        for url in (reverse("purchasing:po_create"), reverse("billing:purchaseinvoice_create")):
+            with self.subTest(url=url):
+                pagina = self.client.get(url).content.decode("utf-8")
+                self.assertNotIn(">Sezione<", pagina, "la colonna Sezione non deve comparire")

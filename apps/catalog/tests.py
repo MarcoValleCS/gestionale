@@ -459,3 +459,37 @@ class QuickCreateTest(TestCase):
         )
         risultati = self.client.get(reverse("catalog:search"), {"q": "540388"}).json()["results"]
         self.assertEqual(risultati[0]["id"], esatto.pk)
+
+    def test_defaults_acquisto_dal_listino_fornitore(self):
+        """Nelle righe d'acquisto arrivano il prezzo di listino e lo sconto del
+        listino del fornitore: il netto lo calcola la riga."""
+        from apps.purchasing.models import PriceListItem, SupplierPriceList
+
+        fornitore = Contact.objects.create(name="Fornitore Listino", is_customer=False, is_supplier=True)
+        articolo = Product.objects.create(
+            name="Articolo listino", uom=self.uom, sale_price=Decimal("150.00"),
+            sale_vat=self.vat, purchase_price=Decimal("90.00"), purchase_vat=self.vat,
+        )
+        listino = SupplierPriceList.objects.create(supplier=fornitore, name="Listino prova")
+        PriceListItem.objects.create(
+            pricelist=listino, product=articolo,
+            price=Decimal("100.00"), discount_pct=Decimal("20"),
+        )
+
+        dati = self.client.get(
+            reverse("catalog:product_defaults", args=[articolo.pk]),
+            {"context": "purchase", "supplier": fornitore.pk},
+        ).json()
+        self.assertEqual(dati["price"], "100.0000", "il prezzo proposto è quello di listino")
+        self.assertEqual(dati["discount"], "20.00", "lo sconto proposto è quello del listino")
+
+        senza_listino = Product.objects.create(
+            name="Articolo senza listino", uom=self.uom, sale_price=Decimal("50.00"),
+            sale_vat=self.vat, purchase_price=Decimal("40.00"), purchase_vat=self.vat,
+        )
+        dati = self.client.get(
+            reverse("catalog:product_defaults", args=[senza_listino.pk]),
+            {"context": "purchase", "supplier": fornitore.pk},
+        ).json()
+        self.assertEqual(dati["price"], "40.0000", "senza listino vale il prezzo di acquisto")
+        self.assertEqual(dati["discount"], "0")

@@ -137,10 +137,16 @@ class Product(TimeStampedModel):
         return self.total_stock < self.min_stock
 
     # ------------------------------------------------------ prezzi fornitore
-    def supplier_price(self, supplier):
-        """Miglior prezzo effettivo dai listini attivi del fornitore (None se assente)."""
+    def supplier_list_item(self, supplier):
+        """Voce di listino attiva del fornitore col miglior prezzo effettivo.
+
+        Serve a riempire le righe d'acquisto col prezzo di listino e lo sconto
+        del listino: la riga mostra i due numeri e il netto lo calcola da sé.
+        """
         from apps.purchasing.models import PriceListItem
 
+        if supplier is None:
+            return None
         today = timezone.localdate()
         items = (
             PriceListItem.objects.filter(
@@ -152,8 +158,12 @@ class Product(TimeStampedModel):
             .filter(Q(pricelist__valid_to__isnull=True) | Q(pricelist__valid_to__gte=today))
             .select_related("pricelist")
         )
-        prices = [item.effective_price for item in items]
-        return min(prices) if prices else None
+        return min(items, key=lambda item: item.effective_price, default=None)
+
+    def supplier_price(self, supplier):
+        """Miglior prezzo effettivo dai listini attivi del fornitore (None se assente)."""
+        item = self.supplier_list_item(supplier)
+        return item.effective_price if item else None
 
     def purchase_unit_price(self, supplier=None):
         """Prezzo di acquisto da usare per gli ordini fornitore.
