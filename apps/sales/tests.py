@@ -1187,6 +1187,22 @@ class BugVariTest(FlowTestBase):
         self.assertIn("800,00", pagina)
         self.assertIn("976,00", pagina)
 
+    def test_lordine_stampato_non_mostra_lo_sconto(self):
+        """Conferma d'ordine per il cliente: niente colonna sconto, prezzo già netto."""
+        ordine = SalesOrder.objects.create(customer=self.customer)
+        ordine.lines.create(
+            product=self.product, description="Con sconto", qty=Decimal("10"),
+            uom=self.uom, unit_price=Decimal("100.00"), discount_pct=Decimal("20"),
+            vat_rate=self.vat22,
+        )
+        ordine.recalculate()
+        pagina = self.client.get(reverse("sales:order_print", args=[ordine.pk])).content.decode("utf-8")
+        self.assertNotIn("Sc. %", pagina, "lo sconto non deve comparire nella conferma d'ordine")
+        self.assertNotIn("20%", pagina, "la percentuale di sconto non deve comparire")
+        # 100 meno il 20% = 80,00: è questo che legge il cliente
+        self.assertIn("80,00", pagina, "deve comparire il prezzo netto, non quello di listino")
+        self.assertNotIn("100,00", pagina, "il prezzo di listino non deve comparire")
+
     def test_la_fattura_stampata_e_pulita(self):
         """Fattura al cliente: niente sezioni né colonna sconto, prezzo già al netto."""
         from apps.billing.models import SalesInvoice

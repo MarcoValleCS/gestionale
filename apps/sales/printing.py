@@ -65,6 +65,8 @@ def order_print_context(order, *, back_url=None):
         notes=order.terms_text,
         show_signature=True,
         signature_label="Conferma d'ordine (data e firma)",
+        # lo sconto è una trattativa interna: al cliente va il prezzo già scontato
+        show_discount=False,
         # come nei preventivi: al cliente gli importi comprensivi di IVA
         gross_amounts=True,
     )
