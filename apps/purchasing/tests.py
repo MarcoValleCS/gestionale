@@ -240,3 +240,45 @@ class ColonneModuliAcquistiTest(TestCase):
             with self.subTest(url=url):
                 pagina = self.client.get(url).content.decode("utf-8")
                 self.assertNotIn(">Sezione<", pagina, "la colonna Sezione non deve comparire")
+
+
+class RinormalizzaPrezziOrdiniTest(TestCase):
+    """Righe in bozza: prezzo di listino + sconto, netto invariato."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.uom = UnitOfMeasure.objects.get(code="PZ")
+        cls.iva = VatRate.objects.get(code="22")
+        cls.fornitore = Contact.objects.create(name="Fornitore Prezzi", is_customer=False, is_supplier=True)
+        cls.articolo = Product.objects.create(
+            name="Vasca listino", uom=cls.uom, sale_price=Decimal("802.00"),
+            sale_vat=cls.iva, purchase_price=Decimal("313.10"), purchase_vat=cls.iva,
+        )
+
+    def _ordine(self):
+        ordine = PurchaseOrder.objects.create(
+            supplier=self.fornitore, status=PurchaseOrder.STATUS_DRAFT
+        )
+        riga = ordine.lines.create(
+            product=self.articolo, description="Vasca", qty=Decimal("1"),
+            uom=self.uom, unit_price=Decimal("313.10"), discount_pct=Decimal("0"),
+            vat_rate=self.iva,
+        )
+        ordine.recalculate()
+        return ordine, riga
+
+    def test_anteprima_non_scrive(self):
+        _ordine, riga = self._ordine()
+        call_command("rinormalizza_prezzi_ordini_fornitore", stdout=StringIO())
+        riga.refresh_from_db()
+        self.assertEqual(riga.unit_price, Decimal("313.1000"))
+
+    def test_applica_listino_e_sconto(self):
+        ordine, riga = self._ordine()
+        call_command("rinormalizza_prezzi_ordini_fornitore", "--applica", stdout=StringIO())
+        riga.refresh_from_db()
+        self.assertEqual(riga.unit_price, Decimal("802.0000"), "prezzo di listino")
+        self.assertEqual(riga.discount_pct, Decimal("60.96"), "sconto per arrivare a 313,10")
+        self.assertEqual(riga.line_subtotal, Decimal("313.10"), "il netto non cambia")
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.grand_total, Decimal("381.98"))

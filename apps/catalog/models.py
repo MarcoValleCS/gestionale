@@ -8,6 +8,22 @@ from apps.contacts.models import Contact
 from apps.core.models import Tag, TimeStampedModel, UnitOfMeasure, VatRate
 
 
+def sconto_per_prezzo_acquisto(prezzo_vendita, prezzo_acquisto):
+    """Sconto % da applicare al prezzo di vendita per ottenere il prezzo di acquisto.
+
+    Es. vendita 802,00 e acquisto 313,10 → 60,96%: la riga d'acquisto mostra il
+    prezzo di listino con lo sconto, e il netto torna il prezzo di acquisto.
+    """
+    vendita = Decimal(prezzo_vendita or 0)
+    acquisto = Decimal(prezzo_acquisto or 0)
+    if vendita <= 0 or acquisto <= 0:
+        return Decimal("0")
+    from apps.core.rounding import round2
+
+    sconto = round2((1 - acquisto / vendita) * 100)
+    return max(Decimal("0"), min(Decimal("100"), sconto))
+
+
 class Category(models.Model):
     name = models.CharField("Nome", max_length=100, unique=True)
     parent = models.ForeignKey(
