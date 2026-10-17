@@ -189,7 +189,7 @@
               <td class="text-end {% if line.qty_delivered >= line.qty %}text-success{% elif line.qty_delivered > 0 %}text-warning{% endif %}">
                 {{ line.qty_delivered|qty }}
               </td>
-              <td class="text-end">{{ received_map|lookup:line.pk|qty }}</td>
+              <td class="text-end text-success">{{ received_map|lookup:line.pk|qty }}</td>
               <td>{{ line.uom.code|default:"—" }}</td>
               <td class="text-end">{{ line.unit_price|money }} €</td>
               <td class="text-end">{{ line.discount_pct|qty }}%</td>
