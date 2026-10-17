@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.catalog.models import sconto_per_prezzo_acquisto
 from apps.inventory.models import StockMovement
 from apps.inventory.services import register_movement
 
@@ -232,6 +233,15 @@ def confirm_sales_order(order, user=None, replenish=False):
                 created_by=user,
             )
             for position, (product, quantity) in enumerate(group["items"], start=1):
+                # Prezzo di listino (quello di vendita dell'articolo) e sconto
+                # che porta al prezzo di acquisto: l'ordine inviato al fornitore
+                # mostra listino e sconto, e il netto resta quello di prima.
+                netto = product.purchase_unit_price(supplier)
+                prezzo_listino = netto
+                sconto = Decimal("0")
+                if netto > 0 and (product.sale_price or 0) > netto:
+                    prezzo_listino = product.sale_price
+                    sconto = sconto_per_prezzo_acquisto(prezzo_listino, netto)
                 PurchaseOrderLine.objects.create(
                     po=po,
                     position=position,
@@ -239,7 +249,8 @@ def confirm_sales_order(order, user=None, replenish=False):
                     description=product.name,
                     qty=quantity,
                     uom=product.uom,
-                    unit_price=product.purchase_unit_price(supplier),
+                    unit_price=prezzo_listino,
+                    discount_pct=sconto,
                     vat_rate=product.purchase_vat,
                 )
             po.recalculate()

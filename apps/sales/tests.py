@@ -116,7 +116,9 @@ class FullFlowTest(FlowTestBase):
         self.assertEqual(po.source_sales_order, order)
         po_line = po.lines.get()
         self.assertEqual(po_line.qty, Decimal("10"))
-        self.assertEqual(po_line.unit_price, Decimal("5.00"))
+        self.assertEqual(po_line.unit_price, Decimal("10.0000"), "prezzo di listino (vendita)")
+        self.assertEqual(po_line.discount_pct, Decimal("50.00"), "sconto per arrivare al prezzo di acquisto")
+        self.assertEqual(po_line.line_subtotal, Decimal("50.00"), "netto invariato: 10 × 5")
 
         # 5. Ricezione merce → carico magazzino
         self.client.post(reverse("purchasing:po_receive", args=[po.pk]), {"receive_all": "1"})
@@ -181,6 +183,21 @@ class FullFlowTest(FlowTestBase):
         result = services.confirm_sales_order(order, user=self.user, replenish=True)
         po = result["purchase_orders"][0]
         self.assertEqual(po.lines.get().qty, Decimal("20"))
+
+    def test_ordine_fornitore_generato_usa_listino_e_sconto(self):
+        """La carenza genera l'ordine fornitore con prezzo di listino e sconto
+        che porta al prezzo di acquisto (netto invariato)."""
+        order = SalesOrder.objects.create(customer=self.customer)
+        order.lines.create(
+            product=self.product, description="x", qty=Decimal("4"),
+            uom=self.uom, unit_price=Decimal("10"), vat_rate=self.vat22,
+        )
+        order.recalculate()
+        result = services.confirm_sales_order(order, user=self.user)
+        riga = result["purchase_orders"][0].lines.get()
+        self.assertEqual(riga.unit_price, Decimal("10.0000"), "prezzo di listino (vendita)")
+        self.assertEqual(riga.discount_pct, Decimal("50.00"), "sconto per arrivare al prezzo di acquisto")
+        self.assertEqual(riga.line_subtotal, Decimal("20.00"), "netto invariato: 4 × 5")
 
     def test_ordine_fornitore_usa_giorni_consegna(self):
         self.product.supplier_lead_days = 5

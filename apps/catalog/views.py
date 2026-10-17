@@ -13,12 +13,11 @@ from apps.accounts.permissions import ROLE_ADMIN, ROLE_PURCHASING, ROLE_SALES, R
 from apps.contacts.models import Contact
 from apps.core.models import Tag
 from apps.core.utils import format_money, to_decimal
-from apps.core.rounding import round2
 from apps.inventory.models import StockLevel
 
 from . import importer
 from .forms import CategoryForm, ProductForm, ProductImportForm, ProductQuickForm
-from .models import Category, KitComponent, Product
+from .models import Category, KitComponent, Product, sconto_per_prezzo_acquisto
 
 # Somma delle giacenze come sottoquery correlata, non come JOIN + GROUP BY:
 # con il raggruppamento il database doveva materializzare tutto il catalogo
@@ -151,20 +150,6 @@ class ProductUpdateView(RoleRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Articolo aggiornato.")
         return super().form_valid(form)
-
-
-def sconto_per_prezzo_acquisto(prezzo_vendita, prezzo_acquisto):
-    """Sconto % da applicare al prezzo di vendita per ottenere il prezzo di acquisto.
-
-    Es. vendita 1.341,00 e acquisto 603,45 → 55%: la riga d'acquisto mostra il
-    prezzo di vendita con lo sconto, e il netto torna il prezzo di acquisto.
-    """
-    vendita = Decimal(prezzo_vendita or 0)
-    acquisto = Decimal(prezzo_acquisto or 0)
-    if vendita <= 0 or acquisto <= 0:
-        return Decimal("0")
-    sconto = round2((1 - acquisto / vendita) * 100)
-    return max(Decimal("0"), min(Decimal("100"), sconto))
 
 
 def product_defaults(request, pk):
