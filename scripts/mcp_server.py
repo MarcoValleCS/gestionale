@@ -10,8 +10,8 @@ Le chiamate Django (sincrone) girano in un thread dedicato via
 
     .\\.venv\\Scripts\\python.exe scripts\\mcp_server.py
 
-Per collegarlo a un client MCP (es. Claude Desktop, opencode) puntare il
-comando sopra come server stdio.
+Per collegarlo a un client MCP (es. Claude Desktop) puntare il comando sopra
+come server stdio.
 """
 import os
 import sys
