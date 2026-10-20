@@ -1,6 +1,6 @@
 # Gestionale aziendale
 
-Gestionale per Aquaforma: preventivi, ordini, magazzino, cantieri, personale e
+Gestionale Aziendale: preventivi, ordini, magazzino, cantieri, personale e
 fatturazione elettronica in un'unica applicazione Django, con l'interfaccia in
 italiano.
 
