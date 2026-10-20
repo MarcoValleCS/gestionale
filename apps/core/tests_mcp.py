@@ -826,6 +826,16 @@ class AutenticazioneMcpTest(TestCase):
         with self.assertRaises(RuntimeError):
             mcp_http.applicazione_http()
 
+    def test_piu_domini_ammessi(self):
+        # «DOMAIN» può elencare più domini separati da virgola.
+        os.environ.pop("MCP_ALLOWED_HOSTS", None)
+        os.environ["DOMAIN"] = "uno.example,due.example"
+        hosts, origini = mcp_http.domini_ammessi()
+        self.assertIn("uno.example", hosts)
+        self.assertIn("due.example", hosts)
+        self.assertIn("https://uno.example", origini)
+        self.assertIn("https://due.example", origini)
+
     def test_host_non_ammesso_rifiutato(self):
         os.environ["MCP_TOKEN"] = "segreto-123"
         os.environ["MCP_USER"] = "admin"

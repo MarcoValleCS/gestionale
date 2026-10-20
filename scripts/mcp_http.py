@@ -22,12 +22,11 @@ def domini_ammessi() -> tuple[list[str], list[str]]:
     """
     domini = [d.strip() for d in (os.environ.get("MCP_ALLOWED_HOSTS") or "").split(",") if d.strip()]
     if not domini:
-        dominio = (os.environ.get("DOMAIN") or "").strip()
-        if dominio:
-            domini = [dominio]
+        # «DOMAIN» può elencare più domini separati da virgola.
+        domini = [d.strip() for d in (os.environ.get("DOMAIN") or "").split(",") if d.strip()]
     origini = [o.strip() for o in (os.environ.get("MCP_ALLOWED_ORIGINS") or "").split(",") if o.strip()]
-    if not origini and domini:
-        origini = [f"https://{domini[0]}"]
+    if not origini:
+        origini = [f"https://{dominio}" for dominio in domini]
     hosts: list[str] = []
     for dominio in domini:
         hosts.append(dominio)
