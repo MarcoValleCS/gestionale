@@ -209,6 +209,70 @@ Nel client si configura come server stdio, con comando
 percorsi assoluti). Gli strumenti sono verificati da `apps/core/tests_mcp.py`,
 saltato se il pacchetto `mcp` non è installato.
 
+### In produzione (HTTPS con token)
+
+Lo stesso server può stare in produzione dietro Caddy, all'indirizzo
+`https://<dominio>/mcp`. Ogni richiesta deve avere l'intestazione
+`Authorization: Bearer <token>`: senza token non passa nulla.
+
+```bash
+# 1. Generare un token (segreto: non va condiviso)
+openssl rand -hex 32
+
+# 2. Nel .env
+#    MCP_ENABLED=true
+#    MCP_TOKEN=<il token generato>
+#    MCP_USER=admin          # a chi sono attribuite le scritture
+
+# 3. Avviare il servizio (profilo «mcp»: non parte con il solo «up -d»)
+docker compose --profile mcp up -d
+docker compose logs -f mcp
+```
+
+Nel client MCP si configura come server remoto:
+
+```json
+{
+  "mcp": {
+    "gestionale": {
+      "type": "remote",
+      "url": "https://gestionale.tuodominio.it/mcp",
+      "headers": { "Authorization": "Bearer <il token>" }
+    }
+  }
+}
+```
+
+Cosa protegge il server in produzione: token Bearer (confrontato a tempo
+costante), allowlist degli IP (`MCP_ALLOWED_IPS`), limite di richieste al
+minuto per token (`MCP_RATE_LIMIT`), protezione DNS rebinding (solo gli host
+dichiarati sono ammessi) e log di ogni chiamata (chi, che strumento, quanto
+tempo). Il contenitore non pubblica porte: l'unico ingresso è Caddy.
+
+Verifica che sia vivo e che chieda il token:
+
+```bash
+# Senza token: deve rispondere 401
+curl -s -o /dev/null -w "%{http_code}\n" https://gestionale.tuodominio.it/mcp
+
+# Con il token: risponde con l'identificazione del server
+curl -s -H "Authorization: Bearer <token>" \
+     -H "Accept: application/json, text/event-stream" \
+     -H "Content-Type: application/json" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"prova","version":"1"}}}' \
+     https://gestionale.tuodominio.it/mcp
+```
+
+Le scritture sono attribuite all'utente indicato dal token: i documenti
+risultano creati da una persona e il registro attività non mostra righe
+anonime. Con più utenti si possono usare token diversi (`MCP_TOKENS`), anche
+limitati alle sole letture (`mcp:sola-lettura`).
+
+Il server MCP **non** applica i ruoli dell'interfaccia: chi ha il token può
+fare tutto quello che può fare l'amministratore, compresi i dati che un
+collaboratore non vedrebbe. Il token va quindi trattato come una chiave di
+amministrazione.
+
 ## Deploy su VPS Linux (Docker)
 
 Serve un VPS (Ubuntu 22.04 o 24.04, 1–2 GB di RAM bastano) e, per l'HTTPS
@@ -267,6 +331,11 @@ accesso obbligatorio a tutte le pagine (sessioni di 12 ore), limite di 8
 tentativi di accesso ogni 5 minuti per IP e 120 ricerche al minuto, header di
 sicurezza e CSP, cookie `Secure` e `SameSite=Lax`, HTTPS con Caddy, upload
 limitati e tipi eseguibili rifiutati, dipendenze bloccate a versioni precise.
+
+Il server MCP (quando è attivo in produzione) è una seconda via d'accesso ai
+dati: è protetto da un token Bearer, ma **non** dai ruoli dell'interfaccia.
+Chi ha il token può fare tutto quello che può fare l'amministratore. Il token
+va trattato come una chiave di amministrazione: personale, non condiviso.
 
 Due script in `scripts/`:
 

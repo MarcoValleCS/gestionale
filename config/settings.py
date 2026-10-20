@@ -329,12 +329,19 @@ LOGGING = {
         "console": {"class": "logging.StreamHandler", "formatter": "semplice"},
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
-    "loggers": {
-        # Solo gli errori veri, non ogni pagina non trovata
-        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
-        "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-        "apps": {"handlers": ["console"], "level": "INFO", "propagate": False},
-    },
+    "loggers": {
+        # Solo gli errori veri, non ogni pagina non trovata
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "apps": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        # Registro delle chiamate agli strumenti MCP (chi, che strumento, quanto
+        # tempo). Nei test è silenzioso: è un rumore, non un errore.
+        "apps.mcp": {
+            "handlers": ["console"],
+            "level": "WARNING" if IN_TEST else "INFO",
+            "propagate": False,
+        },
+    },
 }
 
 # -------------------------------------------------------------- Cache

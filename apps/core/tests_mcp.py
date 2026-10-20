@@ -5,6 +5,7 @@ registrati e che letture e scritture seguano le regole di business. Se il
 pacchetto ``mcp`` non è installato (requirements-mcp.txt, non necessario in
 produzione) i test vengono saltati.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -16,9 +17,12 @@ if str(BASE_DIR / "scripts") not in sys.path:
     sys.path.insert(0, str(BASE_DIR / "scripts"))
 
 try:
+    import mcp_auth
+    import mcp_http
     import mcp_read
     import mcp_write
     from mcp_common import mcp
+    from starlette.testclient import TestClient
 
     MCP_DISPONIBILE = True
 except ImportError:  # pragma: no cover - senza requirements-mcp.txt
@@ -705,3 +709,305 @@ class PaginazioneTest(TestCase):
             self.assertIn("totale", esito[bucket])
             self.assertIn("has_more", esito[bucket])
             self.assertIn("prossimo_offset", esito[bucket])
+
+
+# ========================================================== autenticazione
+@skipUnless(MCP_DISPONIBILE, "pacchetto mcp non installato (requirements-mcp.txt)")
+class AutenticazioneMcpTest(TestCase):
+    """Il token decide chi entra e a chi sono attribuite le scritture."""
+
+    def setUp(self):
+        from django.test import override_settings
+
+        self.ambiente = override_settings()
+        self.ambiente.enable()
+        self.addCleanup(self.ambiente.disable)
+        self.salvato = {
+            chiave: os.environ.get(chiave)
+            for chiave in (
+                "MCP_TOKEN",
+                "MCP_TOKENS",
+                "MCP_USER",
+                "MCP_ALLOWED_IPS",
+                "MCP_RATE_LIMIT",
+                "MCP_ALLOWED_HOSTS",
+                "MCP_ALLOWED_ORIGINS",
+            )
+        }
+        for chiave in self.salvato:
+            os.environ.pop(chiave, None)
+        # L'host del client di test: è l'unico ammesso.
+        os.environ["MCP_ALLOWED_HOSTS"] = "testserver"
+        self.addCleanup(self._ripristina_ambiente)
+
+    def _ripristina_ambiente(self):
+        for chiave, valore in self.salvato.items():
+            if valore is None:
+                os.environ.pop(chiave, None)
+            else:
+                os.environ[chiave] = valore
+
+    def test_token_valido_riconosciuto(self):
+        os.environ["MCP_TOKEN"] = "segreto-123"
+        os.environ["MCP_USER"] = "admin"
+        self.assertTrue(mcp_auth.token_valido("segreto-123"))
+        self.assertFalse(mcp_auth.token_valido("segreto-124"))
+        self.assertFalse(mcp_auth.token_valido(""))
+
+    def test_token_per_utente(self):
+        os.environ["MCP_TOKENS"] = "aaa:marco,bbb:giulia"
+        credenziale = mcp_auth.verifica_token("bbb")
+        self.assertIsNotNone(credenziale)
+        self.assertEqual(credenziale.username, "giulia")
+        self.assertFalse(credenziale.sola_lettura)
+
+    def test_scope_sola_lettura(self):
+        os.environ["MCP_TOKENS"] = "aaa:marco:mcp:sola-lettura"
+        credenziale = mcp_auth.verifica_token("aaa")
+        self.assertIsNotNone(credenziale)
+        self.assertTrue(credenziale.sola_lettura)
+
+    def test_allowlist_ip(self):
+        os.environ["MCP_ALLOWED_IPS"] = "10.0.0.1,10.0.0.2"
+        self.assertTrue(mcp_auth.ip_consentito("10.0.0.1"))
+        self.assertFalse(mcp_auth.ip_consentito("10.0.0.9"))
+        self.assertFalse(mcp_auth.ip_consentito(None))
+
+    def test_allowlist_vuota_ammette_tutti(self):
+        self.assertTrue(mcp_auth.ip_consentito("1.2.3.4"))
+
+    def test_rate_limit(self):
+        limitatore = mcp_auth.Limitatore(limite=2)
+        self.assertTrue(limitatore.ammesso("marco"))
+        self.assertTrue(limitatore.ammesso("marco"))
+        self.assertFalse(limitatore.ammesso("marco"))
+        # un altro utente ha un proprio conteggio
+        self.assertTrue(limitatore.ammesso("giulia"))
+
+    def test_rate_limit_disattivato(self):
+        limitatore = mcp_auth.Limitatore(limite=0)
+        for _ in range(50):
+            self.assertTrue(limitatore.ammesso("marco"))
+
+    def test_middleware_rifiuta_senza_token(self):
+        os.environ["MCP_TOKEN"] = "segreto-123"
+        os.environ["MCP_USER"] = "admin"
+        app = mcp_http.applicazione_http()
+        with TestClient(app, base_url="http://testserver") as client:
+            risposta = client.post("/mcp", json=_richiesta_inizializzazione())
+            self.assertEqual(risposta.status_code, 401)
+
+    def test_middleware_rifiuta_token_sbagliato(self):
+        os.environ["MCP_TOKEN"] = "segreto-123"
+        os.environ["MCP_USER"] = "admin"
+        app = mcp_http.applicazione_http()
+        with TestClient(app, base_url="http://testserver") as client:
+            risposta = client.post(
+                "/mcp",
+                json=_richiesta_inizializzazione(),
+                headers={"Authorization": "Bearer sbagliato"},
+            )
+            self.assertEqual(risposta.status_code, 401)
+
+    def test_middleware_accetta_token_valido(self):
+        os.environ["MCP_TOKEN"] = "segreto-123"
+        os.environ["MCP_USER"] = "admin"
+        app = mcp_http.applicazione_http()
+        with TestClient(app, base_url="http://testserver") as client:
+            risposta = client.post(
+                "/mcp",
+                json=_richiesta_inizializzazione(),
+                headers=_intestazioni("segreto-123"),
+            )
+            self.assertEqual(risposta.status_code, 200)
+            self.assertIn("gestionale", risposta.text)
+
+    def test_server_http_rifiuta_senza_credenziali(self):
+        with self.assertRaises(RuntimeError):
+            mcp_http.applicazione_http()
+
+    def test_host_non_ammesso_rifiutato(self):
+        os.environ["MCP_TOKEN"] = "segreto-123"
+        os.environ["MCP_USER"] = "admin"
+        app = mcp_http.applicazione_http()
+        with TestClient(app, base_url="http://altro.example") as client:
+            risposta = client.post(
+                "/mcp",
+                json=_richiesta_inizializzazione(),
+                headers={"Authorization": "Bearer segreto-123"},
+            )
+            self.assertEqual(risposta.status_code, 421)
+
+
+@skipUnless(MCP_DISPONIBILE, "pacchetto mcp non installato (requirements-mcp.txt)")
+class AttribuzioneUtenteMcpTest(TestCase):
+    """Le scritture degli assistenti AI restano attribuite a una persona."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.utente = get_user_model().objects.create_user(username="mcp-utente", password="segreto12345")
+        self._uom, self._iva, _pagamento, _magazzino, self.cliente = _campioni()
+
+    def _con_credenziale(self, credenziale):
+        """Restituisce un contesto che impersona l'utente del token."""
+        from contextlib import contextmanager
+
+        from mcp_auth import credenziale_attuale
+
+        @contextmanager
+        def contesto():
+            segnaposto = credenziale_attuale.set(credenziale)
+            try:
+                yield
+            finally:
+                credenziale_attuale.reset(segnaposto)
+
+        return contesto()
+
+    def test_ordine_attribuito_all_utente(self):
+        from apps.sales.models import SalesOrder
+
+        credenziale = mcp_auth.Credenziale(token="t", username=self.utente.username)
+        with self._con_credenziale(credenziale):
+            esito = _call(mcp_write.crea_ordine_cliente)(
+                cliente=self.cliente.name,
+                righe=[{"tipo": "articolo", "descrizione": "Riga di prova", "quantita": 1}],
+            )
+        self.assertIn("messaggio", esito)
+        ordine = SalesOrder.objects.order_by("-pk").first()
+        self.assertEqual(ordine.created_by, self.utente)
+
+    def test_registro_attivita_con_utente(self):
+        from apps.core.models import ActivityLog
+
+        credenziale = mcp_auth.Credenziale(token="t", username=self.utente.username)
+        with self._con_credenziale(credenziale):
+            _call(mcp_write.crea_preventivo)(
+                cliente=self.cliente.name,
+                righe=[{"tipo": "articolo", "descrizione": "Riga di prova", "quantita": 1}],
+            )
+        righe = ActivityLog.objects.filter(model_name="Preventivo")
+        self.assertTrue(righe.exists())
+        self.assertTrue(all(riga.user == self.utente for riga in righe))
+
+    def test_token_sola_lettura_non_scrive(self):
+        credenziale = mcp_auth.Credenziale(
+            token="t", username=self.utente.username, scope=mcp_auth.SCOPE_SOLA_LETTURA
+        )
+        with self._con_credenziale(credenziale):
+            esito = _call(mcp_write.crea_preventivo)(
+                cliente=self.cliente.name,
+                righe=[{"tipo": "articolo", "descrizione": "Riga di prova", "quantita": 1}],
+            )
+        self.assertIn("errore", esito)
+        from apps.sales.models import Quote
+
+        self.assertFalse(Quote.objects.exists())
+
+
+@skipUnless(MCP_DISPONIBILE, "pacchetto mcp non installato (requirements-mcp.txt)")
+class ErroriPrevistiTest(TestCase):
+    """Gli errori frequenti tornano come messaggio, non come stack trace."""
+
+    def test_valori_non_finiti_rifiutati(self):
+        from mcp_common import _dec
+
+        for testo in ("NaN", "Infinity", "-Infinity"):
+            with self.assertRaises(ValueError):
+                _dec(testo)
+
+    def test_valori_validi_accettati(self):
+        from decimal import Decimal
+
+        from mcp_common import _dec
+
+        self.assertEqual(_dec("15,50"), Decimal("15.50"))
+        self.assertEqual(_dec(""), Decimal("0"))
+
+    def test_errori_del_database_gestiti(self):
+        from django.db import DataError, IntegrityError
+
+        from mcp_common import _sicuro
+
+        def alza(exc):
+            def funzione():
+                raise exc
+
+            return funzione
+
+        for exc in (IntegrityError("UNIQUE"), DataError("too long")):
+            esito = _sicuro(alza(exc))
+            self.assertIn("errore", esito)
+
+    def test_errori_imprevisti_restano_eccezioni(self):
+        from mcp_common import _sicuro
+
+        def funzione():
+            raise RuntimeError("bug vero")
+
+        with self.assertRaises(RuntimeError):
+            _sicuro(funzione)
+
+    def test_log_audit_registra_la_chiamata(self):
+        from mcp_common import _registra_chiamata
+
+        with self.assertLogs("apps.mcp", level="INFO") as registri:
+            _registra_chiamata(_funzione_di_prova, 0.0, "ok")
+        self.assertTrue(any("MCP" in riga for riga in registri.output))
+
+
+def _funzione_di_prova():
+    """Funzione fittizia per il log di audit."""
+    return None
+
+
+def _richiesta_inizializzazione() -> dict:
+    """Messaggio JSON-RPC di inizializzazione del protocollo MCP."""
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1"},
+        },
+    }
+
+
+def _intestazioni(token: str | None = None) -> dict:
+    """Intestazioni di una richiesta MCP (token facoltativo)."""
+    intestazioni = {"Accept": "application/json, text/event-stream"}
+    if token:
+        intestazioni["Authorization"] = f"Bearer {token}"
+    return intestazioni
+
+
+@skipUnless(MCP_DISPONIBILE, "pacchetto mcp non installato (requirements-mcp.txt)")
+class EspansioneKitMcpTest(TestCase):
+    """Un kit inserito da un assistente AI viene espanso come nell'interfaccia."""
+
+    def test_preventivo_con_kit_espanso(self):
+        from apps.catalog.models import KitComponent
+        from apps.sales.models import Quote
+
+        uom, iva, _pagamento, _magazzino, cliente = _campioni()
+        componente = _prodotto(uom, iva, "KIT-COMP-1", "Componente del kit")
+        kit = _prodotto(uom, iva, "KIT-1", "Kit completo")
+        kit.is_kit = True
+        kit.is_stock_tracked = False
+        kit.save()
+        KitComponent.objects.create(kit=kit, component=componente, qty=2)
+
+        esito = _call(mcp_write.crea_preventivo)(
+            cliente=cliente.name,
+            righe=[{"tipo": "articolo", "articolo": "KIT-1", "quantita": 1}],
+        )
+        self.assertIn("messaggio", esito)
+        preventivo = Quote.objects.order_by("-pk").first()
+        righe = list(preventivo.lines.all())
+        self.assertEqual(len(righe), 2)
+        self.assertTrue(any("componente" in riga.description.lower() for riga in righe))
+        # il totale non cambia: i componenti sono a prezzo zero
+        self.assertEqual(preventivo.subtotal, kit.sale_price)

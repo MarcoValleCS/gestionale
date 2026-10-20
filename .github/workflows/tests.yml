@@ -21,6 +21,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # Anche il pacchetto MCP: senza, i test degli strumenti MCP
+          # (apps.core.tests_mcp) verrebbero saltati.
+          pip install -r requirements-mcp.txt
 
       - name: Esegui i test
         env:

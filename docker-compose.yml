@@ -55,7 +55,9 @@ services:
     logging: *default-logging
 
   web:
-    build: .
+    build:
+      context: .
+      target: web
     restart: unless-stopped
     env_file: .env
     environment:
@@ -88,6 +90,54 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
+    logging: *default-logging
+
+  # Server MCP: lo usano gli assistenti AI per leggere e scrivere il
+  # gestionale. Sta in un profilo a parte: si avvia solo con
+  # «docker compose --profile mcp up -d» e non pubblica porte (l'unico
+  # ingresso è Caddy, che chiede il token).
+  mcp:
+    build:
+      context: .
+      target: mcp
+    restart: unless-stopped
+    profiles: ["mcp"]
+    env_file: .env
+    # Il server MCP in ascolto: le migrazioni le fa il servizio «web».
+    command: ["python", "scripts/mcp_server.py", "--trasporto", "http"]
+    environment:
+      DB_ENGINE: postgresql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DJANGO_DEBUG: "false"
+      DJANGO_HTTPS: "true"
+      # Nell'immagine deve ascoltare su tutte le interfacce: Caddy lo
+      # raggiunge dalla rete interna di Docker.
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Nessuna «ports»: il server è raggiungibile solo da Caddy.
+    expose:
+      - "8001"
+    # Il server non scrive nulla sul disco: il sistema è in sola lettura.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    healthcheck:
+      # Senza token la risposta è 401: vuol dire che il server è vivo e chiede
+      # l'autenticazione.
+      test: ["CMD", "python", "-c", "import http.client as h; c=h.HTTPConnection('127.0.0.1',8001,timeout=5); c.request('GET','/mcp'); r=c.getresponse(); exit(0 if r.status in (401,403,405,406) else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging: *default-logging
 
   caddy:

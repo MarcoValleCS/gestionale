@@ -1,6 +1,4 @@
 {$DOMAIN} {
-	encode zstd gzip
-
 	# Log degli accessi con durata della risposta: servono per trovare le
 	# pagine lente (i tempi finiscono nei log Docker, già ruotati).
 	log {
@@ -28,5 +26,20 @@
 		max_size 25MB
 	}
 
-	reverse_proxy web:8000
+	# Server MCP: lo usano gli assistenti AI. Ogni richiesta deve avere
+	# l'intestazione «Authorization: Bearer <token>»: senza, il server
+	# risponde 401 e non lascia passare nulla.
+	@percorsoMcp path /mcp /mcp/*
+	handle @percorsoMcp {
+		# Niente compressione: il protocollo MCP usa flussi lunghi e
+		# compressi l'attesa si percepisce.
+		reverse_proxy mcp:8001 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy web:8000
+	}
 }

@@ -1,4 +1,11 @@
-FROM python:3.13-slim
+# Due immagini sulla stessa base:
+#  - «web»: l'applicazione Django (quello che gira oggi);
+#  - «mcp»: il server MCP per gli assistenti AI, con il pacchetto «mcp»
+#    installato e un utente non privilegiato.
+# Il pacchetto MCP sta solo nell'immagine «mcp»: l'applicazione web non ne
+# ha bisogno e non deve averlo.
+
+FROM python:3.13-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -12,6 +19,23 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# ------------------------------------------------------------ server MCP
+FROM base AS mcp
+
+COPY requirements-mcp.txt .
+RUN pip install --no-cache-dir -r requirements-mcp.txt \
+    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin mcp
+
+COPY --chown=mcp:mcp . .
+
+# L'utente «mcp» non scrive nulla: il server parla solo con il database.
+USER mcp
+
+EXPOSE 8001
+
+# ---------------------------------------------------------- applicazione web
+FROM base AS web
 
 COPY . .
 

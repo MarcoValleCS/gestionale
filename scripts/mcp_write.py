@@ -20,6 +20,7 @@ from mcp_common import (
     _stato_codice,
     _strumento,
     _valore,
+    utente_sistema,
 )
 
 
@@ -357,6 +358,17 @@ def _crea_righe(cls_linea, campo, documento, righe_valide, uso="vendita"):
     return create
 
 
+def _espandi_kit(documento, fk_field):
+    """Aggiunge le righe dei componenti dei kit rimasti chiusi.
+
+    Come nell'interfaccia: il kit è una riga sola che, alla consegna, deve
+    scaricare i pezzi e non il kit (che a magazzino non esiste).
+    """
+    from apps.sales import services as sales_services
+
+    return sales_services.espandi_kit(documento, fk_field)
+
+
 def _riepilogo(doc):
     return {"numero": doc.number, "data": _valore(doc.date), "totale": _valore(doc.grand_total)}
 
@@ -616,6 +628,7 @@ def registra_movimento_magazzino(
         note=(note or "").strip(),
         reference=(riferimento or "").strip(),
         unit_cost=_dec(prezzo) if prezzo is not None else None,
+        user=utente_sistema(),
     )
     return {
         "messaggio": f"Movimento registrato per {prodotto.code}.",
@@ -654,6 +667,7 @@ def crea_preventivo(
     with transaction.atomic():
         preventivo = Quote(
             customer=_risolvi_contatto(cliente),
+            created_by=utente_sistema(),
             date=_data(data) or timezone.localdate(),
             valid_until=_data(valido_fino_al, "valido_fino_al"),
             reference=(riferimento or "").strip(),
@@ -669,6 +683,7 @@ def crea_preventivo(
             preventivo.commission_pct = _dec(provvigione_pct)
         preventivo.save()
         numero_righe = _crea_righe(QuoteLine, "quote", preventivo, righe_valide, uso="vendita")
+        _espandi_kit(preventivo, "quote")
         preventivo.recalculate()
     return {"messaggio": f"Preventivo {preventivo.number} creato.", **_riepilogo(preventivo), "righe_create": numero_righe}
 
@@ -717,7 +732,7 @@ def duplica_preventivo(numero: Annotated[str, Field(description="Numero esatto d
     from apps.sales.models import Quote
 
     preventivo = _risolvi_documento(Quote, numero, "preventivo")
-    copia = sales_services.duplicate_quote(preventivo)
+    copia = sales_services.duplicate_quote(preventivo, user=utente_sistema())
     return {"messaggio": f"Preventivo {preventivo.number} duplicato.", **_riepilogo(copia)}
 
 
@@ -729,7 +744,7 @@ def converti_preventivo_in_ordine(numero: Annotated[str, Field(description="Nume
     from apps.sales.models import Quote
 
     preventivo = _risolvi_documento(Quote, numero, "preventivo")
-    ordine = sales_services.convert_quote_to_order(preventivo)
+    ordine = sales_services.convert_quote_to_order(preventivo, user=utente_sistema())
     return {
         "messaggio": f"Ordine {ordine.number} creato dal preventivo {preventivo.number}.",
         **_riepilogo(ordine),
@@ -762,6 +777,7 @@ def crea_ordine_cliente(
     with transaction.atomic():
         ordine = SalesOrder(
             customer=_risolvi_contatto(cliente),
+            created_by=utente_sistema(),
             date=_data(data) or timezone.localdate(),
             expected_date=_data(consegna_prevista, "consegna_prevista"),
             reference=(riferimento or "").strip(),
@@ -777,6 +793,7 @@ def crea_ordine_cliente(
             ordine.commission_pct = _dec(provvigione_pct)
         ordine.save()
         numero_righe = _crea_righe(SalesOrderLine, "order", ordine, righe_valide, uso="vendita")
+        _espandi_kit(ordine, "order")
         ordine.recalculate()
     return {"messaggio": f"Ordine {ordine.number} creato in bozza.", **_riepilogo(ordine), "righe_create": numero_righe}
 
@@ -793,7 +810,7 @@ def conferma_ordine(
     from apps.sales.models import SalesOrder
 
     ordine = _risolvi_documento(SalesOrder, numero, "ordine")
-    esito = sales_services.confirm_sales_order(ordine, replenish=bool(rifornisci))
+    esito = sales_services.confirm_sales_order(ordine, user=utente_sistema(), replenish=bool(rifornisci))
     ordine.refresh_from_db()
     return {
         "messaggio": f"Ordine {ordine.number} confermato.",
@@ -817,7 +834,7 @@ def registra_consegna_ordine(
 
     ordine = _risolvi_documento(SalesOrder, numero, "ordine")
     warehouse = _risolvi_magazzino(magazzino) if magazzino else None
-    errori = sales_services.deliver_sales_order(ordine, warehouse=warehouse)
+    errori = sales_services.deliver_sales_order(ordine, user=utente_sistema(), warehouse=warehouse)
     ordine.refresh_from_db()
     return {
         "messaggio": f"Consegna registrata per l'ordine {ordine.number}.",
@@ -835,7 +852,7 @@ def annulla_ordine_cliente(numero: Annotated[str, Field(description="Numero esat
     from apps.sales.models import SalesOrder
 
     ordine = _risolvi_documento(SalesOrder, numero, "ordine")
-    sales_services.cancel_sales_order(ordine)
+    sales_services.cancel_sales_order(ordine, user=utente_sistema())
     ordine.refresh_from_db()
     return {"messaggio": f"Ordine {ordine.number} annullato.", "numero": ordine.number, "stato": ordine.get_status_display()}
 
@@ -848,7 +865,7 @@ def crea_ddt_da_ordine(numero_ordine: Annotated[str, Field(description="Numero e
     from apps.sales.models import SalesOrder
 
     ordine = _risolvi_documento(SalesOrder, numero_ordine, "ordine")
-    ddt = billing_services.create_delivery_note_from_order(ordine)
+    ddt = billing_services.create_delivery_note_from_order(ordine, user=utente_sistema())
     return {
         "messaggio": f"DDT {ddt.number} creato dall'ordine {ordine.number}.",
         "numero": ddt.number,
@@ -869,7 +886,7 @@ def emetti_ddt(
 
     ddt = _risolvi_documento(DeliveryNote, numero, "DDT")
     warehouse = _risolvi_magazzino(magazzino) if magazzino else None
-    errori = billing_services.issue_delivery_note(ddt, warehouse=warehouse)
+    errori = billing_services.issue_delivery_note(ddt, user=utente_sistema(), warehouse=warehouse)
     ddt.refresh_from_db()
     return {
         "messaggio": f"DDT {ddt.number} emesso.",
@@ -904,7 +921,9 @@ def crea_fattura_da_ordine(
     from apps.sales.models import SalesOrder
 
     ordine = _risolvi_documento(SalesOrder, numero_ordine, "ordine")
-    fattura = billing_services.create_sales_invoice_from_order(ordine, only_delivered=bool(solo_consegnate))
+    fattura = billing_services.create_sales_invoice_from_order(
+        ordine, user=utente_sistema(), only_delivered=bool(solo_consegnate)
+    )
     return {"messaggio": f"Fattura {fattura.number} creata dall'ordine {ordine.number}.", **_riepilogo(fattura)}
 
 
@@ -915,7 +934,7 @@ def crea_fattura_da_ddt(numero_ddt: Annotated[str, Field(description="Numero esa
     from apps.billing.models import DeliveryNote
 
     ddt = _risolvi_documento(DeliveryNote, numero_ddt, "DDT")
-    fattura = billing_services.create_sales_invoice_from_delivery_note(ddt)
+    fattura = billing_services.create_sales_invoice_from_delivery_note(ddt, user=utente_sistema())
     return {"messaggio": f"Fattura {fattura.number} creata dal DDT {ddt.number}.", **_riepilogo(fattura)}
 
 
@@ -937,6 +956,7 @@ def crea_acconto_ordine(
         ordine,
         percent=_dec(percentuale) if percentuale is not None else None,
         amount=_dec(importo) if importo is not None else None,
+        user=utente_sistema(),
     )
     return {"messaggio": f"Acconto {fattura.number} creato sull'ordine {ordine.number}.", **_riepilogo(fattura)}
 
@@ -948,7 +968,7 @@ def crea_saldo_ordine(numero_ordine: Annotated[str, Field(description="Numero es
     from apps.sales.models import SalesOrder
 
     ordine = _risolvi_documento(SalesOrder, numero_ordine, "ordine")
-    fattura = billing_services.create_order_balance(ordine)
+    fattura = billing_services.create_order_balance(ordine, user=utente_sistema())
     return {"messaggio": f"Saldo {fattura.number} creato sull'ordine {ordine.number}.", **_riepilogo(fattura)}
 
 
@@ -981,6 +1001,7 @@ def crea_fattura_cantiere(
         tipi[codice_tipo],
         percent=_dec(percentuale) if percentuale is not None else None,
         amount=_dec(importo) if importo is not None else None,
+        user=utente_sistema(),
     )
     return {
         "messaggio": f"{fattura.kind_title} {fattura.number} creato per il cantiere {cantiere.code}.",
@@ -1043,7 +1064,9 @@ def crea_fattura_ricevuta_da_ordine_fornitore(
     from apps.purchasing.models import PurchaseOrder
 
     ordine = _risolvi_documento(PurchaseOrder, numero_ordine, "ordine fornitore")
-    fattura = billing_services.create_purchase_invoice_from_po(ordine, only_received=bool(solo_ricevute))
+    fattura = billing_services.create_purchase_invoice_from_po(
+        ordine, user=utente_sistema(), only_received=bool(solo_ricevute)
+    )
     return {
         "messaggio": f"Fattura ricevuta {fattura.number} creata dall'ordine {ordine.number}.",
         **_riepilogo(fattura),
@@ -1110,6 +1133,7 @@ def crea_ordine_fornitore(
     with transaction.atomic():
         ordine = PurchaseOrder(
             supplier=_risolvi_contatto(fornitore),
+            created_by=utente_sistema(),
             date=_data(data) or timezone.localdate(),
             expected_date=_data(consegna_prevista, "consegna_prevista"),
             notes=note or "",
@@ -1122,6 +1146,7 @@ def crea_ordine_fornitore(
             ordine.source_sales_order = _risolvi_documento(SalesOrder, ordine_cliente, "ordine")
         ordine.save()
         numero_righe = _crea_righe(PurchaseOrderLine, "po", ordine, righe_valide, uso="acquisto")
+        _espandi_kit(ordine, "po")
         ordine.recalculate()
     return {
         "messaggio": f"Ordine fornitore {ordine.number} creato.",
@@ -1166,7 +1191,9 @@ def ricevi_ordine_fornitore(
     if not quantities:
         raise ValueError(f"L'ordine {ordine.number} non ha quantità da ricevere.")
     warehouse = _risolvi_magazzino(magazzino) if magazzino else None
-    ricevute, errori = purchasing_services.receive_purchase_order(ordine, quantities, warehouse=warehouse)
+    ricevute, errori = purchasing_services.receive_purchase_order(
+        ordine, quantities, user=utente_sistema(), warehouse=warehouse
+    )
     ordine.refresh_from_db()
     return {
         "messaggio": f"Ricezione registrata per l'ordine {ordine.number}.",
@@ -1218,7 +1245,7 @@ def annulla_ordine_fornitore(numero: Annotated[str, Field(description="Numero es
     from apps.purchasing.models import PurchaseOrder
 
     ordine = _risolvi_documento(PurchaseOrder, numero, "ordine fornitore")
-    purchasing_services.cancel_purchase_order(ordine)
+    purchasing_services.cancel_purchase_order(ordine, user=utente_sistema())
     ordine.refresh_from_db()
     return {
         "messaggio": f"Ordine fornitore {ordine.number} annullato.",
@@ -1238,7 +1265,9 @@ def applica_variazione_listino(
     from apps.purchasing import services as purchasing_services
 
     prezzo_lista = _risolvi_listino(listino, fornitore)
-    variazione = purchasing_services.apply_pricelist_adjustment(prezzo_lista, _dec(percentuale))
+    variazione = purchasing_services.apply_pricelist_adjustment(
+        prezzo_lista, _dec(percentuale), user=utente_sistema()
+    )
     return {
         "messaggio": f"Listino «{prezzo_lista.name}» aggiornato: {variazione.items_count} voci.",
         "listino": prezzo_lista.name,
@@ -1308,6 +1337,7 @@ def crea_lead(
 
     lead = Lead(
         name=(nome or "").strip(),
+        created_by=utente_sistema(),
         phone=(telefono or "").strip(),
         email=(email or "").strip(),
         city=(citta or "").strip(),
@@ -1505,6 +1535,7 @@ def registra_ore(
         raise ValueError("Le ore devono essere fra 0,25 e 24.")
     voce = TimeEntry(
         employee=dipendente_obj,
+        created_by=utente_sistema(),
         date=_data(data, "data") or timezone.localdate(),
         hours=ore_dec,
         kind=codice_tipo,
@@ -1545,6 +1576,7 @@ def registra_ore_collaboratore(
         raise ValueError("Le ore devono essere fra 0,25 e 24.")
     voce = CollaboratorTimeEntry(
         collaborator=collaboratore_obj,
+        created_by=utente_sistema(),
         date=_data(data, "data") or timezone.localdate(),
         hours=ore_dec,
         description=(descrizione or "").strip(),
@@ -1589,6 +1621,7 @@ def registra_assenza(
         raise ValueError("La data di fine non può precedere quella di inizio.")
     assenza = LeaveRequest(
         employee=dipendente_obj,
+        created_by=utente_sistema(),
         kind=codice_tipo,
         start_date=inizio,
         end_date=fine,
@@ -1628,9 +1661,9 @@ def cambia_stato_assenza(
         raise ValueError(f"Nessuna assenza con id {int(id)!r}.")
     codice = (stato or "").strip().lower()
     if codice in {"approvata", "approva", "approvato"}:
-        assenza.approve(None)
+        assenza.approve(utente_sistema())
     elif codice in {"rifiutata", "rifiuta", "rifiutato"}:
-        assenza.reject(None)
+        assenza.reject(utente_sistema())
     elif codice in {"annullata", "annulla", "annullato"}:
         assenza.status = LeaveRequest.STATUS_CANCELLED
         assenza.save(update_fields=["status", "updated_at"])

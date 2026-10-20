@@ -66,6 +66,42 @@ Sono avvisi brevi: se ne arriva uno, c'è qualcosa da guardare sul server.
 - **Content-Security-Policy**: le pagine caricano solo risorse del gestionale
   (niente CDN esterni) e nessun oggetto incorporato da altri siti.
 
+## Il server MCP (assistenti AI)
+
+Se in produzione è attivo il server MCP (`MCP_ENABLED=true`), l'indirizzo
+`https://<dominio>/mcp` è una **seconda porta d'accesso** ai dati, separata
+dall'interfaccia. Protezioni attive:
+
+- **Token Bearer** su ogni richiesta (intestazione `Authorization`), confrontato
+  a tempo costante: senza token non passa nulla e la risposta è 401.
+- **Nessuna porta pubblicata**: il contenitore del server MCP è raggiungibile
+  solo dalla rete interna di Docker, l'unico ingresso è Caddy con HTTPS.
+- **Allowlist degli IP** (facoltativa, `MCP_ALLOWED_IPS`).
+- **Limite di richieste** al minuto per token (`MCP_RATE_LIMIT`, 300 per
+  default): se si superano, la risposta è 429.
+- **Protezione DNS rebinding**: il server accetta richieste solo dagli host
+  dichiarati (`MCP_ALLOWED_HOSTS`, per default il dominio del gestionale).
+- **Registro delle chiamate**: ogni uso di uno strumento finisce nel log
+  (`docker compose logs mcp`) con utente, strumento, durata ed esito.
+- **Scritture attribuite**: i documenti creati dall'assistente hanno
+  `created_by` valorizzato e il registro attività dell'applicazione li mostra
+  con l'utente, non anonimi.
+
+Da tenere a mente:
+
+- **I ruoli dell'interfaccia non valgono per l'MCP.** Chi ha il token può fare
+  tutto quello che può fare l'amministratore, anche leggere dati che un
+  collaboratore non vedrebbe. Il token è una chiave di amministrazione: va
+  tenuto personale, non va condiviso e va cambiato se trapela.
+- **Le cancellazioni restano all'interfaccia**: gli strumenti MCP non
+  cancellano nulla, al massimo annullano un documento (operazione reversibile).
+- **Cambiare il token**: modificare `MCP_TOKEN` nel `.env` e riavviare il
+  servizio (`docker compose --profile mcp up -d`). Il token vecchio smette
+  subito di funzionare.
+- **Per non esporre nulla**: `MCP_ENABLED=false` (il default) e il servizio
+  spento. Il profilo «mcp» di Docker Compose non viene avviato dal solo
+  `docker compose up -d`.
+
 ## Prestazioni
 
 - Le pagine più pesanti (dashboard, statistiche) tengono i conti in cache per
