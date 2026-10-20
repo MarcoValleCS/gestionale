@@ -111,6 +111,9 @@ services:
       DB_PORT: "5432"
       DJANGO_DEBUG: "false"
       DJANGO_HTTPS: "true"
+      # Il filesystem è in sola lettura: la cache su file non può scrivere,
+      # quindi qui si usa quella in memoria.
+      DJANGO_CACHE_BACKEND: "locmem"
       # Nell'immagine deve ascoltare su tutte le interfacce: Caddy lo
       # raggiunge dalla rete interna di Docker.
       MCP_HOST: "0.0.0.0"

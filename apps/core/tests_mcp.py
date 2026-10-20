@@ -995,6 +995,46 @@ def _intestazioni(token: str | None = None) -> dict:
 
 
 @skipUnless(MCP_DISPONIBILE, "pacchetto mcp non installato (requirements-mcp.txt)")
+class CacheMcpTest(TestCase):
+    """Gli strumenti che usano la cache funzionano anche con la cache in memoria.
+
+    Il server MCP in produzione gira in un container con il filesystem in
+    sola lettura: la cache su file non può scrivere e viene sostituita da
+    quella in memoria (``DJANGO_CACHE_BACKEND=locmem``).
+    """
+
+    CACHE_LOCMEM = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "test-mcp",
+            "TIMEOUT": 300,
+        }
+    }
+
+    def test_strumenti_con_cache_in_memoria(self):
+        from django.core.cache import cache
+        from django.test import override_settings
+
+        with override_settings(CACHES=self.CACHE_LOCMEM):
+            cache.clear()
+            azienda = _call(mcp_read.dati_azienda)()
+            self.assertIn("name", azienda)
+            articoli = _call(mcp_read.articoli_sotto_scorta)()
+            self.assertIn("risultati", articoli)
+
+    def test_cache_su_file_di_default(self):
+        from django.conf import settings
+
+        self.assertIn(
+            settings.CACHES["default"]["BACKEND"],
+            {
+                "django.core.cache.backends.filebased.FileBasedCache",
+                "django.core.cache.backends.locmem.LocMemCache",
+            },
+        )
+
+
+@skipUnless(MCP_DISPONIBILE, "pacchetto mcp non installato (requirements-mcp.txt)")
 class EspansioneKitMcpTest(TestCase):
     """Un kit inserito da un assistente AI viene espanso come nell'interfaccia."""
 

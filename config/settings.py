@@ -349,13 +349,26 @@ LOGGING = {
 # aggiuntiva e nessun servizio esterno. La usa anche il limitatore anti-abuso.
 # Durante i test le ottimizzazioni si disattivano (vedi apps.core.cache): i test
 # scrivono dati che devono essere riletti subito.
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-        "LOCATION": BASE_DIR / ".cache",
-        "TIMEOUT": 300,
+#
+# Il server MCP gira in un container con il filesystem in sola lettura: lì la
+# cache su file non può scrivere, quindi si usa la cache in memoria
+# (DJANGO_CACHE_BACKEND=locmem). In un processo solo fa lo stesso lavoro.
+if env("DJANGO_CACHE_BACKEND", "").lower() == "locmem":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "gestionale",
+            "TIMEOUT": 300,
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+            "LOCATION": BASE_DIR / ".cache",
+            "TIMEOUT": 300,
+        }
+    }
 
 from django.contrib.messages import constants as message_constants  # noqa: E402
 
