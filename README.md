@@ -320,9 +320,14 @@ docker compose logs -f web               # log applicazione
 docker compose restart web               # riavvio applicazione
 docker compose exec web python manage.py <comando>
 
-# Aggiornamento del codice
-git pull && docker compose up -d --build
+# Aggiornamento del codice (con il server MCP: «--profile mcp» serve a
+# ricostruire anche la sua immagine, altrimenti resterebbe indietro)
+git pull && docker compose --profile mcp up -d --build
 ```
+
+Se il server MCP è attivo, ricordati di usare `--profile mcp` anche per
+`up`/`build`: senza, l'immagine del server MCP non viene ricostruita e
+continua a girare il codice precedente.
 
 ## Sicurezza e backup
 

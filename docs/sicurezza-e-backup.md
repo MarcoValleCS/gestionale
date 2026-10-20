@@ -101,6 +101,10 @@ Da tenere a mente:
 - **Per non esporre nulla**: `MCP_ENABLED=false` (il default) e il servizio
   spento. Il profilo «mcp» di Docker Compose non viene avviato dal solo
   `docker compose up -d`.
+- **Aggiornamenti**: usare sempre `docker compose --profile mcp up -d --build`,
+  altrimenti l'immagine del server MCP resta quella vecchia. Un
+  `docker compose down` lo rimuove: per riportarlo su,
+  `docker compose --profile mcp up -d`.
 
 ## Prestazioni
 
