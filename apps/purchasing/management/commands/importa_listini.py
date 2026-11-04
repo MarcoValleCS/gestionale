@@ -12,6 +12,7 @@ Uso:
     python manage.py importa_listini lacus --file "…\\listino 2026 barcode.xls"
     python manage.py importa_listini duplach --file "…\\Listino Prezzi DUPLACH.xlsx"
     python manage.py importa_listini forma-aquae --file "…\\LISTINO ITALIA.xlsx"
+    python manage.py importa_listini cosmic --file "…\\Cosmic Price list 2027.xlsx" --valido-dal 2027-01-01 --chiudi-precedenti
 
 Opzioni utili:
     --dry-run          mostra cosa verrebbe creato senza scrivere nulla
@@ -21,15 +22,21 @@ Opzioni utili:
     --solo-nuovi       non aggiorna gli articoli già presenti
     --valido-dal DATA  inizio validità del listino (AAAA-MM-GG, es. 2027-01-01)
     --valido-al DATA   fine validità del listino (AAAA-MM-GG)
+    --chiudi-precedenti chiude il giorno prima i listini del fornitore che si
+                        sovrappongono alla nuova validità
 """
 import re
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils.text import slugify
+
+from apps.core.rounding import round4
 
 # ------------------------------------------------------------------ pulizia nomi
 
@@ -281,6 +288,13 @@ class Voce:
     serie: str = ""                # serie/collezione da mettere davanti al nome
     etichetta_variante: str = ""
     note: str = ""
+    sconto: Decimal = Decimal("0")  # sconto % sul prezzo di listino
+    prezzo_vendita: Decimal | None = None  # PVP, se il listino lo indica
+
+    @property
+    def prezzo_acquisto(self):
+        """Netto d'acquisto: prezzo di listino meno lo sconto del fornitore."""
+        return round4(self.prezzo * (1 - self.sconto / 100))
 
 
 def leggi_colavene(percorso):
@@ -582,6 +596,87 @@ def leggi_forma_aquae(percorso):
     libro.close()
 
 
+def _misura_cosmic(misurazioni, info=""):
+    """«W:30 D:7 H:6 cm» → «30x7x6 cm»; altrimenti lascia il testo com'è."""
+    testo = normalizza_spazi(misurazioni)
+    trovata = re.fullmatch(r"W:([\d.,]+)\s*D:([\d.,]+)\s*H:([\d.,]+)\s*cm", testo, flags=re.I)
+    if trovata:
+        return "x".join(trovata.groups()) + " cm"
+    return testo or normalizza_spazi(info)
+
+
+def _info_cosmic(info):
+    """Info da aggiungere al nome solo quando dice qualcosa in più della misura.
+
+    «120 cm» o «30 Ø2,2cm» ripetono il dato già nel nome; «Ø60cm», «15L» o le
+    caratteristiche LED distinguono varianti che altrimenti avrebbero lo stesso
+    nome (specchio tondo e quadrato, specchi con potenze diverse…).
+    """
+    testo = normalizza_spazi(info)
+    if not testo:
+        return ""
+    solo_misura = re.fullmatch(r"[\d.,]+\s*(?:cm|mm|m)?(?:\s*Ø[\d.,]+\s*cm)?", testo, flags=re.I)
+    return "" if solo_misura else testo
+
+
+def leggi_cosmic(percorso):
+    """Cosmic — listino 2027 IT/DE: codice, collezione, EAN, PVP, finitura.
+
+    Il PVP è il prezzo al pubblico: resta sulla voce di listino insieme allo
+    sconto fornitore (50%), così il netto d'acquisto lo calcola il gestionale.
+    """
+    import openpyxl
+
+    libro = openpyxl.load_workbook(percorso, read_only=True, data_only=True)
+    foglio = libro.worksheets[0]
+    for riga in foglio.iter_rows(min_row=3, values_only=True):
+        codice = normalizza_spazi(riga[0])
+        descrizione = normalizza_spazi(riga[7])
+        if not codice or not descrizione:
+            continue
+        collezione = normalizza_spazi(riga[2])
+        misurazioni = normalizza_spazi(riga[3])
+        info = normalizza_spazi(riga[5])
+        finitura = normalizza_spazi(riga[8])
+        if finitura.lower() in {"", "none"}:
+            finitura = ""
+        descrizione_de = normalizza_spazi(riga[9])
+        finitura_de = normalizza_spazi(riga[10])
+        misura = _misura_cosmic(misurazioni, info)
+        info_nome = _info_cosmic(info)
+
+        nome = " – ".join(parte for parte in (collezione, descrizione) if parte)
+        if misura:
+            nome = f"{nome} {misura}"
+        if info_nome:
+            nome = f"{nome} ({info_nome})"
+        if finitura:
+            nome = f"{nome} – {finitura}"
+
+        dettagli = " · ".join(
+            parte
+            for parte in (
+                f"Misurazioni: {misurazioni}" if misurazioni else "",
+                f"Info: {info}" if info else "",
+                f"DE: {descrizione_de}" + (f" ({finitura_de})" if finitura_de else "") if descrizione_de else "",
+            )
+            if parte
+        )
+        prezzo = numero(riga[6])
+        yield Voce(
+            codice=codice,
+            nome=nome[:200],
+            prezzo=prezzo,
+            barcode=normalizza_spazi(riga[4]),
+            gruppo=collezione,
+            descrizione=dettagli[:2000],
+            note=descrizione_de[:200],
+            sconto=Decimal("50"),
+            prezzo_vendita=prezzo,
+        )
+    libro.close()
+
+
 LETTORI = {
     "colavene": (leggi_colavene, "Colavene srl", "Listino generale Colavene"),
     "axa": (leggi_axa, "Colavene srl", "AXA / Alchimie"),
@@ -590,6 +685,7 @@ LETTORI = {
     "lacus": (leggi_lacus, "Lacus srl", "Listino 2026"),
     "duplach": (leggi_duplach, "Duplach", "Listino prezzi"),
     "forma-aquae": (leggi_forma_aquae, "Forma Aquae", "Listino Italia 2025"),
+    "cosmic": (leggi_cosmic, "INDUSTRIAS COSMIC SAU", "Cosmic 2027"),
 }
 
 
@@ -606,6 +702,11 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true", help="Mostra il risultato senza salvare.")
         parser.add_argument("--valido-dal", default="", help="Inizio validità del listino (AAAA-MM-GG, es. 2027-01-01).")
         parser.add_argument("--valido-al", default="", help="Fine validità del listino (AAAA-MM-GG).")
+        parser.add_argument(
+            "--chiudi-precedenti",
+            action="store_true",
+            help="Chiude il giorno prima i listini del fornitore che si sovrappongono alla nuova validità.",
+        )
 
     def handle(self, *args, **options):
         chiave = options["fornitore"]
@@ -626,7 +727,8 @@ class Command(BaseCommand):
             self.stdout.write("\n  (prova senza salvare) prime 12 voci:")
             for voce in voci[:12]:
                 extra = f" · variante «{voce.etichetta_variante}» di «{voce.variante_di}»" if voce.variante_di else ""
-                self.stdout.write(f"    {voce.codice:<20} {voce.nome[:62]:<64} {voce.prezzo:>10} €{extra}")
+                sconto = f" · sconto {voce.sconto}% · netto {voce.prezzo_acquisto} €" if voce.sconto else ""
+                self.stdout.write(f"    {voce.codice:<20} {voce.nome[:62]:<64} {voce.prezzo:>10} €{sconto}{extra}")
             return
 
         from apps.catalog.models import Category, Product
@@ -668,6 +770,16 @@ class Command(BaseCommand):
             for campo, valore in campi_listino.items():
                 setattr(listino, campo, valore)
             listino.save(update_fields=list(campi_listino))
+
+        if options["chiudi_precedenti"] and valido_dal:
+            chiusi = (
+                SupplierPriceList.objects.filter(supplier=fornitore, is_active=True, valid_from__lt=valido_dal)
+                .exclude(pk=listino.pk)
+                .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=valido_dal))
+                .update(valid_to=valido_dal - timedelta(days=1))
+            )
+            if chiusi:
+                self.stdout.write(f"  listini precedenti chiusi: {chiusi}")
 
         # il capofamiglia delle varianti può essere già stato creato (Forma Aquae):
         # qui si tiene traccia di quelli letti, per non ricercarli ogni volta
@@ -763,6 +875,14 @@ class Command(BaseCommand):
                 if genitore is not None and voce.etichetta_variante:
                     nome_finale = f"{genitore.name} – {voce.etichetta_variante}"[:200]
 
+                prezzo_acquisto = voce.prezzo_acquisto
+                if ricarico:
+                    prezzo_vendita = (prezzo_acquisto * (1 + ricarico)).quantize(Decimal("0.0001"))
+                elif voce.prezzo_vendita is not None:
+                    prezzo_vendita = voce.prezzo_vendita
+                else:
+                    prezzo_vendita = Decimal("0")
+
                 if prodotto is None:
                     prodotto = Product(
                         code=codice_prodotto,
@@ -771,9 +891,9 @@ class Command(BaseCommand):
                         category=categoria,
                         uom=unita,
                         barcode=voce.barcode[:50],
-                        sale_price=(voce.prezzo * (1 + ricarico)).quantize(Decimal("0.0001")) if ricarico else Decimal("0"),
+                        sale_price=prezzo_vendita,
                         sale_vat=iva,
-                        purchase_price=voce.prezzo,
+                        purchase_price=prezzo_acquisto,
                         purchase_vat=iva,
                         main_supplier=fornitore,
                         is_stock_tracked=True,
@@ -791,8 +911,8 @@ class Command(BaseCommand):
                     if not solo_nuovi:
                         if nome_finale and nome_finale != prodotto.name:
                             campi["name"] = nome_finale[:200]
-                        if voce.prezzo and voce.prezzo != prodotto.purchase_price:
-                            campi["purchase_price"] = voce.prezzo
+                        if prezzo_acquisto and prezzo_acquisto != prodotto.purchase_price:
+                            campi["purchase_price"] = prezzo_acquisto
                         if voce.barcode and not prodotto.barcode:
                             campi["barcode"] = voce.barcode[:50]
                         if categoria and prodotto.category_id != categoria.pk:
@@ -819,6 +939,7 @@ class Command(BaseCommand):
                     defaults={
                         "supplier_code": voce.codice[:60],
                         "price": voce.prezzo,
+                        "discount_pct": voce.sconto,
                         "note": voce.note[:200],
                     },
                 )

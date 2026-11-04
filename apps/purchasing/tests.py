@@ -1,5 +1,6 @@
 """Test dell'importazione dei listini fornitori."""
 import tempfile
+from datetime import date
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
@@ -49,6 +50,79 @@ def _file_axor(finiture=False):
     libro.save(percorso)
     libro.close()
     return percorso
+
+
+def _file_cosmic():
+    """Crea un file Cosmic minimo con la stessa struttura del listino 2027."""
+    libro = openpyxl.Workbook()
+    foglio = libro.active
+    foglio.append(["#VALUE!", None, "Price list Cosmic 2027"])
+    foglio.append([
+        "Riferimento\nProduktreferenz", "Photo", "Collezione\nKollektion", "Misurazioni\nMessen",
+        "EAN", "Info", "PVP", "Descrizione", "Finiture", "Beschreibung", "Oberflächen",
+    ])
+    foglio.append(["WJC235A0024001", "#VALUE!", "Architect S+", "W:30 D:7 H:6 cm", "8429960729226",
+                   "30 Ø2,2cm", 110, "Maniglia diritta", "Cromo", "Haltegriff gerade", "Chrom"])
+    foglio.append(["WJC235A0024036", "#VALUE!", "Architect S+", "W:30 D:7 H:6 cm", "8429960725808",
+                   "30 Ø2,2cm", 110, "Maniglia diritta", "Nero satinato", "Haltegriff gerade", "Schwarz matt"])
+    foglio.append(["WJC783M0016196", "#VALUE!", "Savina", "120x45x58,5 cm", "8429960097554",
+                   "120 cm", 1766, "Mobile 4 cassetti con lavabo", "Rovere naturale",
+                   "Unterschrank 4 schubladen", "Eiche natur"])
+    foglio.append(["WJC999A0001001", None, "Basic", "", None, None, 50, "Gancio", None, "Haken", None])
+    percorso = Path(tempfile.mkdtemp()) / "cosmic.xlsx"
+    libro.save(percorso)
+    libro.close()
+    return percorso
+
+
+class ImportaListiniCosmicTest(TestCase):
+    def test_importa_pvp_con_sconto_fornitore(self):
+        call_command(
+            "importa_listini", "cosmic", file=str(_file_cosmic()), valido_dal="2027-01-01", stdout=StringIO()
+        )
+
+        listino = SupplierPriceList.objects.get(name="Cosmic 2027")
+        self.assertEqual(str(listino.valid_from), "2027-01-01")
+        self.assertEqual(listino.supplier.name, "INDUSTRIAS COSMIC SAU")
+
+        prodotto = Product.objects.get(code="WJC235A0024001")
+        self.assertEqual(prodotto.name, "Architect S+ – Maniglia diritta 30x7x6 cm – Cromo")
+        self.assertEqual(prodotto.barcode, "8429960729226")
+        self.assertEqual(prodotto.category.name, "Architect S+")
+        self.assertEqual(prodotto.category.parent.name, "INDUSTRIAS COSMIC SAU")
+        self.assertEqual(prodotto.sale_price, Decimal("110.0000"), "il prezzo di vendita è il PVP")
+        self.assertEqual(prodotto.purchase_price, Decimal("55.0000"), "il netto sconta il 50%")
+
+        voce = PriceListItem.objects.get(pricelist=listino, product=prodotto)
+        self.assertEqual(voce.price, Decimal("110.0000"))
+        self.assertEqual(voce.discount_pct, Decimal("50.00"))
+        self.assertEqual(voce.effective_price, Decimal("55.0000"))
+
+        senza_finitura = Product.objects.get(code="WJC999A0001001")
+        self.assertEqual(senza_finitura.name, "Basic – Gancio", "la finitura «None» viene ignorata")
+
+    def test_reimport_non_duplica(self):
+        percorso = str(_file_cosmic())
+        for _ in range(2):
+            call_command("importa_listini", "cosmic", file=percorso, valido_dal="2027-01-01", stdout=StringIO())
+
+        self.assertEqual(Product.objects.filter(code="WJC235A0024001").count(), 1)
+        self.assertEqual(SupplierPriceList.objects.filter(name="Cosmic 2027").count(), 1)
+        self.assertEqual(PriceListItem.objects.count(), 4)
+
+    def test_chiudi_precedenti(self):
+        fornitore = Contact.objects.create(name="INDUSTRIAS COSMIC SAU", is_supplier=True)
+        vecchio = SupplierPriceList.objects.create(
+            supplier=fornitore, name="Listino principale", valid_from=date(2026, 10, 13)
+        )
+
+        call_command(
+            "importa_listini", "cosmic", file=str(_file_cosmic()), valido_dal="2027-01-01",
+            chiudi_precedenti=True, stdout=StringIO(),
+        )
+
+        vecchio.refresh_from_db()
+        self.assertEqual(vecchio.valid_to, date(2026, 12, 31))
 
 
 class ImportaListiniAxorTest(TestCase):
