@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="420" viewBox="0 0 1000 420" role="img" aria-labelledby="titolo">
+<title id="titolo">Come si muove la giacenza</title>
+<defs>
+  <marker id="freccia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1000" height="420" fill="#ffffff"/>
+<text x="30" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Come si muove la giacenza</text>
+<text x="30" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#64748b">Ogni movimento ha data, causale, documento collegato e utente: la storia di un articolo si ricostruisce da qui.</text>
+<rect x="390" y="165" width="220" height="80" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
+<text x="500.0" y="200.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600" fill="#0f172a">Giacenza</text>
+<text x="500.0" y="219.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">per articolo e magazzino</text>
+<rect x="40" y="80" width="230" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="155.0" y="106.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Ricezione merce (+)</text>
+<text x="155.0" y="125.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">ordine fornitore</text>
+<rect x="40" y="270" width="230" height="62" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="155.0" y="296.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Rettifica inventario (+/-)</text>
+<text x="155.0" y="315.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">conteggio reale</text>
+<rect x="730" y="80" width="230" height="62" rx="12" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="845.0" y="106.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">DDT / consegna (-)</text>
+<text x="845.0" y="125.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">uscita merce</text>
+<rect x="730" y="270" width="230" height="62" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="845.0" y="296.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Rettifica inventario (+/-)</text>
+<text x="845.0" y="315.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">rottura, reso, errore</text>
+<line x1="270" y1="111" x2="390" y2="185" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="330.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">carico</text>
+<line x1="270" y1="301" x2="390" y2="225" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="330.0" y="255.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">corregge</text>
+<line x1="610" y1="185" x2="730" y2="111" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="670.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">scarico</text>
+<line x1="610" y1="225" x2="730" y2="301" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="670.0" y="255.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">corregge</text>
+<rect x="300" y="345" width="400" height="46" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="500.0" y="363.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Movimenti tracciati</text>
+<text x="500.0" y="382.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">data · tipo · quantità · riferimento · utente</text>
+<text x="30" y="402" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#64748b">I kit non hanno giacenza: si scaricano i componenti. I servizi non gestiti a magazzino non muovono nulla.</text>
+</svg>

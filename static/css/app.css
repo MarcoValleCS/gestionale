@@ -781,6 +781,62 @@ a:hover {
   margin: 0.8rem 0;
 }
 
+.guida-testo .guida-suggerimento {
+  background: #eef6ff;
+  border: 1px solid #cfe3ff;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.8rem 0;
+}
+
+.guida-testo .guida-passi {
+  background: #f8fafd;
+  border: 1px solid #e6ebf2;
+  border-radius: 10px;
+  padding: 0.8rem 1rem 0.2rem;
+  margin: 0.8rem 0;
+}
+
+.guida-testo .guida-ruolo {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.8rem 0;
+}
+
+.guida-testo figure {
+  margin: 1.1rem 0 1.3rem;
+}
+
+.guida-testo figure img,
+.guida-testo img.guida-immagine {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e3e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.guida-testo figcaption {
+  margin-top: 0.45rem;
+  color: #667085;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.guida-testo .guida-elenco-aree {
+  columns: 2;
+  column-gap: 2rem;
+}
+
+@media (max-width: 576px) {
+  .guida-testo .guida-elenco-aree {
+    columns: 1;
+  }
+}
+
 /* ---------------------------------------------------------------- login */
 .login-page {
   min-height: 100vh;

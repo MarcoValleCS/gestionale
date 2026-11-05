@@ -1,17 +1,38 @@
 """Carica le pagine della guida del gestionale.
 
-Le pagine scritte nel codice si creano se mancano. Con ``--aggiorna`` si
-sovrascrive il testo anche delle pagine esistenti (per riportarle alla versione
-del programma), mentre di norma le modifiche fatte dal gestionale restano.
+Le pagine scritte nel codice si creano se mancano. Di norma il comando aggiorna
+anche le pagine del programma che non sono mai state modificate dall'interfaccia:
+così, dopo un aggiornamento, la guida resta allineata senza perdere le
+personalizzazioni fatte dall'amministratore. Con ``--aggiorna`` si sovrascrive
+tutto, anche ciò che è stato modificato a mano.
 """
 from django.core.management.base import BaseCommand
 
 
+def _diversa(pagina, voce):
+    """True se il contenuto della pagina differisce da quello del codice.
+
+    Il corpo viene confrontato già ripulito: ``WikiPage.save()`` applica la
+    stessa pulizia, quindi senza questo passaggio le pagine risulterebbero
+    diverse a ogni avvio e verrebbero riscritte inutilmente.
+    """
+    from apps.core.richtext import clean_guida
+
+    return (
+        pagina.title != voce["title"]
+        or pagina.area != voce["area"]
+        or pagina.summary != voce.get("summary", "")
+        or pagina.roles != voce.get("roles", "")
+        or pagina.order != voce.get("order", 100)
+        or pagina.body != clean_guida(voce["body"])
+    )
+
+
 class Command(BaseCommand):
-    help = "Crea le pagine della guida (Impostazioni → Guida) senza toccare quelle modificate a mano."
+    help = "Crea e aggiorna le pagine della guida (Impostazioni → Guida) senza toccare quelle modificate a mano."
 
     def add_arguments(self, parser):
-        parser.add_argument("--aggiorna", action="store_true", help="Sovrascrive anche le pagine già presenti.")
+        parser.add_argument("--aggiorna", action="store_true", help="Sovrascrive anche le pagine modificate dall'interfaccia.")
         parser.add_argument("--dry-run", action="store_true", help="Mostra cosa verrebbe fatto.")
 
     def handle(self, *args, **options):
@@ -36,8 +57,11 @@ class Command(BaseCommand):
                 continue
 
             if not options["aggiorna"]:
-                invariati += 1
-                continue
+                # Una pagina modificata dall'interfaccia ha updated_by valorizzato:
+                # non la si tocca, altrimenti si perdono le personalizzazioni.
+                if pagina.updated_by_id is not None or not _diversa(pagina, voce):
+                    invariati += 1
+                    continue
 
             pagina.title = voce["title"]
             pagina.area = voce["area"]
@@ -53,5 +77,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  (prova) da creare: {creati} · da aggiornare: {aggiornati} · invariati: {invariati}")
         else:
             self.stdout.write(
-                self.style.SUCCESS(f"  guida: {creati} pagine create · {aggiornati} aggiornate · {invariati} lasciate com'erano")
+                self.style.SUCCESS(
+                    f"  guida: {creati} pagine create · {aggiornati} aggiornate · {invariati} lasciate com'erano"
+                )
             )

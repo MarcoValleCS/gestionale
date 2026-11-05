@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620" role="img" aria-labelledby="titolo">
+<title id="titolo">Chi può fare cosa</title>
+<defs>
+  <marker id="freccia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1000" height="620" fill="#ffffff"/>
+<text x="30" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Chi può fare cosa</text>
+<text x="30" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#64748b">P = accesso completo · M = crea e modifica · L = solo lettura · — = non disponibile</text>
+<text x="20" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Area</text>
+<text x="310" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Amministratore</text>
+<text x="430" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Vendite</text>
+<text x="550" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Acquisti</text>
+<text x="670" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Magazzino</text>
+<text x="790" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Personale</text>
+<text x="910" y="92" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Collaboratore</text>
+<text x="28" y="128" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Contatti</text>
+<rect x="250" y="108" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="108" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="108" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="540" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="610" y="108" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="660" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="730" y="108" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="780" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="850" y="108" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="159" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Articoli</text>
+<rect x="250" y="139" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="158" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="139" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="158" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="139" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="540" y="158" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="610" y="139" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="660" y="158" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="730" y="139" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="780" y="158" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="850" y="139" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="158" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="190" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Preventivi</text>
+<rect x="250" y="170" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="189" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="170" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="189" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="170" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="540" y="189" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="610" y="170" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="189" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="170" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="189" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="170" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="189" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="221" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Ordini cliente</text>
+<rect x="250" y="201" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="220" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="201" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="220" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="201" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="540" y="220" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="610" y="201" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="660" y="220" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="730" y="201" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="220" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="201" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="220" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="252" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Ordini fornitore</text>
+<rect x="250" y="232" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="251" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="232" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="420" y="251" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="490" y="232" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="540" y="251" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="610" y="232" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="660" y="251" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="730" y="232" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="251" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="232" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="251" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="283" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Listini fornitori</text>
+<rect x="250" y="263" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="282" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="263" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="420" y="282" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="490" y="263" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="540" y="282" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="610" y="263" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="282" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="263" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="282" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="263" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="282" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="314" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">DDT</text>
+<rect x="250" y="294" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="313" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="294" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="313" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="294" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="540" y="313" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="610" y="294" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="660" y="313" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="730" y="294" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="313" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="294" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="313" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="345" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Fatture emesse</text>
+<rect x="250" y="325" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="344" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="325" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="344" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="325" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="540" y="344" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="610" y="325" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="344" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="325" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="344" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="325" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="344" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="376" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Fatture ricevute</text>
+<rect x="250" y="356" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="375" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="356" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="420" y="375" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="490" y="356" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="540" y="375" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="610" y="356" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="375" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="356" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="375" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="356" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="375" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="407" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Magazzino</text>
+<rect x="250" y="387" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="406" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="387" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="420" y="406" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="490" y="387" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="540" y="406" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="610" y="387" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="660" y="406" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="730" y="387" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="780" y="406" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="850" y="387" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="406" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="438" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Cantieri</text>
+<rect x="250" y="418" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="437" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="418" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="437" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="418" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="540" y="437" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="610" y="418" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="660" y="437" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="730" y="418" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="780" y="437" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="850" y="418" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="437" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="469" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Manutenzioni</text>
+<rect x="250" y="449" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="468" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="449" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="468" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="449" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="540" y="468" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="610" y="449" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="660" y="468" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="730" y="449" width="100" height="28" rx="7" fill="#f1f5f9" stroke="#475569" stroke-width="1"/>
+<text x="780" y="468" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#475569">L</text>
+<rect x="850" y="449" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="468" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="500" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Personale</text>
+<rect x="250" y="480" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="499" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="480" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="420" y="499" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="490" y="480" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="540" y="499" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="610" y="480" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="499" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="480" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="780" y="499" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="850" y="480" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="499" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="531" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Statistiche</text>
+<rect x="250" y="511" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="530" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="511" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="420" y="530" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="490" y="511" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="540" y="530" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="610" y="511" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="530" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="511" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="530" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="511" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="530" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="28" y="562" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Impostazioni</text>
+<rect x="250" y="542" width="100" height="28" rx="7" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+<text x="300" y="561" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#15803d">P</text>
+<rect x="370" y="542" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="420" y="561" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="490" y="542" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="540" y="561" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="610" y="542" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="660" y="561" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="730" y="542" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="780" y="561" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<rect x="850" y="542" width="100" height="28" rx="7" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+<text x="900" y="561" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">—</text>
+<text x="30" y="602" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#64748b">Il collaboratore con il solo ruolo «Collaboratore» accede unicamente a «Il mio lavoro»: ore e foto del cantiere.</text>
+</svg>

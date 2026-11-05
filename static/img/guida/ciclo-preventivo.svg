@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="370" viewBox="0 0 1000 370" role="img" aria-labelledby="titolo">
+<title id="titolo">Il ciclo di vita del preventivo</title>
+<defs>
+  <marker id="freccia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1000" height="370" fill="#ffffff"/>
+<text x="30" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Il ciclo di vita del preventivo</text>
+<text x="30" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#64748b">Gli stati si cambiano dalla scheda del preventivo o dall&#x27;elenco.</text>
+<rect x="30" y="95" width="150" height="62" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="105.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Bozza</text>
+<text x="105.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">in preparazione</text>
+<rect x="230" y="95" width="150" height="62" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="305.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Inviato</text>
+<text x="305.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">mandato al cliente</text>
+<rect x="430" y="95" width="150" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="505.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Accettato</text>
+<text x="505.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">ok del cliente</text>
+<rect x="630" y="95" width="150" height="62" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
+<text x="705.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Convertito</text>
+<text x="705.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">ordine cliente creato</text>
+<rect x="830" y="95" width="150" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="905.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#0f172a">Ordine</text>
+<text x="905.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">lavoro confermato</text>
+<line x1="180" y1="126" x2="230" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="205.0" y="118.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">invia</text>
+<line x1="380" y1="126" x2="430" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="405.0" y="118.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">accetta</text>
+<line x1="580" y1="126" x2="630" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="605.0" y="118.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">converti</text>
+<line x1="780" y1="126" x2="830" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="305" y1="157" x2="305" y2="215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="455" y1="157" x2="455" y2="215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<rect x="230" y="215" width="150" height="50" rx="12" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="305.0" y="235.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Rifiutato</text>
+<text x="305.0" y="254.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">motivo perso</text>
+<rect x="430" y="215" width="150" height="50" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="505.0" y="235.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Scaduto</text>
+<text x="505.0" y="254.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">validità superata</text>
+<text x="30" y="352" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#64748b">Solo i preventivi in bozza o inviati si possono modificare; il convertito resta come storico.</text>
+</svg>

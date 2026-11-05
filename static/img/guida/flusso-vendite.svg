@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="380" viewBox="0 0 1000 380" role="img" aria-labelledby="titolo">
+<title id="titolo">Dal lead all&#x27;incasso: il flusso delle vendite</title>
+<defs>
+  <marker id="freccia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1000" height="380" fill="#ffffff"/>
+<text x="30" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Dal lead all&#x27;incasso: il flusso delle vendite</text>
+<text x="30" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#64748b">Ogni passaggio conserva il collegamento al cliente e, se indicato, al cantiere.</text>
+<rect x="30" y="95" width="150" height="62" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
+<text x="105.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">Lead</text>
+<text x="105.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">interesse / richiesta</text>
+<rect x="230" y="95" width="150" height="62" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="305.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">Preventivo</text>
+<text x="305.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">offerta al cliente</text>
+<rect x="430" y="95" width="150" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="505.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">Ordine cliente</text>
+<text x="505.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">conferma del lavoro</text>
+<rect x="630" y="95" width="150" height="62" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="705.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">DDT</text>
+<text x="705.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">uscita della merce</text>
+<rect x="830" y="95" width="150" height="62" rx="12" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="905.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">Fattura</text>
+<text x="905.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">documento fiscale</text>
+<line x1="180" y1="126" x2="230" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="205.0" y="86" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">qualifica</text>
+<line x1="380" y1="126" x2="430" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="405.0" y="86" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">accettato</text>
+<line x1="580" y1="126" x2="630" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="605.0" y="86" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">conferma</text>
+<line x1="780" y1="126" x2="830" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="805.0" y="86" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">se serve</text>
+<line x1="305" y1="157" x2="305" y2="215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<rect x="230" y="215" width="150" height="50" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="305.0" y="245.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Rifiutato / scaduto</text>
+<line x1="505" y1="157" x2="505" y2="215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<rect x="420" y="215" width="200" height="50" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="520.0" y="235.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Ordini fornitore</text>
+<text x="520.0" y="254.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">per le carenze di magazzino</text>
+<line x1="905" y1="157" x2="905" y2="215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<rect x="830" y="215" width="150" height="50" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="905.0" y="235.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Incasso</text>
+<text x="905.0" y="254.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">scadenzario clienti</text>
+<text x="30" y="362" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#64748b">Il preventivo accettato diventa ordine con un clic; la fattura può nascere dal DDT o direttamente dall&#x27;ordine.</text>
+</svg>

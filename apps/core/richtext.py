@@ -60,11 +60,29 @@ GUIDA_TAGS = {
     "h2", "h3", "h4", "p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li",
     "a", "code", "pre", "blockquote", "div", "span", "small", "hr",
     "table", "thead", "tbody", "tr", "th", "td", "caption",
+    # Immagini e didascalie: solo file locali sotto static/img/guida/.
+    "img", "figure", "figcaption",
 }
 
-GUIDA_ATTRIBUTES = {"a": {"href", "title", "target"}, "*": {"class"}}
+GUIDA_ATTRIBUTES = {
+    "a": {"href", "title", "target"},
+    "img": {"src", "alt", "title", "width", "height", "loading"},
+    "figure": {"class"},
+    "figcaption": {"class"},
+    "*": {"class"},
+}
 
 GUIDA_URL_SCHEMES = {"http", "https", "mailto"}
+GUIDA_IMMAGINI = "/static/img/guida/"
+
+
+def _filtra_attributo_guida(tag, attributo, valore):
+    """Consente solo le immagini della guida, mai quelle esterne."""
+    if tag == "img" and attributo == "src":
+        percorso = (valore or "").strip()
+        if not percorso.startswith(GUIDA_IMMAGINI):
+            return None
+    return valore
 
 
 def clean_guida(value):
@@ -75,6 +93,7 @@ def clean_guida(value):
         value,
         tags=GUIDA_TAGS,
         attributes=GUIDA_ATTRIBUTES,
+        attribute_filter=_filtra_attributo_guida,
         url_schemes=GUIDA_URL_SCHEMES,
         strip_comments=True,
         link_rel="noopener noreferrer",

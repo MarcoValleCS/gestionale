@@ -340,8 +340,14 @@ def wiki(request):
             or termine in pagina.body.lower()
         ]
 
+    from .guida import ORDINE_AREE
+
+    ordine_aree = {area: posizione for posizione, area in enumerate(ORDINE_AREE)}
     sezioni = {}
-    for pagina in pagine:
+    for pagina in sorted(
+        pagine,
+        key=lambda voce: (ordine_aree.get(voce.area, 999), voce.area, voce.order, voce.title),
+    ):
         sezioni.setdefault(pagina.area, []).append(pagina)
     return render(
         request,

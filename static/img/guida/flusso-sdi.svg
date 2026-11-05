@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="390" viewBox="0 0 1000 390" role="img" aria-labelledby="titolo">
+<title id="titolo">Fattura elettronica allo SDI</title>
+<defs>
+  <marker id="freccia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1000" height="390" fill="#ffffff"/>
+<text x="30" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Fattura elettronica allo SDI</text>
+<text x="30" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#64748b">Il gestionale prepara l&#x27;XML FatturaPA e lo trasmette via PEC; le ricevute si registrano a mano.</text>
+<rect x="30" y="95" width="170" height="62" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="115.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Fattura emessa</text>
+<text x="115.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">dati fiscali completi</text>
+<rect x="230" y="95" width="170" height="62" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
+<text x="315.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Genera XML</text>
+<text x="315.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">FPR12</text>
+<rect x="430" y="95" width="170" height="62" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="515.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Invia via PEC</text>
+<text x="515.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">sdi01@pec.fatturapa.it</text>
+<rect x="630" y="95" width="150" height="62" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="705.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">SDI</text>
+<text x="705.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">controlli</text>
+<rect x="810" y="95" width="160" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="890.0" y="121.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Ricevuta</text>
+<text x="890.0" y="140.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">esito</text>
+<line x1="200" y1="126" x2="230" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="400" y1="126" x2="430" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="600" y1="126" x2="630" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="780" y1="126" x2="810" y2="126" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="705" y1="157" x2="620" y2="225" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="705" y1="157" x2="790" y2="225" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<rect x="520" y="225" width="180" height="50" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="610.0" y="245.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Accettata</text>
+<text x="610.0" y="264.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">fattura valida</text>
+<rect x="720" y="225" width="180" height="50" rx="12" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="810.0" y="245.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Scartata</text>
+<text x="810.0" y="264.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">correggi e ritrasmetti</text>
+<text x="30" y="372" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#64748b">Conservazione sostitutiva e ricevute complete restano a carico del conservatore o del commercialista.</text>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="440" viewBox="0 0 1000 440" role="img" aria-labelledby="titolo">
+<title id="titolo">Personale e collaboratori</title>
+<defs>
+  <marker id="freccia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+  </marker>
+</defs>
+<rect width="1000" height="440" fill="#ffffff"/>
+<text x="30" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Personale e collaboratori</text>
+<text x="30" y="60" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#64748b">Due percorsi diversi, uniti dal cantiere e dal controllo dei costi.</text>
+<text x="30" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">Dipendenti</text>
+<rect x="130" y="105" width="160" height="62" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="210.0" y="131.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Anagrafica</text>
+<text x="210.0" y="150.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">mansione e costo</text>
+<rect x="320" y="105" width="160" height="62" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
+<text x="400.0" y="131.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Ore</text>
+<text x="400.0" y="150.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">ordinario · extra</text>
+<rect x="540" y="105" width="160" height="62" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="620.0" y="131.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Ferie e permessi</text>
+<text x="620.0" y="150.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">richiesta e approvazione</text>
+<rect x="750" y="105" width="160" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="830.0" y="131.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f172a">Presenze</text>
+<text x="830.0" y="150.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">registro mensile</text>
+<line x1="290" y1="136" x2="320" y2="136" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="480" y1="136" x2="540" y2="136" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="700" y1="136" x2="750" y2="136" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="30" y="262" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f172a">Collaboratori esterni</text>
+<rect x="130" y="275" width="180" height="62" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="220.0" y="301.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Anagrafica + utente</text>
+<text x="220.0" y="320.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">accesso solo alla sua area</text>
+<rect x="350" y="275" width="180" height="62" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.5"/>
+<text x="440.0" y="301.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Ore e foto</text>
+<text x="440.0" y="320.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">dal telefono, in cantiere</text>
+<rect x="590" y="275" width="180" height="62" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="680.0" y="301.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Controllo ufficio</text>
+<text x="680.0" y="320.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">ore, bolle e foto</text>
+<rect x="810" y="275" width="150" height="62" rx="12" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="885.0" y="301.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0f172a">Fattura</text>
+<text x="885.0" y="320.0" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" fill="#475569">resoconto del periodo</text>
+<line x1="310" y1="306" x2="350" y2="306" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="530" y1="306" x2="590" y2="306" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<line x1="770" y1="306" x2="810" y2="306" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#freccia)"/>
+<text x="30" y="422" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#64748b">Il collaboratore con il solo ruolo «Collaboratore» non vede prezzi, clienti o documenti: solo ore e foto.</text>
+</svg>

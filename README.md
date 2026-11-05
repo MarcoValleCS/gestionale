@@ -90,7 +90,7 @@ documenti.
 Lead con bacheca per fasi della trattativa, valore stimato, prossima azione e
 import dal modulo contatti del sito. Galleria fotografica con etichette e
 collegamento al cantiere. Posta aziendale via IMAP, messaggi interni, guida
-modificabile dall'interno.
+per ruolo con diagrammi dei processi, modificabile dall'interno.
 
 Dashboard con fatturato, margine e marginalità del periodo, dettaglio per
 articolo, fornitore, cliente e cantiere, valore del magazzino e prossime
@@ -323,6 +323,10 @@ docker compose exec web python manage.py <comando>
 # Aggiornamento del codice (con il server MCP: «--profile mcp» serve a
 # ricostruire anche la sua immagine, altrimenti resterebbe indietro)
 git pull && docker compose --profile mcp up -d --build
+
+# Guide: crea le pagine mancanti e aggiorna quelle del programma non
+# modificate dall'interfaccia (le personalizzazioni restano)
+docker compose exec web python manage.py carica_guida
 ```
 
 Se il server MCP è attivo, ricordati di usare `--profile mcp` anche per

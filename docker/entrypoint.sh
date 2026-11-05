@@ -12,5 +12,10 @@ python manage.py collectstatic --noinput
 echo "Creo l'utente amministratore se configurato…"
 python manage.py create_admin
 
+echo "Aggiorno le pagine della guida…"
+# Aggiorna solo le pagine del programma non modificate dall'interfaccia: le
+# personalizzazioni dell'amministratore restano intatte.
+python manage.py carica_guida
+
 echo "Avvio il server…"
 exec "$@"
