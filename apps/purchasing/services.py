@@ -39,6 +39,78 @@ def apply_pricelist_adjustment(pricelist, percent, user=None):
     return adjustment
 
 
+# Margine oltre il netto atteso entro cui un prezzo di listino si considera
+# «già scontato» (arrotondamenti, piccoli aumenti di listino).
+TOLLERANZA_GIA_NETTO = Decimal("1.10")
+
+
+def voci_gia_nette(pricelist, percentuale):
+    """Voci del listino il cui prezzo sembra già il netto d'acquisto.
+
+    Lo sconto del fornitore va applicato al prezzo di listino lordo (il prezzo
+    al pubblico, che di norma è anche il prezzo di vendita dell'articolo). Se
+    il prezzo della voce è già vicino a «prezzo di vendita meno sconto», lo
+    sconto è già stato applicato: farlo di nuovo abbatte il costo. È successo
+    con un listino importato da Odoo, dove il prezzo era già quello netto: i
+    costi sono finiti al 10% del listino invece del 32% e i margini dei
+    preventivi sono risultati gonfiati.
+
+    Restituisce ``(voci_sospette, voci_controllate)``.
+    """
+    fattore = 1 - Decimal(percentuale) / 100
+    if fattore >= 1:
+        return [], 0
+    sospette = []
+    controllate = 0
+    for voce in pricelist.items.select_related("product"):
+        vendita = Decimal(voce.product.sale_price or 0)
+        prezzo = Decimal(voce.price or 0)
+        if vendita <= 0 or prezzo <= 0:
+            continue
+        controllate += 1
+        if prezzo <= vendita * fattore * TOLLERANZA_GIA_NETTO:
+            sospette.append(voce)
+    return sospette, controllate
+
+
+def applica_sconto_listino(pricelist, percentuale, forza=False):
+    """Imposta lo sconto fornitore su tutte le voci e ricalcola i costi d'acquisto.
+
+    Il prezzo di acquisto di ogni articolo diventa «prezzo della voce meno lo
+    sconto». Se più della metà delle voci ha già un prezzo netto (vedi
+    ``voci_gia_nette``) si rifiuta, a meno di ``forza=True``: lo sconto
+    verrebbe applicato due volte.
+
+    Restituisce ``(voci_del_listino, articoli_aggiornati)``.
+    """
+    from apps.catalog.models import Product
+
+    percentuale = Decimal(str(percentuale))
+    if percentuale < 0 or percentuale > 100:
+        raise ValidationError("Lo sconto deve essere fra 0 e 100.")
+    if percentuale > 0 and not forza:
+        sospette, controllate = voci_gia_nette(pricelist, percentuale)
+        if controllate and len(sospette) * 2 > controllate:
+            raise ValidationError(
+                f"Sconto non applicato: {len(sospette)} voci su {controllate} hanno già un prezzo vicino al "
+                f"netto (prezzo di vendita meno {percentuale}%). Sembra che il listino contenga già i prezzi "
+                "scontati: applicando lo sconto i costi d'acquisto verrebbero scontati due volte. "
+                "Inserisci nel listino i prezzi lordi (di listino) e poi applica lo sconto."
+            )
+
+    da_salvare = []
+    with transaction.atomic():
+        for voce in pricelist.items.select_related("product"):
+            prodotto = voce.product
+            prezzo = round4(Decimal(voce.price or 0) * (1 - percentuale / 100))
+            if prodotto.purchase_price != prezzo:
+                prodotto.purchase_price = prezzo
+                da_salvare.append(prodotto)
+        pricelist.items.update(discount_pct=percentuale)
+        Product.objects.bulk_update(da_salvare, ["purchase_price"], batch_size=500)
+    return pricelist.items.count(), len(da_salvare)
+
+
 def receive_purchase_order(po, quantities, user=None, warehouse=None, ddt=""):
     """Registra la ricezione merce per le righe indicate.
 

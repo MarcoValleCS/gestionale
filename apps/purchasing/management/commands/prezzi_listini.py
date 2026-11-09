@@ -27,11 +27,15 @@ class Command(BaseCommand):
             help="Sconto fornitore da applicare (es. --sconto \"Lacus srl\" 55).",
         )
         parser.add_argument("--dry-run", action="store_true", help="Mostra il risultato senza salvare.")
+        parser.add_argument(
+            "--forza",
+            action="store_true",
+            help="Applica lo sconto anche se i prezzi del listino sembrano già netti (sconto doppio).",
+        )
 
     def handle(self, *args, **options):
         from apps.catalog.models import Product
         from apps.contacts.models import Contact
-        from apps.core.rounding import round4
         from apps.purchasing.models import PriceListItem
 
         if options["vendita"]:
@@ -60,25 +64,32 @@ class Command(BaseCommand):
             if percentuale < 0 or percentuale > 100:
                 raise CommandError("Lo sconto deve essere fra 0 e 100.")
 
-            voci = PriceListItem.objects.filter(
-                pricelist__supplier=fornitore, pricelist__is_active=True
-            ).select_related("product")
-            da_salvare = []
-            for voce in voci:
-                prodotto = voce.product
-                prezzo_acquisto = round4(Decimal(voce.price or 0) * (1 - percentuale / 100))
-                if prodotto.purchase_price != prezzo_acquisto:
-                    prodotto.purchase_price = prezzo_acquisto
-                    da_salvare.append(prodotto)
-            if options["dry_run"]:
-                self.stdout.write(f"  (prova) sconto {percentuale}% su {voci.count()} voci · articoli da aggiornare: {len(da_salvare)}")
-            else:
-                voci.update(discount_pct=percentuale)
-                Product.objects.bulk_update(da_salvare, ["purchase_price"], batch_size=500)
+            from django.core.exceptions import ValidationError
+
+            from apps.purchasing.models import SupplierPriceList
+            from apps.purchasing.services import applica_sconto_listino, voci_gia_nette
+
+            listini = SupplierPriceList.objects.filter(supplier=fornitore, is_active=True)
+            for listino in listini:
+                sospette, controllate = voci_gia_nette(listino, percentuale)
+                if sospette:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"  {listino.name}: {len(sospette)} voci su {controllate} hanno già un prezzo "
+                            f"vicino al netto (sconto già applicato?)"
+                        )
+                    )
+                if options["dry_run"]:
+                    self.stdout.write(f"  (prova) {listino.name}: sconto {percentuale}% su {listino.items.count()} voci")
+                    continue
+                try:
+                    voci, aggiornati = applica_sconto_listino(listino, percentuale, forza=options["forza"])
+                except ValidationError as errore:
+                    raise CommandError("; ".join(errore.messages) + " (usa --forza solo se sei sicuro)") from errore
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"  sconto {percentuale}% applicato a {voci.count()} voci di {fornitore.name} · "
-                        f"prezzi di acquisto aggiornati: {len(da_salvare)}"
+                        f"  sconto {percentuale}% applicato a {voci} voci di {fornitore.name} ({listino.name}) · "
+                        f"prezzi di acquisto aggiornati: {aggiornati}"
                     )
                 )
 

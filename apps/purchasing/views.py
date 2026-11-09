@@ -253,28 +253,21 @@ def pricelist_discount(request, pk):
     """Sconto fornitore: aggiorna prezzo di acquisto di tutte le voci del listino."""
     from decimal import Decimal
 
-    from apps.catalog.models import Product
-    from apps.core.rounding import round4
-
     pricelist = get_object_or_404(SupplierPriceList, pk=pk)
     if request.method == "POST":
         form = SupplierDiscountForm(request.POST)
         if form.is_valid():
             percentuale = Decimal(form.cleaned_data["percent"])
-            da_salvare = []
-            for voce in pricelist.items.select_related("product"):
-                prodotto = voce.product
-                prezzo = round4(Decimal(voce.price or 0) * (1 - percentuale / 100))
-                if prodotto.purchase_price != prezzo:
-                    prodotto.purchase_price = prezzo
-                    da_salvare.append(prodotto)
-            pricelist.items.update(discount_pct=percentuale)
-            Product.objects.bulk_update(da_salvare, ["purchase_price"], batch_size=500)
-            messages.success(
-                request,
-                f"Sconto {percentuale}% applicato a {pricelist.items.count()} articoli del listino: "
-                f"prezzo di acquisto aggiornato per {len(da_salvare)}.",
-            )
+            try:
+                voci, aggiornati = services.applica_sconto_listino(pricelist, percentuale)
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(
+                    request,
+                    f"Sconto {percentuale}% applicato a {voci} articoli del listino: "
+                    f"prezzo di acquisto aggiornato per {aggiornati}.",
+                )
         else:
             messages.error(request, "Sconto non valido: indica una percentuale fra 0 e 100.")
     return redirect("purchasing:pricelist_detail", pk=pricelist.pk)
