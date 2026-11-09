@@ -1005,11 +1005,17 @@ class Command(BaseCommand):
                 giorno = oggi - timedelta(days=giorno_fa)
                 if giorno.weekday() >= 5 or giorno_fa % 3 == 2:
                     continue
+                # Gli ultimi due giorni restano da confermare: così la coda
+                # dei rapportini dell'ufficio non è vuota nella dimostrazione.
                 CollaboratorTimeEntry.objects.create(
                     collaborator=collaboratore, date=giorno,
                     hours=Decimal(self.casuale.choice(["4", "6", "8"])),
                     job=cantieri_attivi[(giorno_fa + indice) % len(cantieri_attivi)],
                     description=f"{specializzazione.capitalize()} in cantiere",
+                    status=(
+                        CollaboratorTimeEntry.STATUS_SUBMITTED if giorno_fa < 2
+                        else CollaboratorTimeEntry.STATUS_APPROVED
+                    ),
                 )
         self.stdout.write(f"  Collaboratori: {len(collaboratori)} con le ore degli ultimi giorni")
 

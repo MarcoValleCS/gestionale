@@ -10,7 +10,7 @@ from apps.core.forms import BaseBootstrapModelForm
 from apps.core.validators import valida_file_caricato
 from apps.jobs.models import Job
 
-from .models import Collaborator, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
+from .models import Collaborator, CollaboratorExpense, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
 
 MIN_HOURS = Decimal("0.25")
 
@@ -367,3 +367,97 @@ class CollaboratorTimeEntryForm(BaseBootstrapModelForm):
         if commit:
             istanza.save()
         return istanza
+
+
+# ------------------------------------------------------------- rapportini
+class _PiuFileInput(forms.ClearableFileInput):
+    """Campo file che accetta più foto in una sola scelta."""
+
+    allow_multiple_selected = True
+
+
+class CampoPiuFile(forms.FileField):
+    """Restituisce l'elenco dei file scelti (anche nessuno)."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", _PiuFileInput(attrs={"multiple": True}))
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        singolo = super().clean
+        if isinstance(data, (list, tuple)):
+            return [singolo(voce, initial) for voce in data if voce]
+        valore = singolo(data, initial)
+        return [valore] if valore else []
+
+
+class RapportinoForm(CollaboratorTimeEntryForm):
+    """Rapportino di una giornata, compilato dal collaboratore dal telefono.
+
+    Le ore possono essere zero solo se il rapportino porta delle spese (lo
+    controlla la vista, che vede anche le righe di spesa).
+    """
+
+    foto = CampoPiuFile(
+        label="Foto del cantiere",
+        required=False,
+        validators=[valida_file_caricato],
+        help_text="Puoi sceglierne più di una: inizio e fine giornata, lavoro fatto, problemi.",
+    )
+
+    class Meta(CollaboratorTimeEntryForm.Meta):
+        fields = ["collaborator", "date", "job", "hours", "description", "notes"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3, "placeholder": "Es. scavo vasca, posa tubazioni, reinterro lato nord"}),
+            "notes": forms.Textarea(attrs={"rows": 2, "placeholder": "Facoltativo: materiale che manca, problemi, richieste"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Sul telefono il calendario nativo è più comodo che scrivere la data.
+        self.fields["date"].widget = forms.DateInput(attrs={"type": "date", "class": "form-control"}, format="%Y-%m-%d")
+        self.fields["hours"].widget.attrs["min"] = "0"
+        self.fields["hours"].widget.attrs["inputmode"] = "decimal"
+        self.fields["hours"].help_text = "In ore e quarti d'ora (4.5 = 4 ore e 30). Zero se porti solo delle spese."
+        self.fields["job"].help_text = "Il cantiere su cui hai lavorato oggi."
+        self.fields["foto"].widget.attrs.update({"accept": "image/*", "class": "form-control"})
+
+
+class SpesaForm(BaseBootstrapModelForm):
+    """Una spesa del rapportino, con la foto dello scontrino o della bolla."""
+
+    scontrino = forms.FileField(
+        label="Foto dello scontrino",
+        required=False,
+        validators=[valida_file_caricato],
+        widget=forms.ClearableFileInput(attrs={"accept": "image/*,application/pdf", "capture": "environment"}),
+    )
+
+    class Meta:
+        model = CollaboratorExpense
+        fields = ["category", "amount", "description", "supplier", "paid_by"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["amount"].widget.attrs.update({"step": "0.01", "min": "0.01", "inputmode": "decimal"})
+        self.fields["description"].widget.attrs["placeholder"] = "Es. 10 sacchi di cemento, pranzo"
+        self.fields["supplier"].widget.attrs["placeholder"] = "Es. Brico, Bar Centrale"
+
+
+SpeseFormSet = forms.inlineformset_factory(
+    CollaboratorTimeEntry,
+    CollaboratorExpense,
+    form=SpesaForm,
+    extra=0,
+    can_delete=True,
+)
+
+
+class RimandaRapportinoForm(forms.Form):
+    """Nota dell'ufficio per rimandare indietro un rapportino."""
+
+    nota = forms.CharField(
+        label="Cosa va corretto",
+        max_length=300,
+        widget=forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+    )

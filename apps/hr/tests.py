@@ -718,7 +718,7 @@ class MenuRuoliTest(CollaboratorTestBase):
         for voce in ("Contatti", "Articoli", "Preventivi", "Fatture emesse", "Collaboratori", "Impostazioni"):
             with self.subTest(voce=voce):
                 self.assertIn(voce, contenuto, f"l'amministratore deve vedere «{voce}»")
-        self.assertNotIn("Le mie ore", contenuto, "l'amministratore non deve vedere il menu del collaboratore")
+        self.assertNotIn("I miei rapportini", contenuto, "l'amministratore non deve vedere il menu del collaboratore")
 
     def test_l_amministratore_accede_a_tutte_le_sezioni(self):
         self.login(self.admin)
@@ -729,7 +729,7 @@ class MenuRuoliTest(CollaboratorTestBase):
     def test_il_collaboratore_vede_solo_le_sue_voci(self):
         self.login(self.collab_user)
         contenuto = self.client.get(reverse("hr:collaborator_area")).content.decode("utf-8", "ignore")
-        self.assertIn("Le mie ore", contenuto)
+        self.assertIn("I miei rapportini", contenuto)
         self.assertNotIn("Fatture emesse", contenuto)
         self.assertNotIn("Preventivi", contenuto)
 
@@ -737,7 +737,7 @@ class MenuRuoliTest(CollaboratorTestBase):
         self.login(self.misto)
         contenuto = self.client.get("/").content.decode("utf-8", "ignore")
         self.assertIn("Preventivi", contenuto)
-        self.assertNotIn("Le mie ore", contenuto)
+        self.assertNotIn("I miei rapportini", contenuto)
 
     def test_utente_senza_ruoli_non_e_limitato_dal_menu(self):
         """Un utente senza gruppi non è un collaboratore: vede il menu normale."""

@@ -418,6 +418,15 @@ class Attachment(TimeStampedModel):
         related_name="photos",
         verbose_name="Collaboratore",
     )
+    report = models.ForeignKey(
+        "hr.CollaboratorTimeEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attachments",
+        verbose_name="Rapportino",
+        help_text="Rapportino del collaboratore a cui appartiene la foto o lo scontrino.",
+    )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="attachments", verbose_name="Caricato da"
     )

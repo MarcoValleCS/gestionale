@@ -52,11 +52,11 @@
     <nav class="sidebar-nav">
       {% if roles.is_collaborator_only %}
       {# Il collaboratore esterno vede solo la sua area: le altre voci lo rimbalzerebbero qui #}
-      <a class="nav-link {% if request.resolver_match.url_name == 'collaborator_area' %}active{% endif %}" href="{% url 'hr:collaborator_area' %}">
-        <i class="bi bi-clock-history"></i> Le mie ore
+      <a class="nav-link {% if request.resolver_match.url_name == 'collaborator_area' or request.resolver_match.url_name == 'collaborator_entry_detail' %}active{% endif %}" href="{% url 'hr:collaborator_area' %}">
+        <i class="bi bi-journal-text"></i> I miei rapportini
       </a>
-      <a class="nav-link" href="{% url 'hr:collaborator_entry_create' %}">
-        <i class="bi bi-plus-lg"></i> Registra le ore
+      <a class="nav-link {% if request.resolver_match.url_name == 'collaborator_entry_create' %}active{% endif %}" href="{% url 'hr:collaborator_entry_create' %}">
+        <i class="bi bi-plus-lg"></i> Nuovo rapportino
       </a>
       <a class="nav-link {% if request.resolver_match.url_name == 'collaborator_photos' %}active{% endif %}" href="{% url 'hr:collaborator_photos' %}">
         <i class="bi bi-camera"></i> Foto del cantiere
@@ -165,6 +165,13 @@
       </a>
       <a class="nav-link {% if 'collaborator' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:collaborator_list' %}">
         <i class="bi bi-person-workspace"></i> Collaboratori
+      </a>
+      <a class="nav-link {% if 'report_' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:report_list' %}">
+        <i class="bi bi-journal-check"></i> Rapportini
+        {% if rapportini_da_confermare %}<span class="badge text-bg-warning ms-auto" title="Da confermare">{{ rapportini_da_confermare }}</span>{% endif %}
+      </a>
+      <a class="nav-link {% if 'expense_' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:expense_reimbursements' %}">
+        <i class="bi bi-cash-coin"></i> Rimborsi spese
       </a>
       {% endif %}
       <a class="nav-link {% if 'leave' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'hr:leave_list' %}">

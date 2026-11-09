@@ -333,14 +333,14 @@ ripristino su una copia. La guida operativa completa è in
         "body": """
 <p>Il ruolo <strong>Collaboratore</strong> è pensato per le partite IVA esterne
 (scavi, elettricista, piastrellista, giardiniere…). Con questo ruolo vedi solo
-la tua area: <strong>Le mie ore</strong>, <strong>Registra le ore</strong>,
+la tua area: <strong>I miei rapportini</strong>, <strong>Nuovo rapportino</strong>,
 <strong>Foto del cantiere</strong> e <strong>Guida</strong>. Non hai accesso
 alle schede clienti, ai prezzi, ai documenti o alle altre sezioni.</p>
 
 <h3>Cosa fai tu</h3>
 <ol>
   <li>Entri con le credenziali che ti ha dato l'ufficio.</li>
-  <li>Registri le ore lavorate, indicando data, ore, cantiere e lavoro svolto.</li>
+  <li>A fine giornata invii il rapportino: ore, cantiere, lavori fatti, spese con lo scontrino e foto.</li>
   <li>Carichi le foto del cantiere o le bolle di acquisto dal telefono.</li>
   <li>Puoi correggere o cancellare le tue registrazioni finché l'ufficio non le ha controllate.</li>
 </ol>

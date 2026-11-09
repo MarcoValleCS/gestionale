@@ -1,0 +1,42 @@
+{% load core_extras %}
+{# Una riga di spesa del rapportino: serve sia per le spese salvate sia come modello vuoto #}
+<div class="spesa border rounded p-2 pb-0 mb-2 bg-light-subtle{% if not form.instance.pk and form.DELETE.value %} d-none{% endif %}" data-spesa{% if not form.instance.pk and form.DELETE.value %} hidden{% endif %}>
+  {% for nascosto in form.hidden_fields %}{{ nascosto }}{% endfor %}
+  {% for error in form.non_field_errors %}<div class="text-danger small mb-1">{{ error }}</div>{% endfor %}
+  <div class="row">
+    {% include "partials/field.html" with field=form.category col=4 %}
+    {% include "partials/field.html" with field=form.amount col=3 %}
+    {% include "partials/field.html" with field=form.paid_by col=5 %}
+    {% include "partials/field.html" with field=form.description col=6 %}
+    {% include "partials/field.html" with field=form.supplier col=6 %}
+    <div class="col-md-8">
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.scontrino.id_for_label }}">{{ form.scontrino.label }}</label>
+        {{ form.scontrino }}
+        {% if form.instance.receipt %}
+        <div class="form-text">
+          Già caricato: <a href="{{ form.instance.receipt.file.url }}" target="_blank" rel="noopener">{{ form.instance.receipt.name }}</a>
+          — scegline un altro solo per sostituirlo.
+        </div>
+        {% else %}
+        <div class="form-text">Fotografa lo scontrino o la bolla: all'ufficio serve per il rimborso.</div>
+        {% endif %}
+        {% for error in form.scontrino.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>
+    </div>
+    <div class="col-md-4 d-flex align-items-end justify-content-md-end">
+      <div class="mb-3">
+        {% if form.instance.pk %}
+        <div class="form-check">
+          {{ form.DELETE }}
+          <label class="form-check-label text-danger" for="{{ form.DELETE.id_for_label }}">Elimina questa spesa</label>
+        </div>
+        {% else %}
+        {# Una riga nuova non si toglie dalla pagina: si segna come eliminata e si nasconde, così il server la ignora #}
+        <span class="d-none">{{ form.DELETE }}</span>
+        <button class="btn btn-outline-danger btn-sm" type="button" data-togli-spesa><i class="bi bi-x-lg"></i> Togli</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

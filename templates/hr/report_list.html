@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Rapportini{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h2 class="h4 mb-1">Rapportini dei collaboratori</h2>
+    <div class="text-muted small">Ore, spese e foto inviate dal cantiere: confermale o rimandale con una nota.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'hr:expense_reimbursements' %}"><i class="bi bi-cash-coin"></i> Rimborsi spese</a>
+</div>
+
+<ul class="nav nav-pills mb-3 flex-wrap gap-1">
+  <li class="nav-item">
+    <a class="nav-link {% if stato == 'da_confermare' %}active{% endif %}" href="?stato=da_confermare">
+      Da confermare {% if conteggi.da_confermare %}<span class="badge text-bg-warning">{{ conteggi.da_confermare }}</span>{% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if stato == 'da_correggere' %}active{% endif %}" href="?stato=da_correggere">
+      Rimandati {% if conteggi.da_correggere %}<span class="badge text-bg-danger">{{ conteggi.da_correggere }}</span>{% endif %}
+    </a>
+  </li>
+  <li class="nav-item"><a class="nav-link {% if stato == 'confermati' %}active{% endif %}" href="?stato=confermati">Confermati</a></li>
+  <li class="nav-item"><a class="nav-link {% if stato == 'tutti' %}active{% endif %}" href="?stato=tutti">Tutti</a></li>
+</ul>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <input type="hidden" name="stato" value="{{ stato }}">
+  <div class="col-sm-5 col-md-4">
+    <label class="form-label small mb-1" for="collaboratore">Collaboratore</label>
+    <select class="form-select form-select-sm" id="collaboratore" name="collaboratore">
+      <option value="">Tutti</option>
+      {% for c in collaborators %}<option value="{{ c.pk }}" {% if collaboratore_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-sm-5 col-md-4">
+    <label class="form-label small mb-1" for="cantiere">Cantiere</label>
+    <select class="form-select form-select-sm" id="cantiere" name="cantiere">
+      <option value="">Tutti</option>
+      {% for j in jobs %}<option value="{{ j.pk }}" {% if cantiere_id == j.pk|stringformat:"s" %}selected{% endif %}>{{ j.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-sm-2 col-md-auto">
+    <button class="btn btn-outline-primary btn-sm w-100" type="submit"><i class="bi bi-funnel"></i> Filtra</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="text-center">Data</th>
+          <th>Collaboratore</th>
+          <th>Cantiere</th>
+          <th class="text-center">Ore</th>
+          <th class="text-end">Spese</th>
+          <th class="text-center">Foto</th>
+          <th class="text-center">Stato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <td class="text-center text-nowrap">{{ entry.date|date:"d/m/Y" }}</td>
+          <td>{{ entry.collaborator.name }}{% if entry.notes %} <i class="bi bi-chat-left-text text-warning" title="Ci sono segnalazioni"></i>{% endif %}</td>
+          <td>{{ entry.job.name|default:"—" }}</td>
+          <td class="text-center fw-semibold">{{ entry.hours|floatformat:"-2" }}</td>
+          <td class="text-end text-nowrap">{% if entry.totale_spese %}{{ entry.totale_spese|money }} €{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="text-center">{{ entry.numero_foto|default:"—" }}</td>
+          <td class="text-center"><span class="badge text-bg-{{ entry.status_badge }}">{{ entry.get_status_display }}</span></td>
+          <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{% url 'hr:report_detail' entry.pk %}">Apri</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          {% if stato == "da_confermare" %}Nessun rapportino da confermare: tutto in ordine.{% else %}Nessun rapportino con questi filtri.{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm">
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?stato={{ stato }}&collaboratore={{ collaboratore_id }}&cantiere={{ cantiere_id }}&page={{ page_obj.previous_page_number }}">‹</a></li>{% endif %}
+    <li class="page-item disabled"><span class="page-link">Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}</span></li>
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?stato={{ stato }}&collaboratore={{ collaboratore_id }}&cantiere={{ cantiere_id }}&page={{ page_obj.next_page_number }}">›</a></li>{% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

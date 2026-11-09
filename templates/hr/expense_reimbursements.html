@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}Rimborsi spese{% endblock %}
+
+{% block content %}
+{% url 'hr:report_list' as url_elenco %}
+{% include "partials/back_link.html" with url=url_elenco label="Rapportini" %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h2 class="h4 mb-1">Rimborsi spese dei collaboratori</h2>
+    <div class="text-muted small">Spese pagate di tasca propria, su rapportini già confermati.</div>
+  </div>
+  <div class="fs-5">Totale da rimborsare: <strong>{{ grand_total|money }} €</strong></div>
+</div>
+
+{% for gruppo in groups %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-person-workspace me-1"></i> <strong>{{ gruppo.collaborator.name }}</strong>{% if gruppo.collaborator.company %} · {{ gruppo.collaborator.company }}{% endif %}</span>
+    <span class="fw-semibold">{{ gruppo.total|money }} €</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead><tr><th class="text-center">Data</th><th>Cantiere</th><th>Tipo</th><th>Cosa</th><th class="text-end">Importo</th><th class="text-center">Scontrino</th></tr></thead>
+      <tbody>
+        {% for spesa in gruppo.expenses %}
+        <tr>
+          <td class="text-center text-nowrap"><a href="{% url 'hr:report_detail' spesa.entry.pk %}">{{ spesa.entry.date|date:"d/m/Y" }}</a></td>
+          <td>{{ spesa.entry.job.name|default:"—" }}</td>
+          <td>{{ spesa.get_category_display }}</td>
+          <td class="small">{{ spesa.description|default:"—" }}{% if spesa.supplier %} <span class="text-muted">· {{ spesa.supplier }}</span>{% endif %}</td>
+          <td class="text-end">{{ spesa.amount|money }} €</td>
+          <td class="text-center">{% if spesa.receipt %}<a href="{{ spesa.receipt.file.url }}" target="_blank" rel="noopener"><i class="bi bi-image"></i></a>{% else %}<span class="text-danger small" title="Manca lo scontrino">manca</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body py-2 text-end">
+    <form method="post" action="{% url 'hr:expense_reimburse' %}" class="d-inline"
+          onsubmit="return confirm('Segnare come rimborsate le spese di {{ gruppo.collaborator.name }} ({{ gruppo.total|money }} €)?');">
+      {% csrf_token %}
+      {% for spesa in gruppo.expenses %}<input type="hidden" name="spesa" value="{{ spesa.pk }}">{% endfor %}
+      <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-check2-all"></i> Segna come rimborsate ({{ gruppo.total|money }} €)</button>
+    </form>
+  </div>
+</div>
+{% empty %}
+<div class="alert alert-light border">Nessuna spesa da rimborsare.</div>
+{% endfor %}
+
+<div class="card mt-4">
+  <div class="card-header">Ultimi rimborsi</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Rimborsata il</th><th>Collaboratore</th><th>Tipo</th><th class="text-end">Importo</th><th>Da</th></tr></thead>
+      <tbody>
+        {% for spesa in reimbursed %}
+        <tr>
+          <td>{{ spesa.reimbursed_at|date:"d/m/Y" }}</td>
+          <td>{{ spesa.entry.collaborator.name }}</td>
+          <td>{{ spesa.get_category_display }}</td>
+          <td class="text-end">{{ spesa.amount|money }} €</td>
+          <td class="small text-muted">{{ spesa.reimbursed_by.get_full_name|default:spesa.reimbursed_by.username|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-3">Ancora nessun rimborso registrato.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

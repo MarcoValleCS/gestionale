@@ -1574,12 +1574,17 @@ def registra_ore_collaboratore(
     ore_dec = _dec(ore)
     if ore_dec < _dec("0.25") or ore_dec > _dec("24"):
         raise ValueError("Le ore devono essere fra 0,25 e 24.")
+    # Le ore registrate dall'ufficio (qui tramite l'assistente) non passano
+    # dalla coda dei rapportini: nascono già confermate.
     voce = CollaboratorTimeEntry(
         collaborator=collaboratore_obj,
         created_by=utente_sistema(),
         date=_data(data, "data") or timezone.localdate(),
         hours=ore_dec,
         description=(descrizione or "").strip(),
+        status=CollaboratorTimeEntry.STATUS_APPROVED,
+        reviewed_by=utente_sistema(),
+        reviewed_at=timezone.now(),
     )
     if cantiere:
         voce.job = _risolvi_cantiere(cantiere)

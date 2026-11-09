@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load core_extras %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-9">
+    {% url 'hr:collaborator_area' as url_area %}
+    {% include "partials/back_link.html" with url=url_area label="I miei rapportini" %}
+    <h2 class="h4 mb-1">{{ page_title }}</h2>
+    <p class="text-muted small mb-3">
+      Ore, lavori fatti, spese con lo scontrino e qualche foto: alla fine premi «Invia all'ufficio».
+    </p>
+
+    {% if entry and entry.status == "rejected" and entry.review_note %}
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      <strong>L'ufficio chiede di correggere:</strong> {{ entry.review_note }}
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" novalidate id="modulo-rapportino">
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-calendar-check me-1"></i> La giornata</div>
+        <div class="card-body pb-0">
+          <div class="row">
+            {% include "partials/field.html" with field=form.date col=4 %}
+            {% include "partials/field.html" with field=form.hours col=3 %}
+            {% include "partials/field.html" with field=form.job col=5 %}
+            {% include "partials/field.html" with field=form.description col=12 %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-receipt me-1"></i> Spese della giornata</span>
+          <button class="btn btn-outline-primary btn-sm" type="button" id="aggiungi-spesa">
+            <i class="bi bi-plus-lg"></i> Aggiungi spesa
+          </button>
+        </div>
+        <div class="card-body">
+          {{ spese.management_form }}
+          {% for error in spese.non_form_errors %}<div class="text-danger small mb-2">{{ error }}</div>{% endfor %}
+          <div id="elenco-spese">
+            {% for spesa in spese.forms %}
+            {% include "hr/_spesa_form.html" with form=spesa %}
+            {% endfor %}
+          </div>
+          <p class="text-muted small mb-0" id="nessuna-spesa" {% if spese.forms %}hidden{% endif %}>
+            Materiale comprato, pranzo, carburante, pedaggi: aggiungi una riga per ogni scontrino.
+          </p>
+          <template id="spesa-vuota">{% include "hr/_spesa_form.html" with form=spese.empty_form %}</template>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-camera me-1"></i> Foto del cantiere</div>
+        <div class="card-body pb-0">
+          {% if photos %}
+          <div class="row g-2 mb-3">
+            {% for foto in photos %}
+            <div class="col-4 col-md-2">
+              <a href="{{ foto.file.url }}" target="_blank" rel="noopener">
+                {% if foto.is_image %}
+                <img src="{{ foto.file.url }}" alt="{{ foto.name }}" class="w-100 rounded border" style="height:90px;object-fit:cover;">
+                {% else %}
+                <span class="d-flex align-items-center justify-content-center border rounded bg-light" style="height:90px;"><i class="bi bi-file-earmark fs-3"></i></span>
+                {% endif %}
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+          <p class="form-text mt-0">Per togliere una foto già caricata usa «Foto del cantiere» nel menu.</p>
+          {% endif %}
+          <div class="row">
+            {% include "partials/field.html" with field=form.foto col=12 %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-chat-left-text me-1"></i> Segnalazioni per l'ufficio</div>
+        <div class="card-body pb-0">
+          <div class="row">
+            {% include "partials/field.html" with field=form.notes col=12 %}
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap mb-4">
+        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send"></i> Invia all'ufficio</button>
+        <a class="btn btn-outline-secondary btn-lg" href="{% url 'hr:collaborator_area' %}">Annulla</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+  const elenco = document.getElementById("elenco-spese");
+  const modello = document.getElementById("spesa-vuota");
+  const totale = document.getElementById("id_spese-TOTAL_FORMS");
+  const vuoto = document.getElementById("nessuna-spesa");
+
+  function aggiorna() {
+    if (vuoto) vuoto.hidden = elenco.querySelectorAll("[data-spesa]:not([hidden])").length > 0;
+  }
+
+  document.getElementById("aggiungi-spesa").addEventListener("click", function () {
+    const indice = parseInt(totale.value, 10) || 0;
+    const contenitore = document.createElement("div");
+    contenitore.innerHTML = modello.innerHTML.replace(/__prefix__/g, String(indice));
+    const riga = contenitore.firstElementChild;
+    elenco.appendChild(riga);
+    totale.value = String(indice + 1);
+    aggiorna();
+    const importo = riga.querySelector('input[name$="-amount"]');
+    if (importo) importo.focus();
+  });
+
+  // «Togli» non cancella la riga dalla pagina: la segna come eliminata e la
+  // nasconde. Una riga sparita del tutto arriverebbe al server senza tipo e
+  // senza «pagata da», e verrebbe scambiata per una spesa incompleta.
+  elenco.addEventListener("click", function (event) {
+    const pulsante = event.target.closest("[data-togli-spesa]");
+    if (!pulsante) return;
+    const riga = pulsante.closest("[data-spesa]");
+    const elimina = riga.querySelector('input[name$="-DELETE"]');
+    if (elimina) elimina.checked = true;
+    riga.hidden = true;
+    riga.classList.add("d-none");
+    aggiorna();
+  });
+})();
+</script>
+{% endblock %}

@@ -246,9 +246,9 @@ altro ruolo.</div>
 
 <h3>Cosa fa il collaboratore dal telefono</h3>
 <ul>
-  <li>Registra le <strong>ore</strong> indicando data, ore, cantiere e lavoro svolto.</li>
-  <li>Carica <strong>foto del cantiere</strong> o <strong>bolle di acquisto</strong>.</li>
-  <li>Può correggere o cancellare solo le proprie registrazioni e le proprie foto.</li>
+  <li>Invia il <strong>rapportino</strong> di fine giornata: ore, cantiere, lavori eseguiti, spese con lo scontrino, foto e segnalazioni (vedi <a href="/guida/rapportini-collaboratori/">Rapportini dei collaboratori</a>).</li>
+  <li>Carica <strong>foto del cantiere</strong> o <strong>bolle di acquisto</strong> anche fuori dal rapportino.</li>
+  <li>Può correggere o cancellare solo i propri rapportini, finché l'ufficio non li conferma.</li>
 </ul>
 
 <h3>Controllare le ore e le foto</h3>
@@ -268,6 +268,48 @@ effettivamente lavorate.</p>
 <div class="guida-avviso">Il collaboratore non approva ferie o permessi e non
 vede le ore degli altri. Il rapporto di lavoro e la fattura restano fuori dal
 gestionale: qui si tracciano solo ore, foto e costi.</div>
+""",
+    },
+    {
+        "slug": "rapportini-collaboratori",
+        "title": "Rapportini dei collaboratori",
+        "area": "Personale",
+        "roles": SOLO_PERSONALE,
+        "order": 55,
+        "summary": "Confermare o rimandare i rapportini, costi per cantiere e rimborsi delle spese.",
+        "body": """
+<p>Ogni sera i collaboratori inviano dal telefono il <strong>rapportino</strong>
+della giornata: ore, cantiere, lavori eseguiti, spese con la foto dello
+scontrino, foto del cantiere e segnalazioni. I rapportini arrivano in una coda
+<strong>da confermare</strong>: il numero giallo accanto a <em>Personale →
+Rapportini</em> dice quanti aspettano.</p>
+
+<h3>Confermare</h3>
+<ol>
+  <li>Apri <em>Personale → Rapportini</em>: per primi i più vecchi da confermare.</li>
+  <li>Premi <strong>Apri</strong>: vedi ore, lavori, spese con gli scontrini, foto e le segnalazioni (icona del fumetto nell'elenco).</li>
+  <li>Se è tutto giusto premi <strong>Conferma rapportino</strong>: si passa subito al successivo della coda.</li>
+</ol>
+<p>Le ore e le spese confermate entrano nel riquadro <strong>Costi dai
+rapportini</strong> della scheda del cantiere: ore e costo per collaboratore
+(con il compenso orario della sua scheda) e spese per tipo.</p>
+
+<h3>Rimandare</h3>
+<p>Se qualcosa non va (ore sbagliate, scontrino illeggibile, cantiere errato)
+scrivi la nota in <strong>Cosa va corretto</strong> e premi <strong>Rimanda al
+collaboratore</strong>. Lui vede il rapportino in rosso con la tua nota, lo
+corregge e lo invia di nuovo: torna nella coda. Si può rimandare anche un
+rapportino già confermato, purché le sue spese non siano già state rimborsate.</p>
+
+<h3>Rimborsi spese</h3>
+<ol>
+  <li>Apri <em>Personale → Rimborsi spese</em>: le spese pagate dai collaboratori, su rapportini confermati, raggruppate per persona.</li>
+  <li>Controlla gli scontrini (la scritta <em>manca</em> indica una spesa senza foto).</li>
+  <li>Dopo aver pagato, premi <strong>Segna come rimborsate</strong>: vengono segnate solo le spese mostrate in pagina.</li>
+</ol>
+
+<div class="guida-avviso">Le spese <em>pagate dall'azienda</em> (carta aziendale,
+conto presso il fornitore) entrano nei costi del cantiere ma non nei rimborsi.</div>
 """,
     },
 ]

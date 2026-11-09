@@ -60,6 +60,7 @@
           <th>Cantiere / lavoro</th>
           <th>Lavoro svolto</th>
           <th class="text-center">Registrato da</th>
+          <th class="text-center">Rapportino</th>
           <th></th>
         </tr>
       </thead>
@@ -75,6 +76,7 @@
           <td>{{ entry.job.name|default:"—" }}</td>
           <td class="text-muted small">{{ entry.description|default:"—" }}</td>
           <td class="text-center small text-muted">{{ entry.created_by.username|default:"—" }}</td>
+          <td class="text-center"><a class="badge text-bg-{{ entry.status_badge }} text-decoration-none" href="{% url 'hr:report_detail' entry.pk %}">{{ entry.get_status_display }}</a></td>
           <td class="text-end">
             <form method="post" action="{% url 'hr:collaborator_time_delete' entry.pk %}"
                   onsubmit="return confirm('Eliminare questa registrazione?');">
@@ -84,7 +86,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted py-4">Nessuna ora registrata dai collaboratori.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Nessuna ora registrata dai collaboratori.</td></tr>
         {% endfor %}
       </tbody>
     </table>

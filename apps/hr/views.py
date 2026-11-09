@@ -5,7 +5,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib import messages
-from django.db.models import Q, Sum
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db.models import Count, OuterRef, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -21,12 +23,15 @@ from .forms import (
     CollaboratorPhotoForm,
     CollaboratorTimeEntryForm,
     EmployeeForm,
+    RapportinoForm,
+    RimandaRapportinoForm,
+    SpeseFormSet,
     LeaveRequestForm,
     StandardHoursForm,
     TimeEntryForm,
     active_employees,
 )
-from .models import Collaborator, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
+from .models import Collaborator, CollaboratorExpense, CollaboratorTimeEntry, Employee, LeaveRequest, TimeEntry
 
 ZERO = Decimal("0")
 HR_EDIT_ROLES = (ROLE_ADMIN, ROLE_HR)
@@ -611,20 +616,27 @@ def collaborator_for(user):
     return Collaborator.objects.filter(user=user).first()
 
 
-# ---- area riservata al collaboratore: vede e tocca solo le proprie ore ----
+# ---- area riservata al collaboratore: vede e tocca solo i propri rapportini ----
 def collaborator_area(request):
-    """Pagina iniziale del collaboratore: le sue ore e il modulo per aggiungerne."""
+    """Pagina iniziale del collaboratore: i suoi rapportini e i totali."""
+    from . import services
+
     collaboratore = collaborator_for(request.user)
     if collaboratore is None:
         return render(request, "hr/collaborator_no_link.html", {"page_title": "La mia area"})
 
     oggi = timezone.localdate()
-    entries = collaboratore.time_entries.select_related("job").order_by("-date", "-pk")[:60]
+    entries = (
+        collaboratore.time_entries.select_related("job")
+        .prefetch_related("expenses")
+        .order_by("-date", "-pk")[:60]
+    )
+    da_rimborsare = services.spese_da_rimborsare().filter(entry__collaborator=collaboratore)
     return render(
         request,
         "hr/collaborator_area.html",
         {
-            "page_title": "Le mie ore",
+            "page_title": "I miei rapportini",
             "collaborator": collaboratore,
             "entries": entries,
             "hours_month": collaboratore.hours_in_month(oggi.year, oggi.month),
@@ -632,67 +644,142 @@ def collaborator_area(request):
             "hours_year": collaboratore.time_entries.filter(date__year=oggi.year).aggregate(
                 total=Sum("hours")
             )["total"] or ZERO,
+            "to_reimburse": da_rimborsare.aggregate(total=Sum("amount"))["total"] or ZERO,
+            "to_fix": collaboratore.time_entries.filter(status=CollaboratorTimeEntry.STATUS_REJECTED).count(),
+        },
+    )
+
+
+def _conta_spese(entry, spese):
+    """Quante spese avrà il rapportino dopo il salvataggio."""
+    if spese is None:
+        return entry.expenses.count() if entry.pk else 0
+    quante = 0
+    for form in spese.forms:
+        if form.cleaned_data.get("DELETE"):
+            continue
+        if form.instance.pk or form.has_changed():
+            quante += 1
+    return quante
+
+
+def _modulo_rapportino(request, collaboratore, entry=None):
+    """Modulo del rapportino: nuovo oppure da correggere."""
+    from . import services
+
+    istanza = entry or CollaboratorTimeEntry(collaborator=collaboratore)
+    if request.method == "POST":
+        form = RapportinoForm(request.POST, request.FILES, instance=istanza, collaborator=collaboratore)
+        # Le spese sono facoltative: un invio senza il blocco delle spese
+        # (vecchie pagine rimaste aperte) vale come «nessuna spesa nuova».
+        spese = None
+        if "spese-TOTAL_FORMS" in request.POST:
+            spese = SpeseFormSet(request.POST, request.FILES, instance=istanza, prefix="spese")
+        if form.is_valid() and (spese is None or spese.is_valid()):
+            if form.cleaned_data["hours"] == 0 and not _conta_spese(istanza, spese):
+                form.add_error("hours", "Indica le ore lavorate oppure aggiungi almeno una spesa.")
+            else:
+                try:
+                    salvato = services.salva_rapportino(
+                        form.save(commit=False), spese, form.cleaned_data.get("foto") or [], request.user
+                    )
+                except ValidationError as exc:
+                    messages.error(request, "; ".join(exc.messages))
+                    return redirect("hr:collaborator_area")
+                messages.success(
+                    request,
+                    f"Rapportino del {salvato.date:%d/%m/%Y} inviato all'ufficio: lo trovi qui sotto in «Da confermare».",
+                )
+                return redirect("hr:collaborator_area")
+        messages.error(request, "Controlla i campi segnalati in rosso.")
+    else:
+        form = RapportinoForm(
+            instance=istanza,
+            collaborator=collaboratore,
+            initial=None if entry else {"date": timezone.localdate()},
+        )
+        spese = SpeseFormSet(instance=istanza, prefix="spese")
+
+    if spese is None:
+        spese = SpeseFormSet(instance=istanza, prefix="spese")
+    return render(
+        request,
+        "hr/report_form.html",
+        {
+            "form": form,
+            "spese": spese,
+            "collaborator": collaboratore,
+            "entry": entry,
+            "photos": list(entry.attachments.filter(kind=Attachment.KIND_SITE)) if entry else [],
+            "page_title": "Correggi il rapportino" if entry else "Nuovo rapportino",
         },
     )
 
 
 def collaborator_entry_create(request):
-    """Il collaboratore registra le ore di una giornata."""
+    """Il collaboratore compila il rapportino della giornata."""
     collaboratore = collaborator_for(request.user)
     if collaboratore is None:
         return redirect("hr:collaborator_area")
-
-    if request.method == "POST":
-        form = CollaboratorTimeEntryForm(request.POST, collaborator=collaboratore)
-        if form.is_valid():
-            entry = form.save(commit=False)
-            entry.created_by = request.user
-            entry.save()
-            messages.success(request, f"Registrate {entry.hours} ore del {entry.date:%d/%m/%Y}.")
-            return redirect("hr:collaborator_area")
-    else:
-        form = CollaboratorTimeEntryForm(collaborator=collaboratore, initial={"date": timezone.localdate()})
-
-    return render(
-        request,
-        "hr/collaborator_entry_form.html",
-        {"form": form, "collaborator": collaboratore, "page_title": "Registra le ore"},
-    )
+    return _modulo_rapportino(request, collaboratore)
 
 
 def collaborator_entry_update(request, pk):
-    """Il collaboratore corregge una propria registrazione (solo le proprie)."""
+    """Il collaboratore corregge un proprio rapportino non ancora confermato."""
     collaboratore = collaborator_for(request.user)
     if collaboratore is None:
         return redirect("hr:collaborator_area")
     entry = get_object_or_404(CollaboratorTimeEntry, pk=pk, collaborator=collaboratore)
+    if not entry.editable_by_collaborator:
+        messages.info(request, "Questo rapportino è già stato confermato dall'ufficio: non si può più modificare.")
+        return redirect("hr:collaborator_entry_detail", pk=entry.pk)
+    return _modulo_rapportino(request, collaboratore, entry)
 
-    if request.method == "POST":
-        form = CollaboratorTimeEntryForm(request.POST, instance=entry, collaborator=collaboratore)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Registrazione aggiornata.")
-            return redirect("hr:collaborator_area")
-    else:
-        form = CollaboratorTimeEntryForm(instance=entry, collaborator=collaboratore)
 
-    return render(
-        request,
-        "hr/collaborator_entry_form.html",
-        {"form": form, "collaborator": collaboratore, "entry": entry, "page_title": "Modifica le ore"},
+def collaborator_entry_detail(request, pk):
+    """Il collaboratore rilegge un proprio rapportino (con lo stato)."""
+    collaboratore = collaborator_for(request.user)
+    if collaboratore is None:
+        return redirect("hr:collaborator_area")
+    entry = get_object_or_404(
+        CollaboratorTimeEntry.objects.select_related("job", "reviewed_by"), pk=pk, collaborator=collaboratore
     )
+    return render(request, "hr/report_detail.html", _contesto_rapportino(entry, ufficio=False))
 
 
 def collaborator_entry_delete(request, pk):
-    """Il collaboratore cancella una propria registrazione."""
+    """Il collaboratore cancella un proprio rapportino non ancora confermato."""
+    from . import services
+
     collaboratore = collaborator_for(request.user)
     if collaboratore is None:
         return redirect("hr:collaborator_area")
     entry = get_object_or_404(CollaboratorTimeEntry, pk=pk, collaborator=collaboratore)
     if request.method == "POST":
-        entry.delete()
-        messages.success(request, "Registrazione eliminata.")
+        try:
+            services.elimina_rapportino(entry)
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Rapportino eliminato.")
     return redirect("hr:collaborator_area")
+
+
+def _contesto_rapportino(entry, ufficio):
+    """Dati comuni alla scheda del rapportino (collaboratore e ufficio)."""
+    spese = list(entry.expenses.select_related("receipt"))
+    allegati = list(entry.attachments.select_related("uploaded_by"))
+    ricevute = {spesa.receipt_id for spesa in spese if spesa.receipt_id}
+    return {
+        "page_title": f"Rapportino del {entry.date:%d/%m/%Y}",
+        "entry": entry,
+        "collaborator": entry.collaborator,
+        "expenses": spese,
+        "expenses_total": sum((spesa.amount for spesa in spese), ZERO),
+        "to_reimburse_total": sum((spesa.amount for spesa in spese if spesa.to_reimburse), ZERO),
+        "photos": [a for a in allegati if a.pk not in ricevute],
+        "ufficio": ufficio,
+    }
 
 
 def collaborator_photo_delete(request, pk):
@@ -898,3 +985,181 @@ def collaborator_time_delete(request, pk):
         entry.delete()
         messages.success(request, "Registrazione eliminata.")
     return redirect("hr:collaborator_time_list")
+
+
+# ---- rapportini: controllo dall'ufficio ----
+def _rapportini_con_totali():
+    """Rapportini con totale spese e numero di foto, senza moltiplicare le righe."""
+    totale_spese = (
+        CollaboratorExpense.objects.filter(entry=OuterRef("pk"))
+        .values("entry")
+        .annotate(totale=Sum("amount"))
+        .values("totale")
+    )
+    numero_foto = (
+        Attachment.objects.filter(report=OuterRef("pk"), kind=Attachment.KIND_SITE)
+        .values("report")
+        .annotate(quante=Count("pk"))
+        .values("quante")
+    )
+    return CollaboratorTimeEntry.objects.select_related("collaborator", "job", "job__customer").annotate(
+        totale_spese=Subquery(totale_spese), numero_foto=Subquery(numero_foto)
+    )
+
+
+FILTRI_STATO = {
+    "da_confermare": CollaboratorTimeEntry.STATUS_SUBMITTED,
+    "confermati": CollaboratorTimeEntry.STATUS_APPROVED,
+    "da_correggere": CollaboratorTimeEntry.STATUS_REJECTED,
+}
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def report_list(request):
+    """Rapportini dei collaboratori: per prima la coda da confermare."""
+    from apps.jobs.models import Job
+
+    stato = request.GET.get("stato", "da_confermare")
+    rapportini = _rapportini_con_totali()
+    if stato in FILTRI_STATO:
+        rapportini = rapportini.filter(status=FILTRI_STATO[stato])
+    collaboratore_id = request.GET.get("collaboratore", "")
+    if collaboratore_id.isdigit():
+        rapportini = rapportini.filter(collaborator_id=int(collaboratore_id))
+    cantiere_id = request.GET.get("cantiere", "")
+    if cantiere_id.isdigit():
+        rapportini = rapportini.filter(job_id=int(cantiere_id))
+    # La coda si smaltisce dal più vecchio; gli archivi dal più recente.
+    ordine = ("date", "pk") if stato == "da_confermare" else ("-date", "-pk")
+    rapportini = rapportini.order_by(*ordine)
+
+    pagina = Paginator(rapportini, 50).get_page(request.GET.get("page"))
+    conteggi = CollaboratorTimeEntry.objects.aggregate(
+        da_confermare=Count("pk", filter=Q(status=CollaboratorTimeEntry.STATUS_SUBMITTED)),
+        da_correggere=Count("pk", filter=Q(status=CollaboratorTimeEntry.STATUS_REJECTED)),
+    )
+    return render(
+        request,
+        "hr/report_list.html",
+        {
+            "page_title": "Rapportini dei collaboratori",
+            "page_obj": pagina,
+            "entries": pagina.object_list,
+            "stato": stato,
+            "conteggi": conteggi,
+            "collaborators": Collaborator.objects.order_by("name"),
+            "jobs": Job.objects.exclude(status__in=[Job.STATUS_CLOSED, Job.STATUS_CANCELLED]).order_by("name"),
+            "collaboratore_id": collaboratore_id,
+            "cantiere_id": cantiere_id,
+        },
+    )
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def report_detail(request, pk):
+    """Scheda del rapportino per l'ufficio, con conferma e rimando."""
+    entry = get_object_or_404(
+        CollaboratorTimeEntry.objects.select_related("collaborator", "job", "job__customer", "reviewed_by", "created_by"),
+        pk=pk,
+    )
+    contesto = _contesto_rapportino(entry, ufficio=True)
+    contesto["reject_form"] = RimandaRapportinoForm()
+    contesto["in_coda"] = CollaboratorTimeEntry.objects.filter(status=CollaboratorTimeEntry.STATUS_SUBMITTED).count()
+    return render(request, "hr/report_detail.html", contesto)
+
+
+def _prossimo_da_confermare():
+    return (
+        CollaboratorTimeEntry.objects.filter(status=CollaboratorTimeEntry.STATUS_SUBMITTED)
+        .order_by("date", "pk")
+        .values_list("pk", flat=True)
+        .first()
+    )
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def report_approve(request, pk):
+    """Conferma il rapportino e passa al prossimo della coda."""
+    from . import services
+
+    entry = get_object_or_404(CollaboratorTimeEntry.objects.select_related("collaborator"), pk=pk)
+    if request.method != "POST":
+        return redirect("hr:report_detail", pk=entry.pk)
+    try:
+        services.conferma_rapportino(entry, request.user)
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return redirect("hr:report_detail", pk=entry.pk)
+    messages.success(request, f"Rapportino di {entry.collaborator.name} del {entry.date:%d/%m/%Y} confermato.")
+    prossimo = _prossimo_da_confermare()
+    if prossimo:
+        return redirect("hr:report_detail", pk=prossimo)
+    return redirect("hr:report_list")
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def report_reject(request, pk):
+    """Rimanda il rapportino al collaboratore con una nota."""
+    from . import services
+
+    entry = get_object_or_404(CollaboratorTimeEntry.objects.select_related("collaborator"), pk=pk)
+    if request.method != "POST":
+        return redirect("hr:report_detail", pk=entry.pk)
+    form = RimandaRapportinoForm(request.POST)
+    try:
+        if not form.is_valid():
+            raise ValidationError("Scrivi cosa va corretto: il collaboratore vedrà la nota.")
+        services.rimanda_rapportino(entry, request.user, form.cleaned_data["nota"])
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return redirect("hr:report_detail", pk=entry.pk)
+    messages.warning(request, f"Rapportino rimandato a {entry.collaborator.name} con la nota.")
+    prossimo = _prossimo_da_confermare()
+    if prossimo:
+        return redirect("hr:report_detail", pk=prossimo)
+    return redirect("hr:report_list")
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def expense_reimbursements(request):
+    """Spese pagate dai collaboratori da rimborsare, raggruppate per persona."""
+    from . import services
+
+    spese = list(services.spese_da_rimborsare().order_by("entry__collaborator__name", "entry__date", "pk"))
+    gruppi = {}
+    for spesa in spese:
+        collaboratore = spesa.entry.collaborator
+        gruppo = gruppi.setdefault(collaboratore.pk, {"collaborator": collaboratore, "expenses": [], "total": ZERO})
+        gruppo["expenses"].append(spesa)
+        gruppo["total"] += spesa.amount
+    rimborsate = (
+        CollaboratorExpense.objects.filter(reimbursed_at__isnull=False)
+        .select_related("entry__collaborator", "reimbursed_by")
+        .order_by("-reimbursed_at", "-pk")[:30]
+    )
+    return render(
+        request,
+        "hr/expense_reimbursements.html",
+        {
+            "page_title": "Rimborsi spese dei collaboratori",
+            "groups": list(gruppi.values()),
+            "grand_total": sum((gruppo["total"] for gruppo in gruppi.values()), ZERO),
+            "reimbursed": rimborsate,
+        },
+    )
+
+
+@role_required(*COLLAB_EDIT_ROLES)
+def expense_reimburse(request):
+    """Segna come rimborsate le spese mostrate in pagina per un collaboratore."""
+    from . import services
+
+    if request.method == "POST":
+        quante = services.segna_rimborsate(request.POST.getlist("spesa"), request.user)
+        if quante == 1:
+            messages.success(request, "1 spesa segnata come rimborsata.")
+        elif quante:
+            messages.success(request, f"{quante} spese segnate come rimborsate.")
+        else:
+            messages.info(request, "Nessuna spesa da segnare: forse erano già state rimborsate.")
+    return redirect("hr:expense_reimbursements")

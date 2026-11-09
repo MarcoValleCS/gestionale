@@ -5,54 +5,53 @@ from .base import SOLO_COLLABORATORE
 PAGINE = [
     {
         "slug": "il-mio-lavoro",
-        "title": "Il mio lavoro: ore dal cantiere",
+        "title": "Il mio lavoro: il rapportino dal cantiere",
         "area": "Collaboratori",
         "roles": SOLO_COLLABORATORE,
         "order": 10,
-        "summary": "Come entrare, registrare le ore, correggerle e leggere i tuoi totali.",
+        "summary": "Compilare il rapportino di fine giornata: ore, lavori, spese con lo scontrino e foto.",
         "body": """
-<p>Da questa area registri le ore lavorate sui cantieri. Vedi solo le tue
-registrazioni: non hai accesso alle schede clienti, ai prezzi, ai documenti o
-alle ore degli altri.</p>
+<p>A fine giornata compili il <strong>rapportino</strong>: le ore lavorate, i
+lavori fatti, le spese che hai sostenuto (con la foto dello scontrino) e
+qualche foto del cantiere. L'ufficio lo controlla e lo conferma. Vedi solo i
+tuoi rapportini: non hai accesso a clienti, prezzi o documenti.</p>
 
 <h3>Entrare</h3>
 <ol>
   <li>Apri il gestionale con le credenziali che ti ha dato l'ufficio.</li>
-  <li>Dal menu scegli <strong>Le mie ore</strong>.</li>
-  <li>La pagina mostra il tuo nome, le ore del mese, dell'anno e il totale.</li>
+  <li>Dal menu scegli <strong>I miei rapportini</strong>: vedi i rapportini inviati, le ore del mese e dell'anno e le spese che devi ancora ricevere.</li>
 </ol>
 <p>Se compare un messaggio che dice che l'utente non è collegato a un
-collaboratore, chiedi all'ufficio di collegare il tuo utente alla tua scheda
-collaboratore.</p>
+collaboratore, chiedi all'ufficio di collegare il tuo utente alla tua scheda.</p>
 
-<h3>Registrare le ore</h3>
+<h3>Compilare il rapportino</h3>
 <ol>
-  <li>Premi <strong>Registra le ore</strong>.</li>
-  <li>Indica la data, le ore lavorate, il cantiere (se lo conosci) e una breve descrizione del lavoro fatto.</li>
-  <li>Salva: le ore compaiono nell'elenco e nei totali.</li>
+  <li>Premi <strong>Nuovo rapportino</strong>.</li>
+  <li><strong>La giornata</strong>: data, ore lavorate, cantiere e cosa hai fatto.</li>
+  <li><strong>Spese</strong>: per ogni scontrino premi «Aggiungi spesa» e indica il tipo (materiale, pranzo, carburante, pedaggi…), l'importo, cosa hai comprato e dove. Scegli <em>Pagata da me</em> se l'hai pagata tu: ti verrà rimborsata. Fotografa lo scontrino.</li>
+  <li><strong>Foto del cantiere</strong>: puoi sceglierne più di una insieme.</li>
+  <li><strong>Segnalazioni</strong>: problemi, materiale che manca, richieste per l'ufficio.</li>
+  <li>Premi <strong>Invia all'ufficio</strong>.</li>
 </ol>
 <p>Le ore vanno in quarti d'ora: <code>4,5</code> significa 4 ore e 30 minuti.
-Non puoi registrare più di 24 ore in un giorno.</p>
+Se quel giorno non hai lavorato ma hai comprato del materiale, metti
+<code>0</code> ore e aggiungi la spesa.</p>
 
-<h3>Correggere o cancellare</h3>
+<h3>Cosa succede dopo</h3>
 <ul>
-  <li>Premi la matita accanto a una registrazione per modificare data, ore, cantiere o descrizione.</li>
-  <li>Premi il cestino per cancellarla.</li>
-  <li>Puoi modificare o cancellare solo le tue registrazioni.</li>
-</ul>
-<p>Se una giornata è sbagliata, correggila tu: è più semplice che farla
-correggere dall'ufficio.</p>
-
-<h3>I totali</h3>
-<ul>
-  <li><strong>Ore questo mese</strong>: somma delle ore del mese corrente.</li>
-  <li><strong>Ore quest'anno</strong>: somma dall'inizio dell'anno.</li>
-  <li><strong>Ore in totale</strong>: tutte le ore registrate.</li>
+  <li><span class="badge text-bg-warning">Da confermare</span>: l'ufficio non l'ha ancora visto. Puoi correggerlo o cancellarlo.</li>
+  <li><span class="badge text-bg-danger">Da correggere</span>: l'ufficio te lo ha rimandato. Aprilo: in alto trovi la nota con cosa sistemare. Correggi e invia di nuovo.</li>
+  <li><span class="badge text-bg-success">Confermato</span>: ore e spese sono state accettate. Non si può più modificare: se c'è un errore, avvisa l'ufficio.</li>
 </ul>
 
-<div class="guida-avviso">Le tue ore vengono controllate dall'ufficio e
-confrontate con la tua fattura. Registra le ore giorno per giorno, non tutte
-insieme a fine mese: è più facile ricordare i cantieri e le attività.</div>
+<h3>Le spese da rimborsare</h3>
+<p>Il riquadro <strong>Spese da rimborsarti</strong> somma le spese che hai
+pagato tu, già confermate dall'ufficio e non ancora rimborsate. Quando l'ufficio
+ti rimborsa, spariscono dal totale.</p>
+
+<div class="guida-avviso">Compila il rapportino ogni giorno, non a fine mese:
+è più facile ricordare cantieri, ore e scontrini. Senza la foto dello scontrino
+il rimborso può essere rifiutato.</div>
 """,
     },
     {

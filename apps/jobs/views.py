@@ -74,6 +74,14 @@ class JobDetailView(DetailView):
         from apps.billing.services import job_billing_summary
 
         context["billing"] = job_billing_summary(job)
+        # Costi dai rapportini dei collaboratori: compensi e spese non sono
+        # per tutti (il magazzino vede il cantiere ma non i costi).
+        from apps.accounts.permissions import has_role
+
+        if has_role(self.request.user, ROLE_ADMIN, ROLE_HR, ROLE_SALES):
+            from apps.hr.services import costi_collaboratori_cantiere
+
+            context["costi_collaboratori"] = costi_collaboratori_cantiere(job)
         return context
 
 

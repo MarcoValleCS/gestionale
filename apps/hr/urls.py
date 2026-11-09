@@ -32,10 +32,18 @@ urlpatterns = [
     path("collaboratori/<int:pk>/elimina/", views.collaborator_delete, name="collaborator_delete"),
     path("collaboratori/ore/", views.CollaboratorTimeListView.as_view(), name="collaborator_time_list"),
     path("collaboratori/ore/<int:pk>/elimina/", views.collaborator_time_delete, name="collaborator_time_delete"),
+    # Rapportini dei collaboratori: controllo e rimborsi dall'ufficio
+    path("rapportini/", views.report_list, name="report_list"),
+    path("rapportini/<int:pk>/", views.report_detail, name="report_detail"),
+    path("rapportini/<int:pk>/conferma/", views.report_approve, name="report_approve"),
+    path("rapportini/<int:pk>/rimanda/", views.report_reject, name="report_reject"),
+    path("rapportini/rimborsi/", views.expense_reimbursements, name="expense_reimbursements"),
+    path("rapportini/rimborsi/segna/", views.expense_reimburse, name="expense_reimburse"),
     path("presenze/", views.timesheet, name="timesheet"),
     # Collaboratori esterni: area riservata a chi rendiconta le ore
     path("mio-lavoro/", views.collaborator_area, name="collaborator_area"),
     path("mio-lavoro/nuova/", views.collaborator_entry_create, name="collaborator_entry_create"),
+    path("mio-lavoro/<int:pk>/", views.collaborator_entry_detail, name="collaborator_entry_detail"),
     path("mio-lavoro/<int:pk>/modifica/", views.collaborator_entry_update, name="collaborator_entry_update"),
     path("mio-lavoro/<int:pk>/elimina/", views.collaborator_entry_delete, name="collaborator_entry_delete"),
     path("mio-lavoro/foto/", views.collaborator_photos, name="collaborator_photos"),

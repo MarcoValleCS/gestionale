@@ -63,7 +63,13 @@ def roles(request):
     spento["is_collaborator_only"] = False
 
     if not user or not user.is_authenticated:
-        return {"roles": spento, "messaggi_non_letti": 0, "posta_non_lette": 0, "leads_non_visti": 0}
+        return {
+            "roles": spento,
+            "messaggi_non_letti": 0,
+            "posta_non_lette": 0,
+            "leads_non_visti": 0,
+            "rapportini_da_confermare": 0,
+        }
 
     if user.is_superuser:
         # l'amministratore ha tutti i ruoli e non è mai limitato
@@ -72,6 +78,7 @@ def roles(request):
             "messaggi_non_letti": _messaggi_non_letti(user),
             "posta_non_lette": _posta_non_letta(user),
             "leads_non_visti": _leads_non_visti(),
+            "rapportini_da_confermare": _rapportini_da_confermare(),
         }
 
     names = getattr(request, "_ruoli_cache", None)
@@ -94,7 +101,21 @@ def roles(request):
         "messaggi_non_letti": _messaggi_non_letti(user),
         "posta_non_lette": _posta_non_letta(user),
         "leads_non_visti": _leads_non_visti(),
+        # Solo per chi conferma i rapportini (amministrazione e personale)
+        "rapportini_da_confermare": (
+            _rapportini_da_confermare() if names & {"Amministratore", "Personale"} else 0
+        ),
     }
+
+
+def _rapportini_da_confermare():
+    """Quanti rapportini dei collaboratori aspettano l'ufficio."""
+    try:
+        from apps.hr.services import rapportini_da_confermare
+
+        return rapportini_da_confermare()
+    except Exception:  # tabelle non ancora migrate
+        return 0
 
 
 def _messaggi_non_letti(utente):

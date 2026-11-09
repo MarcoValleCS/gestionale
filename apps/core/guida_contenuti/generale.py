@@ -358,7 +358,7 @@ un accesso non tuo.</div>
 sono i più frequenti e la prima cosa da provare.</p>
 
 <div class="guida-ruolo"><strong>Se sei un collaboratore esterno:</strong> il tuo
-menu mostra solo «Le mie ore», «Registra le ore», «Foto del cantiere» e
+menu mostra solo «I miei rapportini», «Nuovo rapportino», «Foto del cantiere» e
 «Guida». Un errore di permesso sulle altre pagine è normale: non devi fare
 nulla, torna alla tua area.</div>
 

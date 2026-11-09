@@ -122,6 +122,62 @@
       {% endif %}
     </div>
     {% endif %}
+    {% if costi_collaboratori %}
+    {% with costi=costi_collaboratori %}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-journal-check me-1"></i> Costi dai rapportini dei collaboratori</span>
+        <span class="small">
+          {% if costi.in_attesa %}<a class="badge text-bg-warning text-decoration-none me-1" href="{% url 'hr:report_list' %}?stato=da_confermare&cantiere={{ job.pk }}">{{ costi.in_attesa }} da confermare</a>{% endif %}
+          <a href="{% url 'hr:report_list' %}?stato=tutti&cantiere={{ job.pk }}">Rapportini del cantiere</a>
+        </span>
+      </div>
+      {% if costi.vuoto %}
+      <div class="card-body text-muted small">Nessun rapportino confermato su questo cantiere.</div>
+      {% else %}
+      <div class="card-body pb-2">
+        <div class="row text-center small g-2">
+          <div class="col"><div class="text-muted">Ore</div><div class="fw-semibold">{{ costi.ore|floatformat:"-2" }}</div></div>
+          <div class="col"><div class="text-muted">Manodopera</div><div class="fw-semibold">{{ costi.costo_manodopera|money }} €{% if costi.senza_tariffa %}<span class="text-warning" title="Alcuni collaboratori non hanno il compenso orario: le loro ore non hanno costo"> *</span>{% endif %}</div></div>
+          <div class="col"><div class="text-muted">Spese</div><div class="fw-semibold">{{ costi.totale_spese|money }} €</div></div>
+          <div class="col"><div class="text-muted">Totale</div><div class="fw-bold">{{ costi.totale|money }} €</div></div>
+        </div>
+      </div>
+      <div class="row g-0 border-top">
+        <div class="col-md-7">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Collaboratore</th><th class="text-center">Giornate</th><th class="text-center">Ore</th><th class="text-end">Costo</th></tr></thead>
+            <tbody>
+              {% for riga in costi.manodopera %}
+              <tr>
+                <td>{{ riga.collaboratore }}</td>
+                <td class="text-center">{{ riga.giornate }}</td>
+                <td class="text-center">{{ riga.ore|floatformat:"-2" }}</td>
+                <td class="text-end">{% if riga.costo is not None %}{{ riga.costo|money }} €{% else %}<span class="text-muted small" title="Compenso orario non indicato nella scheda del collaboratore">—</span>{% endif %}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-muted small">Nessuna ora confermata.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="col-md-5 border-start">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Spese per tipo</th><th class="text-end">Totale</th></tr></thead>
+            <tbody>
+              {% for spesa in costi.spese %}
+              <tr><td>{{ spesa.etichetta }} <span class="text-muted small">({{ spesa.quante }})</span></td><td class="text-end">{{ spesa.totale|money }} €</td></tr>
+              {% empty %}
+              <tr><td colspan="2" class="text-muted small">Nessuna spesa.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endwith %}
+    {% endif %}
     <div class="card">
       <div class="card-header p-0 border-0">
         <ul class="nav nav-tabs card-header-tabs m-0 px-2 pt-2" role="tablist">

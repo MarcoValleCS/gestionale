@@ -361,14 +361,36 @@ class Collaborator(TimeStampedModel):
 
 
 class CollaboratorTimeEntry(TimeStampedModel):
-    """Ore rendicontate da un collaboratore esterno su un cantiere."""
+    """Rapportino giornaliero di un collaboratore esterno.
+
+    Una giornata su un cantiere: ore lavorate, lavori eseguiti, segnalazioni
+    per l'ufficio, spese sostenute (``expenses``) e foto (``attachments``).
+    Il collaboratore lo invia dal telefono; l'ufficio lo conferma oppure lo
+    rimanda indietro con una nota. Le ore confermate e le spese entrano nei
+    costi del cantiere; le spese pagate dal collaboratore nei rimborsi.
+
+    Le ore inserite dall'ufficio (o dall'assistente MCP) nascono già confermate.
+    """
+
+    STATUS_SUBMITTED = "submitted"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_SUBMITTED, "Da confermare"),
+        (STATUS_APPROVED, "Confermato"),
+        (STATUS_REJECTED, "Da correggere"),
+    ]
 
     collaborator = models.ForeignKey(
         Collaborator, on_delete=models.CASCADE, related_name="time_entries", verbose_name="Collaboratore"
     )
     date = models.DateField("Data", default=timezone.localdate)
     hours = models.DecimalField(
-        "Ore", max_digits=5, decimal_places=2, validators=[MinValueValidator(Decimal("0.25"))]
+        "Ore",
+        max_digits=5,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Zero solo per un rapportino con le sole spese.",
     )
     job = models.ForeignKey(
         "jobs.Job",
@@ -378,7 +400,23 @@ class CollaboratorTimeEntry(TimeStampedModel):
         related_name="collaborator_time_entries",
         verbose_name="Cantiere / lavoro",
     )
-    description = models.CharField("Lavoro svolto", max_length=200, blank=True)
+    description = models.CharField("Lavori eseguiti", max_length=500, blank=True)
+    notes = models.TextField(
+        "Segnalazioni per l'ufficio",
+        blank=True,
+        help_text="Problemi, materiale che manca, richieste: l'ufficio lo legge alla conferma.",
+    )
+    status = models.CharField("Stato", max_length=12, choices=STATUS_CHOICES, default=STATUS_SUBMITTED)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_collaborator_entries",
+        verbose_name="Controllato da",
+    )
+    reviewed_at = models.DateTimeField("Controllato il", null=True, blank=True)
+    review_note = models.CharField("Nota dell'ufficio", max_length=300, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -389,12 +427,13 @@ class CollaboratorTimeEntry(TimeStampedModel):
     )
 
     class Meta:
-        verbose_name = "Ore collaboratore"
-        verbose_name_plural = "Ore collaboratori"
+        verbose_name = "Rapportino"
+        verbose_name_plural = "Rapportini"
         ordering = ["-date", "-pk"]
         indexes = [
             models.Index(fields=["date", "collaborator"], name="collabentry_date_idx"),
             models.Index(fields=["collaborator", "-date"], name="collabentry_collab_idx"),
+            models.Index(fields=["status", "-date"], name="collabentry_status_idx"),
         ]
 
     def __str__(self):
@@ -405,3 +444,103 @@ class CollaboratorTimeEntry(TimeStampedModel):
         if self.collaborator.hourly_rate is None:
             return None
         return round2(self.collaborator.hourly_rate * self.hours)
+
+    @property
+    def is_approved(self):
+        return self.status == self.STATUS_APPROVED
+
+    @property
+    def editable_by_collaborator(self):
+        """Il collaboratore corregge finché l'ufficio non l'ha confermato."""
+        return self.status != self.STATUS_APPROVED
+
+    @property
+    def status_badge(self):
+        """Colore Bootstrap dello stato, per le etichette."""
+        return {
+            self.STATUS_SUBMITTED: "warning",
+            self.STATUS_APPROVED: "success",
+            self.STATUS_REJECTED: "danger",
+        }.get(self.status, "secondary")
+
+    def expenses_total(self):
+        """Totale delle spese del rapportino (usa le spese già caricate, se ci sono)."""
+        return round2(sum((spesa.amount for spesa in self.expenses.all()), ZERO))
+
+
+class CollaboratorExpense(TimeStampedModel):
+    """Spesa sostenuta in cantiere e allegata a un rapportino.
+
+    Materiale comprato al volo, pranzo, carburante, pedaggi… con lo scontrino
+    o la bolla in foto. Se l'ha pagata il collaboratore, una volta confermato il
+    rapportino va rimborsata (``reimbursed_at`` segna quando).
+    """
+
+    CATEGORY_MATERIAL = "material"
+    CATEGORY_MEAL = "meal"
+    CATEGORY_FUEL = "fuel"
+    CATEGORY_TOLL = "toll"
+    CATEGORY_LODGING = "lodging"
+    CATEGORY_RENTAL = "rental"
+    CATEGORY_OTHER = "other"
+    CATEGORY_CHOICES = [
+        (CATEGORY_MATERIAL, "Materiale"),
+        (CATEGORY_MEAL, "Vitto (pranzo, cena)"),
+        (CATEGORY_FUEL, "Carburante"),
+        (CATEGORY_TOLL, "Pedaggi e parcheggi"),
+        (CATEGORY_LODGING, "Alloggio"),
+        (CATEGORY_RENTAL, "Noleggio attrezzatura"),
+        (CATEGORY_OTHER, "Altro"),
+    ]
+
+    PAID_BY_COLLABORATOR = "collaborator"
+    PAID_BY_COMPANY = "company"
+    PAID_BY_CHOICES = [
+        (PAID_BY_COLLABORATOR, "Pagata da me (da rimborsare)"),
+        (PAID_BY_COMPANY, "Pagata dall'azienda (carta o conto fornitore)"),
+    ]
+
+    entry = models.ForeignKey(
+        CollaboratorTimeEntry, on_delete=models.CASCADE, related_name="expenses", verbose_name="Rapportino"
+    )
+    category = models.CharField("Tipo di spesa", max_length=12, choices=CATEGORY_CHOICES, default=CATEGORY_MATERIAL)
+    amount = models.DecimalField(
+        "Importo (€)",
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Il totale dello scontrino, IVA compresa.",
+    )
+    description = models.CharField("Cosa", max_length=200, blank=True)
+    supplier = models.CharField("Negozio / fornitore", max_length=120, blank=True)
+    paid_by = models.CharField("Pagata da", max_length=12, choices=PAID_BY_CHOICES, default=PAID_BY_COLLABORATOR)
+    receipt = models.ForeignKey(
+        "core.Attachment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Scontrino / bolla",
+    )
+    reimbursed_at = models.DateTimeField("Rimborsata il", null=True, blank=True)
+    reimbursed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reimbursed_collaborator_expenses",
+        verbose_name="Rimborsata da",
+    )
+
+    class Meta:
+        verbose_name = "Spesa del collaboratore"
+        verbose_name_plural = "Spese dei collaboratori"
+        ordering = ["pk"]
+        indexes = [models.Index(fields=["paid_by", "reimbursed_at"], name="collabexp_rimborso_idx")]
+
+    def __str__(self):
+        return f"{self.get_category_display()} · {self.amount} €"
+
+    @property
+    def to_reimburse(self):
+        return self.paid_by == self.PAID_BY_COLLABORATOR and self.reimbursed_at is None
