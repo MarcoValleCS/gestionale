@@ -30,12 +30,31 @@ ROLE_DESCRIPTIONS = {
 }
 
 
+def ruoli_di(user):
+    """Nomi dei ruoli (gruppi) dell'utente, letti dal database una volta sola.
+
+    Il risultato resta sull'oggetto utente: ``request.user`` viene ricaricato a
+    ogni richiesta, quindi vale per la richiesta in corso. Senza questa memoria
+    ogni ``has_role`` (menu, ricerca, guida…) era una query in più.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return frozenset()
+    ruoli = getattr(user, "_ruoli_cache", None)
+    if ruoli is None:
+        ruoli = frozenset(user.groups.values_list("name", flat=True))
+        try:
+            user._ruoli_cache = ruoli
+        except AttributeError:  # oggetti che non accettano attributi
+            pass
+    return frozenset(ruoli)
+
+
 def has_role(user, *roles):
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
-    return user.groups.filter(name__in=roles).exists()
+    return not ruoli_di(user).isdisjoint(roles)
 
 
 def role_required(*roles):

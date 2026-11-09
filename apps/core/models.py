@@ -723,7 +723,11 @@ class WikiPage(TimeStampedModel):
         richiesti = self.elenco_ruoli
         if not richiesti:
             return True
-        return utente.groups.filter(name__in=richiesti).exists()
+        # I ruoli dell'utente si leggono una volta per richiesta: l'indice della
+        # guida controlla decine di pagine e prima faceva una query per pagina.
+        from apps.accounts.permissions import ruoli_di
+
+        return not ruoli_di(utente).isdisjoint(richiesti)
 
     def save(self, *args, **kwargs):
         from django.utils.text import slugify

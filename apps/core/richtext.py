@@ -114,8 +114,12 @@ EMAIL_TAGS = {
     "td", "tfoot", "th", "thead", "time", "tr", "u", "ul", "var",
 }
 
+# Niente «class»: l'email finisce dentro la pagina del gestionale e potrebbe
+# usare le classi di Bootstrap (es. «position-fixed w-100 h-100») per coprire
+# la pagina con un finto avviso o un finto modulo di accesso. Le classi
+# dell'email stessa non servono: i suoi fogli di stile vengono comunque tolti.
 EMAIL_ATTRIBUTES = {
-    "*": {"style", "class", "title", "dir", "lang", "align", "valign", "width", "height", "bgcolor"},
+    "*": {"style", "title", "dir", "lang", "align", "valign", "width", "height", "bgcolor"},
     "a": {"href", "title", "target"},
     "img": {"src", "alt", "title", "width", "height", "border"},
     "table": {"border", "cellpadding", "cellspacing", "width", "height", "align", "bgcolor", "role"},
@@ -126,8 +130,10 @@ EMAIL_ATTRIBUTES = {
     "col": {"width", "span"},
 }
 
+# Niente «background» e «list-style» completi: possono contenere url(...) e
+# far caricare un indirizzo del gestionale (o esterno) all'apertura dell'email.
 EMAIL_STYLES = {
-    "color", "background", "background-color", "font", "font-family", "font-size", "font-weight",
+    "color", "background-color", "font", "font-family", "font-size", "font-weight",
     "font-style", "font-variant", "text-decoration", "text-align", "text-transform",
     "vertical-align", "line-height", "letter-spacing", "word-break", "overflow-wrap", "white-space",
     "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
@@ -135,10 +141,17 @@ EMAIL_STYLES = {
     "border", "border-top", "border-right", "border-bottom", "border-left",
     "border-color", "border-style", "border-width", "border-collapse", "border-spacing", "border-radius",
     "width", "max-width", "min-width", "height", "max-height", "min-height", "display",
-    "float", "clear", "list-style", "list-style-type", "table-layout",
+    "float", "clear", "list-style-type", "table-layout",
 }
 
 EMAIL_URL_SCHEMES = {"http", "https", "mailto", "tel", "data", "cid"}
+
+# Collegamenti e immagini ammessi così come sono: solo indirizzi completi.
+EMAIL_SCHEMI_ESTERNI = ("http:", "https:", "mailto:", "tel:")
+
+# Pezzi di CSS che fanno caricare qualcosa: uno stile che li contiene si toglie
+# tutto (la barra rovesciata copre le sequenze di escape come «u\72l(»).
+EMAIL_STILI_VIETATI = ("url", "image", "expression", "\\")
 
 
 def clean_email_html(value, mappa_allegati=None):
@@ -153,14 +166,26 @@ def clean_email_html(value, mappa_allegati=None):
     mappa = {str(chiave).strip().strip("<>").lower(): url for chiave, url in (mappa_allegati or {}).items()}
 
     def filtra_attributo(tag, attributo, valore):
-        if attributo in ("src", "href") and valore.lower().startswith("cid:"):
-            chiave = valore[4:].strip().strip("<>").lower()
+        if attributo == "style":
+            minuscolo = (valore or "").lower()
+            return None if any(pezzo in minuscolo for pezzo in EMAIL_STILI_VIETATI) else valore
+        if attributo not in ("src", "href"):
+            return valore
+        minuscolo = (valore or "").strip().lower()
+        if minuscolo.startswith("cid:"):
+            chiave = valore.strip()[4:].strip().strip("<>").lower()
             return mappa.get(chiave)  # None = attributo rimosso
         # I link «data:» possono contenere HTML/script: si lascia il «data:» solo
         # per le immagini incorporate (img src), non per i collegamenti.
-        if attributo in ("src", "href") and valore.lower().startswith("data:") and not (tag == "img" and attributo == "src"):
-            return None
-        return valore
+        if minuscolo.startswith("data:"):
+            return valore if (tag == "img" and attributo == "src") else None
+        if minuscolo.startswith(EMAIL_SCHEMI_ESTERNI):
+            return valore
+        # Indirizzi relativi («/vendite/ordini/5/consegna/», «//host», «#…»):
+        # dentro il gestionale punterebbero alle sue pagine con la sessione di
+        # chi legge l'email. Un'immagine così basterebbe a far partire una
+        # richiesta appena si apre il messaggio: si tolgono.
+        return None
 
     return nh3.clean(
         value,

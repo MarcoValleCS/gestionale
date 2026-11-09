@@ -499,6 +499,9 @@ def po_email(request, pk):
 @role_required(*PO_EDIT_ROLES)
 def po_send(request, pk):
     order = get_object_or_404(PurchaseOrder, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("purchasing:po_detail", pk=order.pk)
     if order.status == PurchaseOrder.STATUS_DRAFT:
         order.status = PurchaseOrder.STATUS_SENT
         order.save(update_fields=["status"])
@@ -511,6 +514,9 @@ def po_send(request, pk):
 @role_required(*PO_EDIT_ROLES)
 def po_confirm(request, pk):
     order = get_object_or_404(PurchaseOrder, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("purchasing:po_detail", pk=order.pk)
     if order.status in {PurchaseOrder.STATUS_DRAFT, PurchaseOrder.STATUS_SENT}:
         order.status = PurchaseOrder.STATUS_CONFIRMED
         order.save(update_fields=["status"])

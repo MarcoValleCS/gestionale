@@ -298,7 +298,9 @@ def lead_da_sito(request):
         )
 
     ricevuto = request.headers.get("X-Lead-Token", "")
-    if not hmac.compare_digest(ricevuto, atteso):
+    # Confronto sui byte: con stringhe non ASCII compare_digest solleva
+    # TypeError e la risposta diventerebbe un errore 500 invece di un 403.
+    if not hmac.compare_digest(ricevuto.encode(), atteso.encode()):
         return JsonResponse({"ok": False, "errore": "Token non valido."}, status=403)
 
     if len(request.body) > 64 * 1024:

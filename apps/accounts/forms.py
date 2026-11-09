@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 from django.contrib.auth.models import Group
 
@@ -33,6 +34,21 @@ class StyledPasswordChangeForm(BootstrapFormMixin, PasswordChangeForm):
         return user
 
 
+def _valida_password(form, campo, password):
+    """Applica alla password scelta dall'amministratore le stesse regole del
+    cambio password (lunghezza, password comuni, solo numeri, simile al nome)."""
+    utente = form.instance if form.instance.pk else User(
+        username=form.cleaned_data.get("username") or "",
+        first_name=form.cleaned_data.get("first_name") or "",
+        last_name=form.cleaned_data.get("last_name") or "",
+        email=form.cleaned_data.get("email") or "",
+    )
+    try:
+        password_validation.validate_password(password, utente)
+    except forms.ValidationError as errore:
+        form.add_error(campo, errore)
+
+
 class UserForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = User
@@ -61,6 +77,8 @@ class UserCreateForm(UserForm):
         cleaned = super().clean()
         if cleaned.get("password1") != cleaned.get("password2"):
             self.add_error("password2", "Le due password non coincidono.")
+        elif cleaned.get("password1"):
+            _valida_password(self, "password1", cleaned["password1"])
         return cleaned
 
     def save(self, commit=True):
@@ -80,6 +98,12 @@ class UserUpdateForm(UserForm):
         min_length=10,
         help_text="Compilare solo per cambiare la password.",
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("new_password"):
+            _valida_password(self, "new_password", cleaned["new_password"])
+        return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=False)

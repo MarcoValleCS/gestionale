@@ -13,6 +13,10 @@
 # per email: è la copia che resta fuori dal server.
 set -euo pipefail
 
+# Le copie contengono tutto il database (clienti, dipendenti, fatture): le
+# legge solo root. Il gestionale le vede comunque (il contenitore gira da root).
+umask 077
+
 BACKUP_DIR="${1:-${BACKUP_DIR:-/opt/backups/gestionale}}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 STAMP="$(date +%F_%H%M)"
@@ -54,6 +58,11 @@ fi
 echo "→ Backup dei file caricati in $BACKUP_DIR/media_$STAMP.tar.gz"
 docker compose exec -T web mkdir -p /app/media
 docker compose exec -T web tar czf - -C /app media > "$BACKUP_DIR/media_$STAMP.tar.gz"
+if ! gzip -t "$BACKUP_DIR/media_$STAMP.tar.gz"; then
+    echo "L'archivio dei file caricati è corrotto."
+    avvisa "Il backup dei file caricati di stanotte è CORROTTO (controllo gzip fallito). Controlla il server." "Backup non valido"
+    exit 1
+fi
 
 echo "→ Rimozione dei backup più vecchi di $RETENTION_DAYS giorni"
 find "$BACKUP_DIR" -type f -name "*.gz" -mtime +"$RETENTION_DAYS" -delete

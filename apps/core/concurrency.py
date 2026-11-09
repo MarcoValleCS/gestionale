@@ -29,6 +29,34 @@ def seen_key(model, pk):
     return f"{SESSION_PREFIX}:{model._meta.label_lower}:{pk}"
 
 
+def aggiorna_se(istanza, condizione, **valori):
+    """Cambia dei campi solo se la riga è ancora nella ``condizione`` (un ``Q``).
+
+    È il passaggio di stato «prendi e cambia» in un solo ``UPDATE ... WHERE``:
+    con un doppio clic o due utenti che emettono lo stesso DDT, la seconda
+    richiesta trova lo stato già cambiato, non aggiorna nulla e riceve
+    ``False``. Leggere lo stato in Python e poi salvarlo lascerebbe passare
+    entrambe (doppio scarico di magazzino, doppi ordini fornitore).
+
+    Funziona allo stesso modo su SQLite e PostgreSQL, senza ``select_for_update``.
+    Va chiamata dentro ``transaction.atomic()`` insieme alle scritture che
+    dipendono dal cambio di stato, così un errore annulla anche il cambio.
+
+    Il registro attività riceve la modifica come con un ``save()`` (l'UPDATE
+    diretto non passa dai segnali dei modelli).
+    """
+    from . import activity
+
+    modello = type(istanza)
+    if not modello.objects.filter(condizione, pk=istanza.pk).update(**valori):
+        return False
+    for campo, valore in valori.items():
+        setattr(istanza, campo, valore)
+    if modello in activity.MODELLI_SORVEGLIATI:
+        activity.registra("modificato", istanza, ", ".join(valori))
+    return True
+
+
 class ConflictAwareUpdateView:
     """Mixin per ``UpdateView``: rileva se un altro utente ha salvato nel frattempo.
 

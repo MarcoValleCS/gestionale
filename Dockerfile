@@ -45,9 +45,13 @@ EXPOSE 8000
 
 ENTRYPOINT ["docker/entrypoint.sh"]
 # Ottimizzato per 1 vCPU / 1 GB RAM: 2 worker con thread, riciclo periodico dei worker.
+# --preload: l'applicazione si carica una volta nel processo principale e i
+# worker nascono già pronti (vedi config/wsgi.py): niente pagine lente dopo un
+# riciclo e meno memoria occupata, perché il codice caricato è condiviso.
 # Il log degli accessi include i microsecondi (ultimo campo): serve per trovare
 # le pagine lente nei log senza altri strumenti.
 CMD ["gunicorn", "config.wsgi:application", \
+     "--preload", \
      "--bind", "0.0.0.0:8000", \
      "--worker-class", "gthread", \
      "--workers", "2", \

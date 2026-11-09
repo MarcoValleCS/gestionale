@@ -42,6 +42,14 @@ class UserUpdateView(RoleRequiredMixin, UpdateView):
     template_name = "accounts/user_form.html"
     success_url = reverse_lazy("accounts:user_list")
 
+    def get_queryset(self):
+        # Il ruolo «Amministratore» non è un superutente: non deve poter
+        # cambiare la password di un superutente e prenderne il posto.
+        utenti = super().get_queryset()
+        if not self.request.user.is_superuser:
+            utenti = utenti.filter(is_superuser=False)
+        return utenti
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["page_title"] = f"Modifica utente: {self.object}"

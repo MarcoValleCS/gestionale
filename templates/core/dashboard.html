@@ -28,12 +28,14 @@
       {% endfor %}
     </select>
     <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i></button>
+    {% if roles.is_admin or roles.is_sales %}
     <a class="btn btn-outline-success btn-sm text-nowrap" href="{% url 'sales:export_sales_excel' %}?periodo={{ period }}">
       <i class="bi bi-file-earmark-excel"></i> Esporta Excel
     </a>
     <a class="btn btn-outline-primary btn-sm text-nowrap" href="{% url 'sales:statistics' %}">
       <i class="bi bi-graph-up-arrow"></i> Statistiche complete
     </a>
+    {% endif %}
   </form>
 </div>
 

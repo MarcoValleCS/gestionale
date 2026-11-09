@@ -105,7 +105,9 @@ def verifica_token(token: str) -> Credenziale | None:
     if not token:
         return None
     for credenziale in carica_credenziali():
-        if hmac.compare_digest(credenziale.token, token):
+        # Sui byte: un token con caratteri non ASCII farebbe sollevare
+        # TypeError a compare_digest (errore 500 invece di 401).
+        if hmac.compare_digest(credenziale.token.encode(), token.encode()):
             return credenziale
     return None
 

@@ -10,7 +10,7 @@ dipendente dell'ufficio che collabora anche ai cantieri mantiene l'accesso pieno
 """
 from django.shortcuts import redirect
 
-from .permissions import COLLABORATOR_AREA_PREFIX, RESTRICTED_ROLES, ROLE_COLLABORATOR
+from .permissions import COLLABORATOR_AREA_PREFIX, RESTRICTED_ROLES, ROLE_COLLABORATOR, ruoli_di
 
 # Pagine sempre raggiungibili: accesso, uscita, cambio password, file statici
 ALWAYS_ALLOWED_PREFIXES = ("/accounts/", "/static/", "/media/", "/guida/")
@@ -25,7 +25,7 @@ def is_collaborator_only(user, ruoli=None):
     """
     if not user or not user.is_authenticated or user.is_superuser:
         return False
-    ruoli = set(user.groups.values_list("name", flat=True)) if ruoli is None else set(ruoli)
+    ruoli = set(ruoli_di(user)) if ruoli is None else set(ruoli)
     if ROLE_COLLABORATOR not in ruoli:
         return False
     return not (ruoli - set(RESTRICTED_ROLES))
@@ -40,7 +40,7 @@ class CollaboratorRestrictionMiddleware:
         # sola volta qui e si riusano, così ogni pagina risparmia una query.
         utente = getattr(request, "user", None)
         if utente and utente.is_authenticated and not utente.is_superuser:
-            request._ruoli_cache = set(utente.groups.values_list("name", flat=True))
+            request._ruoli_cache = set(ruoli_di(utente))
         if is_collaborator_only(utente, ruoli=getattr(request, "_ruoli_cache", None)):
             percorso = request.path
             consentito = (

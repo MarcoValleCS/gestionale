@@ -1,9 +1,11 @@
 """URL principali del progetto."""
+import posixpath
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.urls import include, path
 from django.views.static import serve as media_serve
 
@@ -13,8 +15,35 @@ from django.views.static import serve as media_serve
 ESTENSIONI_INLINE = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".bmp", ".ico"}
 
 
+def _media_consentito_al_collaboratore(request, path):
+    """Un collaboratore esterno vede solo il logo e le proprie foto.
+
+    Gli altri file (allegati dei cantieri, schede articolo, XML delle fatture,
+    foto della galleria) non lo riguardano: senza questo controllo bastava
+    conoscerne il percorso per scaricarli.
+    """
+    from apps.core.models import Attachment
+    from apps.hr.models import Collaborator
+
+    # Lo stesso percorso che userà il server dei file: «company/../x» non deve
+    # passare come logo.
+    path = posixpath.normpath(path).lstrip("/")
+    if path.startswith("../") or path == "..":
+        return False
+    if path.startswith("company/"):
+        return True
+    collaboratore = Collaborator.objects.filter(user=request.user).first()
+    if collaboratore is None:
+        return False
+    return Attachment.objects.filter(collaborator=collaboratore, file=path).exists()
+
+
 def protected_media(request, path):
     """Serve i file caricati leggendo MEDIA_ROOT a runtime (non all'avvio)."""
+    from apps.accounts.middleware import is_collaborator_only
+
+    if is_collaborator_only(request.user) and not _media_consentito_al_collaboratore(request, path):
+        raise Http404("File non trovato.")
     risposta = media_serve(request, path, document_root=settings.MEDIA_ROOT)
     if Path(path).suffix.lower() not in ESTENSIONI_INLINE:
         risposta["Content-Disposition"] = "attachment"

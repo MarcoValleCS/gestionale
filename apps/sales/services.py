@@ -4,9 +4,11 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.catalog.models import sconto_per_prezzo_acquisto
+from apps.core.concurrency import aggiorna_se
 from apps.inventory.models import StockMovement
 from apps.inventory.services import register_movement
 
@@ -114,6 +116,10 @@ def convert_quote_to_order(quote, user=None):
         raise ValidationError("Il preventivo non contiene righe.")
 
     with transaction.atomic():
+        # Prima si «prende» il preventivo: con un doppio clic la seconda
+        # richiesta lo trova già convertito e non crea un secondo ordine.
+        if not aggiorna_se(quote, ~Q(status=Quote.STATUS_CONVERTED), status=Quote.STATUS_CONVERTED):
+            raise ValidationError("Questo preventivo è già stato convertito in ordine.")
         order = SalesOrder.objects.create(
             date=timezone.localdate(),
             customer=quote.customer,
@@ -144,8 +150,6 @@ def convert_quote_to_order(quote, user=None):
             )
         _normalizza_posizioni(order)
         order.recalculate()
-        quote.status = Quote.STATUS_CONVERTED
-        quote.save(update_fields=["status"])
         return order
 
 
@@ -215,6 +219,13 @@ def confirm_sales_order(order, user=None, replenish=False):
 
     created = []
     with transaction.atomic():
+        # Il cambio di stato va per primo: se l'ordine è già stato confermato
+        # (doppio clic, due utenti) non si generano di nuovo gli ordini fornitore.
+        if not aggiorna_se(
+            order, Q(status=SalesOrder.STATUS_DRAFT), status=SalesOrder.STATUS_CONFIRMED, confirmed_at=timezone.now()
+        ):
+            raise ValidationError("Solo gli ordini in bozza possono essere confermati.")
+
         # Fissa il costo unitario per il calcolo della marginalità
         for line in lines:
             if line.product_id and line.unit_cost is None:
@@ -256,11 +267,39 @@ def confirm_sales_order(order, user=None, replenish=False):
             po.recalculate()
             created.append(po)
 
-        order.status = SalesOrder.STATUS_CONFIRMED
-        order.confirmed_at = timezone.now()
-        order.save(update_fields=["status", "confirmed_at"])
-
     return {"purchase_orders": created, "without_supplier": without_supplier}
+
+
+def _consegna_riga(line, user, warehouse, reference):
+    """Consegna una riga d'ordine e scarica il magazzino, tutto o niente.
+
+    La riga viene «presa» con un UPDATE che riesce solo se la quantità
+    consegnata è ancora quella letta: una seconda richiesta contemporanea non
+    trova più la riga da consegnare e non scarica una seconda volta.
+    Restituisce False se la riga era già stata consegnata nel frattempo;
+    solleva ``ValidationError`` (e lascia la riga com'era) se manca giacenza.
+    """
+    remaining = line.qty_remaining
+    valori = {"qty_delivered": line.qty}
+    if line.product_id and line.unit_cost is None:
+        valori["unit_cost"] = line.product.purchase_unit_price(line.product.main_supplier)
+    with transaction.atomic():
+        presa = SalesOrderLine.objects.filter(pk=line.pk, qty_delivered=line.qty_delivered).update(**valori)
+        if not presa:
+            return False
+        if line.product is not None and line.product.is_stock_tracked:
+            register_movement(
+                product=line.product,
+                warehouse=warehouse,
+                delta=-remaining,
+                movement_type=StockMovement.TYPE_UNLOAD,
+                user=user,
+                reference=reference,
+                note=f"Consegna {reference}",
+            )
+    for campo, valore in valori.items():
+        setattr(line, campo, valore)
+    return True
 
 
 def deliver_sales_order(order, user=None, warehouse=None):
@@ -269,37 +308,23 @@ def deliver_sales_order(order, user=None, warehouse=None):
         raise ValidationError("L'ordine non è in uno stato che consente la consegna.")
 
     errors = []
-    for line in order.lines.select_related("product"):
-        if line.is_display:
-            continue
-        remaining = line.qty_remaining
-        if remaining <= 0:
-            continue
-        if line.product is not None and line.product.is_stock_tracked:
-            try:
-                register_movement(
-                    product=line.product,
-                    warehouse=warehouse,
-                    delta=-remaining,
-                    movement_type=StockMovement.TYPE_UNLOAD,
-                    user=user,
-                    reference=order.number,
-                    note=f"Consegna {order.number}",
-                )
-            except ValidationError as exc:
-                errors.append(str(exc))
+    with transaction.atomic():
+        for line in order.lines.select_related("product"):
+            if line.is_display or line.qty_remaining <= 0:
                 continue
-        update_fields = ["qty_delivered"]
-        if line.product_id and line.unit_cost is None:
-            line.unit_cost = line.product.purchase_unit_price(line.product.main_supplier)
-            update_fields.append("unit_cost")
-        line.qty_delivered = line.qty
-        line.save(update_fields=update_fields)
+            try:
+                _consegna_riga(line, user, warehouse, order.number)
+            except ValidationError as exc:
+                # Giacenza insufficiente: la riga resta da consegnare.
+                errors.append(str(exc))
 
-    if order.all_delivered:
-        order.status = SalesOrder.STATUS_DELIVERED
-        order.delivered_at = timezone.now()
-        order.save(update_fields=["status", "delivered_at"])
+        if order.all_delivered:
+            aggiorna_se(
+                order,
+                ~Q(status=SalesOrder.STATUS_DELIVERED),
+                status=SalesOrder.STATUS_DELIVERED,
+                delivered_at=timezone.now(),
+            )
 
     return errors
 

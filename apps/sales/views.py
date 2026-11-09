@@ -59,8 +59,13 @@ def fdate(value):
     return value.strftime("%d/%m/%Y") if value else ""
 
 
+@role_required(*QUOTE_ROLES)
 def statistics(request):
-    """Statistiche complete: fatturato, margine e classifiche del periodo."""
+    """Statistiche complete: fatturato, margine e classifiche del periodo.
+
+    Margini e classifiche clienti sono riservati a vendite e amministrazione,
+    come l'esportazione Excel e la voce di menu.
+    """
     from apps.core.cache import memoizza
 
     period = request.GET.get("periodo", analytics.PERIOD_YEAR)
@@ -642,6 +647,9 @@ def quote_pdf_download(request, pk):
 @role_required(*QUOTE_ROLES)
 def quote_send(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:quote_detail", pk=quote.pk)
     if quote.status == Quote.STATUS_DRAFT:
         quote.status = Quote.STATUS_SENT
         quote.save(update_fields=["status"])
@@ -699,6 +707,9 @@ def quote_email(request, pk):
 @role_required(*QUOTE_ROLES)
 def quote_accept(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:quote_detail", pk=quote.pk)
     if quote.status in {Quote.STATUS_DRAFT, Quote.STATUS_SENT}:
         quote.status = Quote.STATUS_ACCEPTED
         quote.save(update_fields=["status"])
@@ -711,6 +722,9 @@ def quote_accept(request, pk):
 @role_required(*QUOTE_ROLES)
 def quote_reject(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:quote_detail", pk=quote.pk)
     if quote.status in {Quote.STATUS_DRAFT, Quote.STATUS_SENT, Quote.STATUS_ACCEPTED}:
         quote.status = Quote.STATUS_REJECTED
         quote.save(update_fields=["status"])
@@ -723,6 +737,9 @@ def quote_reject(request, pk):
 @role_required(*QUOTE_ROLES)
 def quote_convert(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:quote_detail", pk=quote.pk)
     try:
         order = services.convert_quote_to_order(quote, user=request.user)
     except ValidationError as exc:
@@ -735,6 +752,9 @@ def quote_convert(request, pk):
 @role_required(*QUOTE_ROLES)
 def quote_duplicate(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:quote_detail", pk=quote.pk)
     new = services.duplicate_quote(quote, user=request.user)
     messages.success(request, f"Preventivo duplicato: {new.number}.")
     return redirect("sales:quote_update", pk=new.pk)
@@ -945,7 +965,10 @@ def order_pdf_download(request, pk):
 @role_required(*ORDER_EDIT_ROLES)
 def order_confirm(request, pk):
     order = get_object_or_404(SalesOrder, pk=pk)
-    replenish = request.method == "POST" and request.POST.get("replenish") == "1"
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:order_detail", pk=order.pk)
+    replenish = request.POST.get("replenish") == "1"
     try:
         result = services.confirm_sales_order(order, user=request.user, replenish=replenish)
     except ValidationError as exc:
@@ -970,6 +993,9 @@ def order_confirm(request, pk):
 @role_required(*ORDER_DELIVER_ROLES)
 def order_deliver(request, pk):
     order = get_object_or_404(SalesOrder, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("sales:order_detail", pk=order.pk)
     if order.status == SalesOrder.STATUS_DRAFT:
         messages.warning(request, "Conferma l'ordine prima di registrare la consegna.")
         return redirect("sales:order_detail", pk=order.pk)

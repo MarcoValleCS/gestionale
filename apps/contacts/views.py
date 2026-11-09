@@ -111,6 +111,9 @@ class ContactUpdateView(RoleRequiredMixin, UpdateView):
 @role_required(*EDIT_ROLES)
 def contact_toggle_active(request, pk):
     contact = get_object_or_404(Contact, pk=pk)
+    if request.method != "POST":
+        # Cambia lo stato: solo da modulo (POST con token CSRF), mai da un link.
+        return redirect("contacts:detail", pk=contact.pk)
     contact.active = not contact.active
     contact.save(update_fields=["active"])
     if contact.active:

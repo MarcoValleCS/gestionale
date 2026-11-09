@@ -10,6 +10,12 @@ if [ ! -f "$FILE" ]; then
   echo "File non trovato: $FILE"
   exit 1
 fi
+# Un archivio rovinato si scopre prima di toccare il database, non a metà.
+if ! gzip -t "$FILE"; then
+  echo "Il file $FILE è corrotto: ripristino annullato."
+  exit 1
+fi
+umask 077
 
 cd "$(dirname "$0")/.."
 
@@ -29,15 +35,29 @@ SALVATAGGIO="$(dirname "$FILE")/pre-restore_$(date +%F_%H%M).sql.gz"
 echo "→ Copia di sicurezza dello stato attuale in $SALVATAGGIO"
 docker compose exec -T db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$SALVATAGGIO"
 
-echo "→ Svuoto lo schema corrente…"
-docker compose exec -T db psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+# Durante il ripristino nessuno deve scrivere: si fermano gestionale e server
+# MCP. All'uscita (anche in caso di errore) ripartono da soli.
+MCP_ACCESO="$(docker compose --profile mcp ps --status running --quiet mcp 2>/dev/null || true)"
+echo "→ Fermo l'applicazione…"
+docker compose --profile mcp stop web mcp
+riavvia() {
+  echo "→ Riavvio l'applicazione…"
+  docker compose up -d web
+  # Il server MCP riparte solo se era acceso prima del ripristino.
+  if [ -n "$MCP_ACCESO" ]; then
+    docker compose --profile mcp up -d mcp
+  fi
+}
+trap riavvia EXIT
 
-# ON_ERROR_STOP=1 fa fallire subito il ripristino al primo errore;
-# --single-transaction lo rende atomico (o tutto, o niente).
+# Lo svuotamento dello schema sta nella STESSA transazione del ripristino:
+# se il file dà errore a metà, PostgreSQL annulla tutto e il database resta
+# com'era (prima lo schema veniva svuotato a parte e un errore lo lasciava vuoto).
+# ON_ERROR_STOP=1 si ferma al primo errore; --single-transaction: o tutto o niente.
 echo "→ Ripristino i dati…"
-gunzip -c "$FILE" | docker compose exec -T db psql -v ON_ERROR_STOP=1 --single-transaction -U "$DB_USER" -d "$DB_NAME"
-
-echo "→ Riavvio l'applicazione…"
-docker compose restart web
+{
+  echo "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+  gunzip -c "$FILE"
+} | docker compose exec -T db psql -v ON_ERROR_STOP=1 --single-transaction -U "$DB_USER" -d "$DB_NAME"
 
 echo "Ripristino completato."

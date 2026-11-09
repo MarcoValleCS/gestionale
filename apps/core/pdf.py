@@ -24,7 +24,12 @@ def render_pdf(html):
         return None
     import weasyprint
 
-    return weasyprint.HTML(string=html).write_pdf()
+    # Il documento è già completo (stili in linea, logo come data-URI): non
+    # deve scaricare nulla. Senza questo limite un indirizzo finito nell'HTML
+    # (http://, file://) verrebbe aperto dal server: richieste verso la rete
+    # interna o lettura di file locali dentro il PDF.
+    fetcher = weasyprint.URLFetcher(allowed_protocols={"data"})
+    return weasyprint.HTML(string=html, url_fetcher=fetcher).write_pdf()
 
 
 def render_pdf_cached(chiave, html, timeout=3600):

@@ -577,8 +577,17 @@ def conversazione(request, pk):
         .order_by("created_at", "pk")
     )
     da_leggere = [m for m in scambio if m.recipient_id == request.user.pk and not m.is_read]
-    for messaggio in da_leggere:
-        messaggio.mark_read()
+    if da_leggere:
+        # Un solo UPDATE per tutta la conversazione (prima uno per messaggio).
+        adesso = timezone.now()
+        InternalMessage.objects.filter(pk__in=[m.pk for m in da_leggere], read_at__isnull=True).update(
+            read_at=adesso, updated_at=adesso
+        )
+        for messaggio in da_leggere:
+            messaggio.read_at = adesso
+        from .cache import dimentica
+
+        dimentica(f"badge_msg_{request.user.pk}")
 
     return render(
         request,

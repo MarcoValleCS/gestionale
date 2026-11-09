@@ -4,11 +4,14 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import F, Q
+from django.db.models.functions import Least
 from django.utils import timezone
 
+from apps.core.concurrency import aggiorna_se
 from apps.inventory.models import StockMovement
 from apps.inventory.services import register_movement
-from apps.sales.models import SalesOrder
+from apps.sales.models import SalesOrder, SalesOrderLine
 
 from .models import (
     DeliveryNote,
@@ -61,48 +64,61 @@ def create_delivery_note_from_order(order, user=None):
 
 
 def issue_delivery_note(note, user=None, warehouse=None):
-    """Emette il DDT: scarica il magazzino e aggiorna l'ordine collegato."""
+    """Emette il DDT: scarica il magazzino e aggiorna l'ordine collegato.
+
+    Tutto in una transazione e con il cambio di stato come primo passo: con un
+    doppio clic (o due utenti) solo la prima richiesta trova il DDT in bozza,
+    la seconda riceve un errore e il magazzino viene scaricato una volta sola.
+    """
     if note.status != DeliveryNote.STATUS_DRAFT:
         raise ValidationError("Solo i DDT in bozza possono essere emessi.")
     if not note.lines.exists():
         raise ValidationError("Il DDT non contiene righe.")
 
     errors = []
-    for line in note.lines.select_related("product", "source_order_line"):
-        line_qty = Decimal(line.qty or 0)
-        if line_qty <= 0:
-            continue
-        if line.product is not None and line.product.is_stock_tracked:
-            try:
-                register_movement(
-                    product=line.product,
-                    warehouse=warehouse,
-                    delta=-line_qty,
-                    movement_type=StockMovement.TYPE_UNLOAD,
-                    user=user,
-                    reference=note.number,
-                    note=f"DDT {note.number}",
-                )
-            except ValidationError as exc:
-                errors.append(str(exc))
+    with transaction.atomic():
+        if not aggiorna_se(
+            note,
+            Q(status=DeliveryNote.STATUS_DRAFT),
+            status=DeliveryNote.STATUS_ISSUED,
+            issued_at=timezone.now(),
+        ):
+            raise ValidationError("Solo i DDT in bozza possono essere emessi.")
+
+        for line in note.lines.select_related("product"):
+            line_qty = Decimal(line.qty or 0)
+            if line_qty <= 0:
                 continue
-        if line.source_order_line_id:
-            order_line = line.source_order_line
-            new_delivered = min(order_line.qty, order_line.qty_delivered + line_qty)
-            if new_delivered != order_line.qty_delivered:
-                order_line.qty_delivered = new_delivered
-                order_line.save(update_fields=["qty_delivered"])
+            if line.product is not None and line.product.is_stock_tracked:
+                try:
+                    register_movement(
+                        product=line.product,
+                        warehouse=warehouse,
+                        delta=-line_qty,
+                        movement_type=StockMovement.TYPE_UNLOAD,
+                        user=user,
+                        reference=note.number,
+                        note=f"DDT {note.number}",
+                    )
+                except ValidationError as exc:
+                    errors.append(str(exc))
+                    continue
+            if line.source_order_line_id:
+                # Somma in SQL (mai lettura + scrittura in Python), senza
+                # superare la quantità ordinata.
+                SalesOrderLine.objects.filter(pk=line.source_order_line_id).update(
+                    qty_delivered=Least(F("qty"), F("qty_delivered") + line_qty)
+                )
 
-    note.status = DeliveryNote.STATUS_ISSUED
-    note.issued_at = timezone.now()
-    note.save(update_fields=["status", "issued_at"])
-
-    if note.source_order_id:
-        order = note.source_order
-        if order.all_delivered and order.status != SalesOrder.STATUS_DELIVERED:
-            order.status = SalesOrder.STATUS_DELIVERED
-            order.delivered_at = timezone.now()
-            order.save(update_fields=["status", "delivered_at"])
+        if note.source_order_id:
+            order = note.source_order
+            if order.all_delivered:
+                aggiorna_se(
+                    order,
+                    ~Q(status=SalesOrder.STATUS_DELIVERED),
+                    status=SalesOrder.STATUS_DELIVERED,
+                    delivered_at=timezone.now(),
+                )
 
     return errors
 
@@ -167,6 +183,10 @@ def create_sales_invoice_from_delivery_note(note, user=None):
         raise ValidationError("Il DDT non contiene righe.")
 
     with transaction.atomic():
+        # Il DDT si segna come fatturato per primo: un doppio clic non crea
+        # due fatture dallo stesso DDT.
+        if not aggiorna_se(note, Q(invoiced=False), invoiced=True):
+            raise ValidationError("Questo DDT risulta già fatturato.")
         invoice = SalesInvoice.objects.create(
             customer=note.customer,
             job=note.job,
@@ -180,8 +200,6 @@ def create_sales_invoice_from_delivery_note(note, user=None):
             SalesInvoiceLine.objects.create(invoice=invoice, **row)
         _apply_advance_storno(note.source_order, invoice)
         invoice.recalculate()
-        note.invoiced = True
-        note.save(update_fields=["invoiced"])
     return invoice
 
 

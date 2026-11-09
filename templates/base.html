@@ -314,6 +314,29 @@
     });
   }
 
+  /* ------------------------------------------ un invio per volta (POST) */
+  // Un doppio clic su «Emetti», «Consegna», «Salva» spediva due volte lo
+  // stesso modulo. Il server rifiuta comunque il secondo invio, ma così non
+  // parte nemmeno: dopo l'invio i pulsanti del modulo si disattivano per
+  // qualche secondo (non per sempre: un PDF scaricato non cambia pagina).
+  document.addEventListener("submit", function (event) {
+    const form = event.target;
+    if (event.defaultPrevented || !(form instanceof HTMLFormElement)) return;
+    if (form.method !== "post" || form.target) return;
+    // Dopo l'invio, non prima: il pulsante premuto deve ancora spedire il
+    // suo nome e valore (es. «receive_all»).
+    window.setTimeout(function () {
+      const pulsanti = Array.prototype.filter.call(
+        form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]'),
+        function (pulsante) { return !pulsante.disabled; }
+      );
+      pulsanti.forEach(function (pulsante) { pulsante.disabled = true; });
+      window.setTimeout(function () {
+        pulsanti.forEach(function (pulsante) { pulsante.disabled = false; });
+      }, 5000);
+    }, 0);
+  });
+
   /* ----------------------------------------------------- service worker */
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {

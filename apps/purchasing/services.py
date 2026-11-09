@@ -70,6 +70,17 @@ def receive_purchase_order(po, quantities, user=None, warehouse=None, ddt=""):
             continue
 
         with transaction.atomic():
+            # La riga si aggiorna solo se la quantità ricevuta è ancora quella
+            # letta (e controllata) qui sopra: due invii dello stesso modulo
+            # (doppio clic, due magazzinieri) non caricano due volte la merce.
+            # Prima la seconda richiesta riscriveva il valore senza vedere la
+            # prima. Il nuovo valore si calcola in Decimal, esatto anche su SQLite.
+            presa = PurchaseOrderLine.objects.filter(pk=line.pk, qty_received=line.qty_received).update(
+                qty_received=line.qty_received + qty
+            )
+            if not presa:
+                errors.append(f"«{line.description}»: la merce risulta già ricevuta nel frattempo, ricarica la pagina.")
+                continue
             if line.product is not None and line.product.is_stock_tracked:
                 register_movement(
                     product=line.product,
@@ -81,8 +92,7 @@ def receive_purchase_order(po, quantities, user=None, warehouse=None, ddt=""):
                     note=nota,
                     unit_cost=line.unit_cost,
                 )
-            line.qty_received = line.qty_received + qty
-            line.save(update_fields=["qty_received"])
+        line.refresh_from_db(fields=["qty_received"])
         received_lines.append(line)
 
     campi = []
