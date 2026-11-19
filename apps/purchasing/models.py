@@ -180,6 +180,12 @@ class PurchaseOrder(TotalsDocument, TimeStampedModel):
 class PurchaseOrderLine(DocumentLine):
     po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="lines", verbose_name="Ordine fornitore")
     qty_received = models.DecimalField("Quantità ricevuta", max_digits=12, decimal_places=3, default=ZERO)
+    note = models.CharField(
+        "Nota per il fornitore",
+        max_length=300,
+        blank=True,
+        help_text="Indicazioni sull'articolo (colore, misura, imballo…): si stampano sotto la descrizione.",
+    )
 
     @property
     def qty_remaining(self):

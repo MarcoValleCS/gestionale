@@ -80,7 +80,7 @@
         </thead>
         <tbody id="lines-body">
           {% for lineform in line_formset %}
-          {% include "sales/_line_row.html" %}
+          {% include "sales/_line_row.html" with line_notes=True %}
           {% endfor %}
         </tbody>
       </table>
@@ -94,7 +94,7 @@
     <div class="card-body py-2 text-danger small">{% for error in line_formset.non_form_errors %}{{ error }}<br>{% endfor %}</div>
     {% endif %}
   </div>
-  <template id="empty-line-template">{% include "sales/_line_row.html" with lineform=line_formset.empty_form %}</template>
+  <template id="empty-line-template">{% include "sales/_line_row.html" with lineform=line_formset.empty_form line_notes=True %}</template>
 </form>
 {% include "sales/_quick_modals.html" %}
 {% endblock %}

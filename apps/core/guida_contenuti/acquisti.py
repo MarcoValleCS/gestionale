@@ -28,6 +28,9 @@ controlla cosa è stato ordinato, a che prezzo e quando arriva.</p>
   <li>Inserisci le righe: articolo, quantità, prezzo di acquisto (proposto dal
   listino attivo del fornitore, se c'è), IVA. Puoi usare anche righe di testo
   (sezioni, note).</li>
+  <li>Se devi dare un'indicazione su un singolo articolo (colore, misura,
+  imballo), scrivila nel campo <strong>Nota per il fornitore</strong> sotto la
+  descrizione della riga: si stampa nel PDF, quindi la riceve il fornitore.</li>
   <li>Salva e, quando è pronto, segna l'ordine come <strong>Inviato</strong>.</li>
 </ol>
 

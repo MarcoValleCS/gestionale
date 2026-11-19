@@ -35,6 +35,15 @@
     return parseFloat(String(value).replace(/\s/g, "").replace(",", ".")) || 0;
   }
 
+  /* I prezzi nelle righe si mostrano con due decimali. Nel database restano a
+     quattro (i listini fornitore li generano), ma in compilazione i centesimi
+     bastano e «12,3400» rende la tabella illeggibile. */
+  function formatPrice(value) {
+    if (value === undefined || value === null || String(value).trim() === "") return "";
+    const numero = parseNumber(value);
+    return isNaN(numero) ? String(value) : numero.toFixed(2);
+  }
+
   function isDeleted(row) {
     const checkbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
     return checkbox && checkbox.checked;
@@ -227,7 +236,7 @@
         const uom = row.querySelector('[name$="-uom"]');
         if (uom && data.uom_id) uom.value = data.uom_id;
         const price = row.querySelector('[name$="-unit_price"]');
-        if (price) price.value = data.price;
+        if (price) price.value = formatPrice(data.price);
         // Acquisti: il prezzo arriva di listino e lo sconto dal listino del
         // fornitore, così in riga si legge listino − sconto. Nelle vendite il
         // campo sconto resta com'è (lo decide chi compila).
@@ -273,6 +282,16 @@
   function bindRow(row) {
     const productSelect = row.querySelector('[name$="-product"]');
     if (productSelect) productSelect.addEventListener("change", function () { fillFromProduct(row); });
+    // Prezzo: si mostra sempre con due decimali, anche per le righe già
+    // salvate o riproposte dopo un errore di validazione.
+    const priceField = row.querySelector('[name$="-unit_price"]');
+    if (priceField) {
+      priceField.value = formatPrice(priceField.value);
+      priceField.addEventListener("change", function () {
+        priceField.value = formatPrice(priceField.value);
+        recalc();
+      });
+    }
     row.querySelectorAll('input, select').forEach(function (field) {
       field.addEventListener("input", recalc);
       field.addEventListener("change", recalc);
@@ -353,7 +372,7 @@
     }
     setFieldValue(row, '[name$="-qty"]', values.qty);
     setSelectValue(row.querySelector('[name$="-uom"]'), values.uom);
-    setFieldValue(row, '[name$="-unit_price"]', values.unitPrice);
+    setFieldValue(row, '[name$="-unit_price"]', formatPrice(values.unitPrice));
     setFieldValue(row, '[name$="-discount_pct"]', values.discount);
     setSelectValue(row.querySelector('[name$="-vat_rate"]'), values.vat);
     aggiornaPulsanteArticolo(row);

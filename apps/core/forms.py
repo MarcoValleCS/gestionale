@@ -1,7 +1,10 @@
 """Form condivisi: mixin Bootstrap e form di impostazione."""
+from decimal import Decimal, InvalidOperation
+
 from django import forms
 
 from .models import Attachment, CompanySettings, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .rounding import round2
 
 
 def active_units():
@@ -87,6 +90,25 @@ def usa_autocomplete(campo):
         nuovo.choices = widget.choices
         campo.widget = nuovo
     return campo
+
+
+class PriceInput(forms.NumberInput):
+    """Campo prezzo con due decimali.
+
+    Nel database i prezzi restano con quattro decimali (i listini fornitore
+    generano sconti con più cifre), ma chi compila un documento ragiona in
+    centesimi: «12,3400» in una riga confonde e allunga la tabella. Il valore
+    resta un numero, si arrotonda solo per la visualizzazione.
+    """
+
+    def format_value(self, value):
+        if value in (None, ""):
+            return ""
+        try:
+            numero = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return super().format_value(value)
+        return f"{round2(numero):.2f}"
 
 
 class BootstrapFormMixin:

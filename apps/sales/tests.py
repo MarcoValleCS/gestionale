@@ -2242,3 +2242,18 @@ class OrdineConfermatoModificabileTest(FlowTestBase):
         pagina = self.client.get(reverse("sales:order_detail", args=[self.order.pk])).content.decode("utf-8")
         self.assertIn(reverse("sales:order_update", args=[self.order.pk]), pagina)
         self.assertNotIn(reverse("sales:order_confirm", args=[self.order.pk]), pagina)
+
+
+class PrezzoRigheDueDecimaliTest(FlowTestBase):
+    """Nei campi prezzo delle righe si leggono due decimali, non quattro."""
+
+    def test_modifica_preventivo_mostra_due_decimali(self):
+        self.login()
+        preventivo = Quote.objects.create(customer=self.customer, date=timezone.localdate())
+        preventivo.lines.create(
+            product=self.product, description="x", qty=Decimal("1"), uom=self.uom,
+            unit_price=Decimal("12.3456"), vat_rate=self.vat22,
+        )
+        pagina = self.client.get(reverse("sales:quote_update", args=[preventivo.pk])).content.decode("utf-8")
+        self.assertIn('value="12.35"', pagina, "il prezzo di riga si mostra con due decimali")
+        self.assertNotIn("12.3456", pagina)

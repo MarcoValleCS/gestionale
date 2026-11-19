@@ -97,11 +97,13 @@ class PurchaseOrderLineForm(LineFormMixin, BaseBootstrapModelForm):
 
     class Meta:
         model = PurchaseOrderLine
-        fields = ["section", "product", "description", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
+        fields = ["section", "product", "description", "note", "qty", "uom", "unit_price", "discount_pct", "vat_rate"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_line_fields()
+        self.fields["note"].required = False
+        self.fields["note"].widget.attrs["placeholder"] = "Indicazioni per il fornitore (es. colore, misura, imballo)"
         # L'ordine fornitore non gestisce le sezioni: il campo resta nascosto
         # (i valori già salvati nelle righe restano intatti).
         self.fields["section"].widget = forms.HiddenInput()

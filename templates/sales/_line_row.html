@@ -34,6 +34,7 @@
     </div>
   </td>
   <td class="cell-descrizione">{{ lineform.description }}
+    {% if line_notes %}<div class="mt-1">{{ lineform.note }}</div>{% endif %}
     {% if lineform.description.errors %}<div class="invalid-feedback d-block">{{ lineform.description.errors|striptags }}</div>{% endif %}
     {% if lineform.non_field_errors %}<div class="invalid-feedback d-block">{{ lineform.non_field_errors|striptags }}</div>{% endif %}
   </td>

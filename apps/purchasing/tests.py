@@ -356,3 +356,60 @@ class RinormalizzaPrezziOrdiniTest(TestCase):
         self.assertEqual(riga.line_subtotal, Decimal("313.10"), "il netto non cambia")
         ordine.refresh_from_db()
         self.assertEqual(ordine.grand_total, Decimal("381.98"))
+
+
+class NotaRigaOrdineFornitoreTest(TestCase):
+    """Indicazioni sull'articolo: si compilano, si salvano e arrivano al fornitore."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_superuser("admin", "admin@example.com", "password123!")
+        cls.uom = UnitOfMeasure.objects.get(code="PZ")
+        cls.iva = VatRate.objects.get(code="22")
+        cls.fornitore = Contact.objects.create(name="Fornitore Note S.p.A.", is_customer=False, is_supplier=True)
+        cls.articolo = Product.objects.create(
+            name="Rubinetto note", uom=cls.uom, sale_price=Decimal("50"),
+            sale_vat=cls.iva, purchase_price=Decimal("30"), purchase_vat=cls.iva,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def test_modulo_ha_il_campo_nota_per_riga(self):
+        pagina = self.client.get(reverse("purchasing:po_create")).content.decode("utf-8")
+        self.assertIn('name="lines-__prefix__-note"', pagina)
+        self.assertIn("Indicazioni per il fornitore", pagina)
+
+    def test_nota_salvata_e_mostrata_in_scheda_e_stampa(self):
+        risposta = self.client.post(
+            reverse("purchasing:po_create"),
+            {
+                "supplier": self.fornitore.pk,
+                "job": "",
+                "date": "2026-11-19",
+                "expected_date": "",
+                "payment_term": "",
+                "notes": "",
+                "lines-TOTAL_FORMS": "1",
+                "lines-INITIAL_FORMS": "0",
+                "lines-MIN_NUM_FORMS": "0",
+                "lines-MAX_NUM_FORMS": "1000",
+                "lines-0-product": self.articolo.pk,
+                "lines-0-description": "",
+                "lines-0-note": "Finiture cromate lucide",
+                "lines-0-qty": "2",
+                "lines-0-uom": self.uom.pk,
+                "lines-0-unit_price": "30.00",
+                "lines-0-discount_pct": "0",
+                "lines-0-vat_rate": self.iva.pk,
+            },
+        )
+        self.assertEqual(risposta.status_code, 302, getattr(risposta, "context", None))
+        ordine = PurchaseOrder.objects.get()
+        riga = ordine.lines.get()
+        self.assertEqual(riga.note, "Finiture cromate lucide")
+
+        scheda = self.client.get(reverse("purchasing:po_detail", args=[ordine.pk])).content.decode("utf-8")
+        self.assertIn("Finiture cromate lucide", scheda)
+        stampa = self.client.get(reverse("purchasing:po_print", args=[ordine.pk])).content.decode("utf-8")
+        self.assertIn("Finiture cromate lucide", stampa)

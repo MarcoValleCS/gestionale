@@ -136,6 +136,7 @@
     .num { text-align: right; white-space: nowrap; }
     .item-code { color: #6b7280; font-size: 10.5px; }
     .item-desc { font-weight: 600; color: #111827; }
+    .item-note { margin-top: 1mm; font-size: 10px; font-style: italic; color: #6b7280; }
     /* ------------------------------------------------------------ totali */
     .after { display: flex; justify-content: space-between; gap: 10mm; margin-top: 7mm; align-items: flex-start; }
     .notes-block { flex: 1; font-size: 10.5px; color: #4b5563; line-height: 1.6; white-space: pre-line; }
@@ -323,6 +324,7 @@
           <td>
             {% if show_product_code and line.product %}<span class="item-code">{{ line.product.code }}</span><br>{% endif %}
             <span class="item-desc">{{ line.description|default:"—" }}</span>
+            {% if line.note %}<div class="item-note">{{ line.note }}</div>{% endif %}
           </td>
           <td class="num">{{ line.qty|qty }}</td>
           <td>{{ line.uom.code|default:"—" }}</td>

@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
-from apps.core.forms import AutocompleteSelect, BaseBootstrapModelForm, menu_aliquote, menu_unita, usa_autocomplete
+from apps.core.forms import AutocompleteSelect, BaseBootstrapModelForm, PriceInput, menu_aliquote, menu_unita, usa_autocomplete
 
 from .models import (
     DISPLAY_LINE_TYPES,
@@ -122,6 +122,10 @@ class LineFormMixin:
                 ]
         self.fields["uom"].choices = menu_unita()
         self.fields["vat_rate"].choices = menu_aliquote()
+        # Il prezzo di riga si mostra con due decimali: il valore nel database
+        # resta a quattro (vedi core.forms.PriceInput).
+        prezzo = self.fields["unit_price"]
+        prezzo.widget = PriceInput(attrs=prezzo.widget.attrs)
         self.fields["description"].required = False
         self.fields["description"].label = "Descrizione"
         if "line_type" in self.fields:

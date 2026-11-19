@@ -102,6 +102,7 @@
               <td>
                 {% if line.product %}<a class="text-muted number-badge text-decoration-none" href="{% url 'catalog:product_detail' line.product.pk %}" target="_blank" title="Apri la scheda dell'articolo"><i class="bi bi-box-arrow-up-right"></i> {{ line.product.code }}</a>{% endif %}
                 {{ line.description|default:"—" }}
+                {% if line.note %}<div class="small text-muted fst-italic mt-1"><i class="bi bi-chat-left-text me-1"></i>{{ line.note }}</div>{% endif %}
               </td>
               <td class="text-end">{{ line.qty|qty }}</td>
               <td class="text-end {% if line.qty_received >= line.qty %}text-success{% elif line.qty_received > 0 %}text-warning{% endif %}">
