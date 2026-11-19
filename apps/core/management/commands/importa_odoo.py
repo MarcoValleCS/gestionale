@@ -368,7 +368,7 @@ class Importatore:
         """Cancella i dati di dominio; restano utenti, ruoli e configurazioni."""
         sequenza = [
             ("core", "EmailInCoda"), ("core", "ActivityLog"), ("core", "InternalMessage"),
-            ("core", "InboundEmail"), ("core", "Attachment"), ("core", "WikiPage"),
+            ("core", "Attachment"), ("core", "WikiPage"),
             ("gallery", "GalleryPhoto"), ("gallery", "GalleryTag"),
             ("leads", "Lead"),
             ("jobs", "MaintenancePlan"), ("jobs", "Job"),

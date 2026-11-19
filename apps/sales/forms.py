@@ -183,11 +183,12 @@ class QuoteForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         self.apply_job_queryset()
         self.apply_commission_queryset()
         if not self.instance.pk:
-            from apps.core.termini_vendita import RIGA_TERMINI_BREVE
+            from apps.core.models import CompanySettings
 
             self.fields["date"].initial = timezone.localdate()
             self.fields["valid_until"].initial = timezone.localdate() + timedelta(days=30)
-            self.fields["terms_text"].initial = RIGA_TERMINI_BREVE
+            # Note predefinite: si cambiano in Impostazioni › Note predefinite
+            self.fields["terms_text"].initial = CompanySettings.load().note_vendita
 
 
 class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
@@ -212,10 +213,10 @@ class SalesOrderForm(CustomerChoiceFormMixin, BaseBootstrapModelForm):
         self.apply_job_queryset()
         self.apply_commission_queryset()
         if not self.instance.pk:
-            from apps.core.termini_vendita import RIGA_TERMINI_BREVE
+            from apps.core.models import CompanySettings
 
             self.fields["date"].initial = timezone.localdate()
-            self.fields["terms_text"].initial = RIGA_TERMINI_BREVE
+            self.fields["terms_text"].initial = CompanySettings.load().note_vendita
 
 
 class QuoteTemplateForm(BaseBootstrapModelForm):

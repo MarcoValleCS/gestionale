@@ -10,16 +10,11 @@ urlpatterns = [
     # Messaggi interni fra utenti
     path("messaggi/", views.messaggi, name="messaggi"),
     path("messaggi/<int:pk>/", views.conversazione, name="conversazione"),
-    # Posta in arrivo della casella aziendale
-    path("posta/", views.posta, name="posta"),
-    path("posta/sincronizza/", views.posta_sincronizza, name="posta_sincronizza"),
-    path("posta/<int:pk>/", views.posta_messaggio, name="posta_messaggio"),
-    path("posta/<int:pk>/rispondi/", views.posta_rispondi, name="posta_rispondi"),
-    path("posta/<int:pk>/allegato/<int:indice>/", views.posta_allegato, name="posta_allegato"),
     path("impostazioni/", views.settings_home, name="settings"),
     path("impostazioni/azienda/", views.CompanyUpdateView.as_view(), name="company_update"),
     path("impostazioni/email/", views.email_settings, name="email_settings"),
     path("impostazioni/email/modelli/", views.email_templates_view, name="email_templates"),
+    path("impostazioni/note/", views.note_predefinite, name="note_predefinite"),
     path("impostazioni/attivita/", views.activity_log, name="activity_log"),
     path("impostazioni/backup/", views.backup, name="backup"),
     path("impostazioni/backup/<str:nome>/", views.backup_download, name="backup_download"),

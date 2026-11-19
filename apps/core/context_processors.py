@@ -66,7 +66,6 @@ def roles(request):
         return {
             "roles": spento,
             "messaggi_non_letti": 0,
-            "posta_non_lette": 0,
             "leads_non_visti": 0,
             "rapportini_da_confermare": 0,
         }
@@ -76,7 +75,6 @@ def roles(request):
         return {
             "roles": {**{flag: True for flag in ROLE_FLAGS}, "is_collaborator_only": False},
             "messaggi_non_letti": _messaggi_non_letti(user),
-            "posta_non_lette": _posta_non_letta(user),
             "leads_non_visti": _leads_non_visti(),
             "rapportini_da_confermare": _rapportini_da_confermare(),
         }
@@ -99,7 +97,6 @@ def roles(request):
             "is_collaborator_only": "Collaboratore" in names and names <= {"Collaboratore"},
         },
         "messaggi_non_letti": _messaggi_non_letti(user),
-        "posta_non_lette": _posta_non_letta(user),
         "leads_non_visti": _leads_non_visti(),
         # Solo per chi conferma i rapportini (amministrazione e personale)
         "rapportini_da_confermare": (
@@ -132,25 +129,10 @@ def _messaggi_non_letti(utente):
         return 0
 
 
-def _posta_non_letta(utente):
-    """Quante email rilevanti non lette ci sono in casella."""
-    try:
-        from .cache import memoizza
-        from .models import InboundEmail
-
-        def conta():
-            return InboundEmail.objects.filter(is_relevant=True, read_at__isnull=True).count()
-
-        # Il conteggio è globale (non dipende dall'utente): una chiave sola.
-        return memoizza("badge_posta", conta, 60)
-    except Exception:
-        return 0
-
-
 def _leads_non_visti():
     """Quanti lead non sono ancora stati aperti (per il pallino nel menu).
 
-    Vale per l'ufficio intero, come la casella posta: appena qualcuno apre la
+    Vale per l'ufficio intero: appena qualcuno apre la
     scheda del lead, il pallino si spegne per tutti.
     """
     try:

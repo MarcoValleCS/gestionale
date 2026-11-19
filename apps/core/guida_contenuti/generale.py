@@ -39,16 +39,18 @@ non la vedi, chiedi all'amministratore: non è un errore del browser. La pagina
 <a href="/guida/percorso-vendite/">Percorso Vendite</a> (o quella del tuo
 ruolo) riassume cosa puoi fare.</p>
 
-<h3>Messaggi e posta</h3>
+<h3>Messaggi</h3>
 <p><strong>Messaggi</strong> serve a scriversi fra colleghi dentro il
-gestionale. <strong>Posta</strong> (se il tuo ruolo la prevede) è la casella
-email aziendale: leggi, rispondi e scarichi gli allegati senza uscire dal
-programma.</p>
+gestionale. La posta email si legge con il proprio programma di posta (Outlook,
+webmail): il gestionale la usa solo per <strong>inviare</strong> i documenti.</p>
 
-<h3>Il tuo profilo e la password</h3>
-<p>Dal menu con il tuo nome puoi <strong>cambiare la password</strong>. Se l'hai
-dimenticata, chiedi all'amministratore di reimpostarla: non esiste un link
-automatico via email.</p>
+<h3>Il tuo profilo, la password e la tua email</h3>
+<p>Dal menu con il tuo nome, <strong>Password ed email</strong>, puoi cambiare
+la password e impostare la <strong>tua casella email</strong>: con la sua
+password, i documenti che invii partono dal tuo indirizzo (vedi
+<a href="/guida/invio-email/">Inviare email dalla propria casella</a>). Se hai
+dimenticato la password di accesso, chiedi all'amministratore di reimpostarla:
+non esiste un link automatico via email.</p>
 
 <h3>Sul telefono</h3>
 <p>Il gestionale si può installare come app: apri il sito con Chrome (Android)
@@ -204,7 +206,7 @@ indica quanti ne hai.</p>
 <h3>Cosa non sono i messaggi</h3>
 <ul>
   <li>Non sono email: non arrivano sul telefono e non escono dal gestionale.</li>
-  <li>Non sono un registro ufficiale: per le comunicazioni con i clienti usa la <strong>Posta</strong> o l'invio del documento per email.</li>
+  <li>Non sono un registro ufficiale: per le comunicazioni con i clienti usa l'email o l'invio del documento dalla sua scheda.</li>
   <li>Non si possono allegare file: usa la scheda del documento o del cantiere per caricare un allegato.</li>
 </ul>
 
@@ -214,51 +216,45 @@ che non vorresti far leggere a un collega.</div>
 """,
     },
     {
-        "slug": "posta",
-        "title": "Posta: la casella aziendale nel gestionale",
+        "slug": "invio-email",
+        "title": "Inviare email dalla propria casella",
         "area": "Generale",
         "roles": POSTA,
         "order": 50,
-        "summary": "Leggere, filtrare, rispondere e scaricare gli allegati della casella aziendale.",
+        "summary": "Da quale indirizzo partono preventivi, ordini e fatture, e come usare la propria casella.",
         "body": """
-<p>La sezione <strong>Posta</strong> mostra le email della casella aziendale,
-scaricate via IMAP. Non sostituisce il programma di posta: serve per vedere
-subito le risposte dei clienti e le comunicazioni importanti mentre si lavora
-sui documenti.</p>
-
-<h3>I filtri</h3>
+<p>Preventivi, ordini fornitore, fatture e solleciti si inviano dalla scheda
+del documento. L'email può partire da due caselle:</p>
 <ul>
-  <li><strong>Rilevanti</strong>: risposte, email dei colleghi e comunicazioni SDI/PEC. È il filtro predefinito.</li>
-  <li><strong>Non lette</strong>: solo le email non ancora aperte.</li>
-  <li><strong>Da contatti</strong>: email di clienti o fornitori presenti in anagrafica.</li>
-  <li><strong>Con allegati</strong>: solo i messaggi che hanno file.</li>
-  <li><strong>Tutte</strong>: anche newsletter e pubblicità.</li>
+  <li><strong>La tua casella</strong> (es. <code>simone@aquaforma.it</code>): se
+  hai impostato email e password della tua casella, il cliente vede il tuo
+  indirizzo e le risposte arrivano a te.</li>
+  <li><strong>La casella aziendale</strong> (l'email di invio predefinita): se
+  non hai una casella personale. Le risposte arrivano comunque a te, se hai
+  indicato la tua email.</li>
 </ul>
+<p>Nella scheda del documento, sopra il pulsante di invio, è scritto da quale
+indirizzo partirà l'email.</p>
 
-<h3>Leggere e rispondere</h3>
+<h3>Impostare la tua casella</h3>
 <ol>
-  <li>Apri una email dall'elenco: il corpo viene scaricato dal server al momento.</li>
-  <li>Premi <strong>Rispondi</strong>, scrivi il testo e invia. La risposta parte
-  dalla casella aziendale e l'oggetto diventa «Re: …».</li>
-  <li>Gli allegati si scaricano con il pulsante accanto al nome del file.</li>
+  <li>Dal menu con il tuo nome apri <strong>Password ed email</strong>.</li>
+  <li>Nel riquadro <strong>La tua casella email</strong> scrivi la tua email e la
+  password della casella (la stessa che usi in Outlook o nella webmail).</li>
+  <li>Premi <strong>Salva e invia una prova</strong>: se ti arriva l'email di
+  prova, da ora i tuoi invii partono dalla tua casella.</li>
 </ol>
+<p>La password viene salvata cifrata. Se cambi la password della casella,
+aggiornala anche qui: finché non lo fai, le tue email partono dalla casella
+aziendale.</p>
 
-<h3>Scaricare le nuove email subito</h3>
-<p>Il pulsante <strong>Scarica nuove email</strong> forza il controllo della
-casella senza aspettare il prossimo giro automatico. Se la lettura IMAP non è
-configurata, compare un avviso con le variabili da impostare nel file
-<code>.env</code>.</p>
+<h3>Inviati</h3>
+<p>Ogni email spedita dal gestionale viene copiata nella cartella
+<strong>Inviati</strong> della casella da cui è partita: la ritrovi in Outlook o
+nella webmail.</p>
 
-<h3>Se una email non arriva</h3>
-<ul>
-  <li>Controlla di aver premuto <strong>Scarica nuove email</strong>.</li>
-  <li>Verifica che il messaggio non sia finito nello spam della casella: il gestionale scarica la cartella configurata (di norma <code>INBOX</code>).</li>
-  <li>Se compare un errore di connessione, la casella è momentaneamente irraggiungibile: riprova più tardi e segnalalo se continua.</li>
-</ul>
-
-<div class="guida-avviso">La posta del gestionale è in sola lettura rispetto al
-server: scarica i messaggi ma non cancella né sposta le email dalla casella
-originale. Per archiviazioni e regole usa il programma di posta abituale.</div>
+<div class="guida-avviso">La trasmissione delle fatture allo SDI parte sempre
+dalla casella aziendale (PEC), mai da quella personale.</div>
 """,
     },
     {
@@ -384,10 +380,11 @@ La pagina si ricarica con i dati aggiornati: controlla le differenze e
 risalva.</p>
 
 <h3>L'email non parte</h3>
-<p>Se compare «Invio email non configurato», mancano le variabili
-<code>EMAIL_*</code> nel file <code>.env</code>. Chiedi all'amministratore. Se
-l'invio è configurato ma la mail non arriva, controlla la casella spam del
-destinatario e la pagina <strong>Posta</strong> per eventuali errori.</p>
+<p>Se compare «Invio email non configurato», manca la casella di invio: imposta
+la tua in <strong>Password ed email</strong> oppure chiedi all'amministratore di
+configurare quella aziendale (<em>Impostazioni → Email</em>). Se l'invio è
+configurato ma la mail non arriva, controlla la casella spam del destinatario e
+la cartella Inviati della casella da cui è partita.</p>
 
 <h3>Il PDF non è disponibile</h3>
 <p>Il PDF viene generato dal server. Se il sistema non riesce, puoi sempre usare

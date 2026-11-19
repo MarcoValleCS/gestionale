@@ -111,6 +111,11 @@ class ProductDetailView(DetailView):
         context["variants"] = product.variants.order_by("name")
         context["components"] = product.components.select_related("component").order_by("component__name")
         context["attachments"] = product.attachments.select_related("uploaded_by")[:20]
+        from apps.accounts.permissions import has_role
+
+        if has_role(self.request.user, *EDIT_ROLES):
+            # Il pulsante «Elimina» è attivo solo se nulla usa l'articolo
+            context["collegamenti"] = collegamenti_articolo(product)
         return context
 
 
@@ -131,6 +136,47 @@ class ProductCreateView(RoleRequiredMixin, CreateView):
     def form_valid(self, form):
         messages.success(self.request, f"Articolo «{form.instance.name}» creato.")
         return super().form_valid(form)
+
+
+# Parti dell'articolo che se ne vanno con lui: composizione del kit, righe di
+# giacenza a zero e schede tecniche. Tutto il resto (righe di documenti,
+# movimenti, listini, varianti, kit che lo usano) blocca l'eliminazione.
+PARTI_ARTICOLO = ("components", "stock_levels", "attachments")
+
+
+def collegamenti_articolo(product):
+    from apps.core.eliminazione import collegamenti
+
+    elenco = collegamenti(product, propri=PARTI_ARTICOLO)
+    if product.stock_levels.exclude(quantity=0).exists():
+        elenco.append(("giacenza in magazzino", 1))
+    return elenco
+
+
+@role_required(*EDIT_ROLES)
+def product_delete(request, pk):
+    """Elimina un articolo mai usato (nessun documento, movimento o listino)."""
+    from django.db import transaction
+
+    from apps.core.eliminazione import descrivi_collegamenti, elimina_se_libero
+
+    product = get_object_or_404(Product, pk=pk)
+    if request.method != "POST":
+        return redirect("catalog:product_detail", pk=product.pk)
+    etichetta = f"{product.code} – {product.name}" if product.code else product.name
+    with transaction.atomic():
+        bloccanti = [voce for voce in collegamenti_articolo(product) if voce[0] == "giacenza in magazzino"]
+        if not bloccanti:
+            bloccanti = elimina_se_libero(product, propri=PARTI_ARTICOLO)
+    if bloccanti:
+        messages.error(
+            request,
+            f"L'articolo {etichetta} non si può eliminare: è collegato a {descrivi_collegamenti(bloccanti)}. "
+            "Se non serve più, disattivalo.",
+        )
+        return redirect("catalog:product_detail", pk=product.pk)
+    messages.success(request, f"Articolo {etichetta} eliminato.")
+    return redirect("catalog:product_list")
 
 
 class ProductUpdateView(RoleRequiredMixin, UpdateView):

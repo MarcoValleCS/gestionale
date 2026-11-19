@@ -25,6 +25,10 @@
     {% if roles.is_admin or roles.is_warehouse %}
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'inventory:adjust_create' %}?articolo={{ product.pk }}"><i class="bi bi-sliders"></i> Rettifica giacenza</a>
     {% endif %}
+    {% if roles.is_admin or roles.is_sales or roles.is_purchasing %}
+    {% url 'catalog:product_delete' product.pk as url_elimina %}
+    {% include "partials/elimina_button.html" with url=url_elimina etichetta=product.name collegamenti=collegamenti %}
+    {% endif %}
   </div>
 </div>
 

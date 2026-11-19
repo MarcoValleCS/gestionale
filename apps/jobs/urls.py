@@ -10,6 +10,7 @@ urlpatterns = [
     path("cantieri/nuovo/", views.JobCreateView.as_view(), name="job_create"),
     path("cantieri/<int:pk>/", views.JobDetailView.as_view(), name="job_detail"),
     path("cantieri/<int:pk>/modifica/", views.JobUpdateView.as_view(), name="job_update"),
+    path("cantieri/<int:pk>/elimina/", views.job_delete, name="job_delete"),
     # Foto di cantieri e bolle (caricate dai collaboratori)
     path("cantieri/foto/", views.photo_list, name="photo_list"),
     path("cantieri/foto/<int:pk>/elimina/", views.photo_delete, name="photo_delete"),

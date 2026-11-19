@@ -25,7 +25,7 @@ from .forms import (
     VatRateForm,
 )
 from .cache import memoizza
-from .models import Attachment, CompanySettings, InboundEmail, InternalMessage, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
+from .models import Attachment, CompanySettings, InternalMessage, NumberSequence, PaymentTerm, Tag, UnitOfMeasure, VatRate
 from .richtext import clean_notes
 
 
@@ -171,56 +171,75 @@ def settings_home(request):
 
 @role_required(ROLE_ADMIN)
 def email_settings(request):
-    """Stato della configurazione email e invio di una email di prova."""
+    """Email di invio predefinita (casella aziendale), stato e prova di invio."""
     from django.conf import settings as dj_settings
 
-    from .mailing import email_configured
+    from apps.accounts.models import User
 
+    from .forms import EmailInvioForm
+    from .mailing import configurazione_smtp, invia_subito, server_caselle_personali
+
+    azienda = CompanySettings.load()
+    form = EmailInvioForm(instance=azienda)
     esito = None
-    if request.method == "POST":
+    if request.method == "POST" and request.POST.get("azione") == "salva":
+        form = EmailInvioForm(request.POST, instance=azienda)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Email di invio predefinita aggiornata.")
+            return redirect("core:email_settings")
+    elif request.method == "POST":
         destinatario = (request.POST.get("to") or request.user.email or "").strip()
         if not destinatario:
             esito = ("errore", "Indica un indirizzo email di destinazione (o aggiungilo al tuo utente).")
-        elif not email_configured():
-            esito = ("errore", "L'invio non è configurato: compila le variabili EMAIL_* nel file .env e riavvia.")
+        elif not configurazione_smtp()["configurata"]:
+            esito = ("errore", "L'invio non è configurato: indica qui sopra la casella di invio (o le variabili EMAIL_* nel file .env).")
         else:
-            from django.core.mail import send_mail
-
             try:
-                send_mail(
+                invia_subito(
+                    to_email=destinatario,
                     subject="Prova di invio dal gestionale",
                     message=(
                         "Questa è una email di prova inviata dal gestionale.\n\n"
                         "Se la ricevi, l'invio di preventivi e fatture funziona."
                     ),
-                    from_email=dj_settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[destinatario],
-                    fail_silently=False,
                 )
             except Exception as exc:
                 esito = ("errore", f"Invio non riuscito: {exc}")
             else:
-                esito = ("ok", f"Email di prova inviata a {destinatario}.")
+                esito = ("ok", f"Email di prova inviata a {destinatario} dalla casella aziendale.")
 
-    configurato = email_configured()
-    backend = dj_settings.EMAIL_BACKEND.rsplit(".", 1)[-1]
+    configurazione = configurazione_smtp()
+    utenti = User.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
     return render(
         request,
         "core/email_settings.html",
         {
             "page_title": "Email",
-            "configurato": configurato,
+            "form": form,
+            "configurazione": configurazione,
+            "password_salvata": bool(azienda.smtp_password),
             "esito": esito,
-            "backend": backend,
-            "host": dj_settings.EMAIL_HOST or "—",
-            "port": dj_settings.EMAIL_PORT,
-            "utente": dj_settings.EMAIL_HOST_USER or "—",
-            "mittente": dj_settings.DEFAULT_FROM_EMAIL,
-            "tls": getattr(dj_settings, "EMAIL_USE_TLS", False),
             "pec_sdi": getattr(dj_settings, "SDI_PEC_ADDRESS", "—"),
             "destinatario": request.user.email,
+            "utenti": utenti,
+            "server_caselle": server_caselle_personali(azienda),
         },
     )
+
+
+@role_required(ROLE_ADMIN)
+def note_predefinite(request):
+    """Testo proposto nelle note dei nuovi preventivi, ordini cliente e ordini fornitore."""
+    from .forms import NotePredefiniteForm
+
+    azienda = CompanySettings.load()
+    form = NotePredefiniteForm(request.POST or None, instance=azienda)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Note predefinite aggiornate: valgono per i nuovi documenti.")
+        return redirect("core:note_predefinite")
+    return render(request, "core/note_predefinite.html", {"page_title": "Note predefinite", "form": form})
 
 
 @role_required(ROLE_ADMIN)
@@ -594,201 +613,6 @@ def conversazione(request, pk):
         "core/conversazione.html",
         {"page_title": f"Messaggi con {altro.get_full_name() or altro.username}", "altro": altro, "messaggi": scambio},
     )
-
-
-# ----------------------------------------------------------- posta in arrivo
-POSTA_ROLES = (ROLE_ADMIN, ROLE_SALES, ROLE_PURCHASING, ROLE_HR)
-
-
-@role_required(*POSTA_ROLES)
-def posta(request):
-    """Casella aziendale: elenco delle email ricevute."""
-    from django.conf import settings as dj_settings
-    from django.db.models import Q
-
-    from .imap import posta_configurata
-
-    elenco = InboundEmail.objects.select_related("contact")
-    filtro = request.GET.get("filtro", "rilevanti")
-    if filtro == "non_lette":
-        elenco = elenco.filter(read_at__isnull=True)
-    elif filtro == "allegati":
-        elenco = elenco.filter(attachments__isnull=False).exclude(attachments=[])
-    elif filtro == "contatti":
-        elenco = elenco.filter(contact__isnull=False)
-    elif filtro == "rilevanti":
-        elenco = elenco.filter(is_relevant=True)
-    # filtro vuoto o "tutte": nessun filtro
-
-    cerca = (request.GET.get("q") or "").strip()
-    if cerca:
-        elenco = elenco.filter(
-            Q(subject__icontains=cerca) | Q(sender_email__icontains=cerca) | Q(sender_name__icontains=cerca)
-        )
-
-    base = InboundEmail.objects.all()
-    from django.db.models import Count, Q
-
-    conteggi = base.aggregate(
-        tutte=Count("pk"),
-        rilevanti=Count("pk", filter=Q(is_relevant=True)),
-        non_lette=Count("pk", filter=Q(read_at__isnull=True)),
-        allegati=Count("pk", filter=~Q(attachments=[]) & Q(attachments__isnull=False)),
-        contatti=Count("pk", filter=Q(contact__isnull=False)),
-    )
-    return render(
-        request,
-        "core/posta.html",
-        {
-            "page_title": "Posta",
-            "email": elenco[:200],
-            "totale": elenco.count(),
-            "non_lette": conteggi["non_lette"],
-            "conteggi": conteggi,
-            "filtro": filtro,
-            "cerca": cerca,
-            "configurata": posta_configurata(),
-            "cartella": dj_settings.IMAP_FOLDER,
-        },
-    )
-
-
-@role_required(*POSTA_ROLES)
-def posta_sincronizza(request):
-    """Scarica le nuove email dalla casella.
-
-    Ogni scaricamento apre una connessione al server di posta: se qualcuno
-    preme il pulsante più volte di seguito si aspetta, invece di aprire dieci
-    connessioni in un minuto.
-    """
-    from django.core.cache import cache
-
-    from .imap import PostaNonConfigurata, sincronizza
-
-    if request.method == "POST":
-        if cache.get("posta_sincronizzazione_in_corso"):
-            messages.info(request, "Una sincronizzazione è appena partita: attendi qualche secondo e ricarica.")
-            return redirect("core:posta")
-        cache.set("posta_sincronizzazione_in_corso", True, 20)
-        try:
-            esito = sincronizza()
-        except PostaNonConfigurata as exc:
-            messages.error(request, str(exc))
-        except Exception as exc:
-            messages.error(request, f"Non sono riuscito a leggere la casella: {exc}")
-        else:
-            if esito["nuove"]:
-                messages.success(request, f"{esito['nuove']} nuove email scaricate ({esito['esaminate']} controllate).")
-            else:
-                messages.info(request, f"Nessuna email nuova ({esito['esaminate']} controllate).")
-    return redirect("core:posta")
-
-
-@role_required(*POSTA_ROLES)
-def posta_messaggio(request, pk):
-    """Legge una email (scarica il corpo la prima volta)."""
-    from .imap import PostaNonConfigurata, scarica_corpo
-    from .models import InboundEmail
-
-    email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
-    errore = None
-    if not email_ricevuta.body_loaded:
-        try:
-            scarica_corpo(email_ricevuta)
-        except PostaNonConfigurata as exc:
-            errore = str(exc)
-        except Exception as exc:
-            errore = f"Non sono riuscito a scaricare il messaggio: {exc}"
-    email_ricevuta.mark_read()
-
-    # le immagini incorporate (cid:) si scaricano dal gestionale, così si vedono
-    from django.urls import reverse
-    from django.utils.safestring import mark_safe
-
-    from .richtext import clean_email_html
-
-    mappa_allegati = {
-        allegato["cid"]: reverse("core:posta_allegato", args=[email_ricevuta.pk, allegato["indice"]])
-        for allegato in (email_ricevuta.attachments or [])
-        if allegato.get("cid")
-    }
-    allegati_visibili = [a for a in (email_ricevuta.attachments or []) if not a.get("incorporato")]
-
-    return render(
-        request,
-        "core/posta_messaggio.html",
-        {
-            "page_title": email_ricevuta.subject,
-            "email": email_ricevuta,
-            "errore": errore,
-            "testo_sicuro": clean_notes(email_ricevuta.body_text),
-            # il filtro di nh3 è la barriera di sicurezza: dopo di lui l'HTML
-            # può essere mostrato così com'è, altrimenti comparirebbe come testo
-            "html_sicuro": mark_safe(clean_email_html(email_ricevuta.body_html, mappa_allegati)),
-            "allegati_visibili": allegati_visibili,
-        },
-    )
-
-
-@role_required(*POSTA_ROLES)
-def posta_rispondi(request, pk):
-    """Accoda una risposta a una email della casella aziendale (invio in background)."""
-    from .mailing import accoda_email, email_configured
-    from .models import EmailInCoda, InboundEmail
-
-    email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
-    if request.method != "POST":
-        return redirect("core:posta_messaggio", pk=pk)
-
-    testo = (request.POST.get("body") or "").strip()
-    if not email_ricevuta.sender_email:
-        messages.error(request, "Questa email non ha un mittente a cui rispondere.")
-    elif not testo:
-        messages.error(request, "Scrivi il testo della risposta.")
-    elif not email_configured():
-        messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
-    else:
-        oggetto = email_ricevuta.subject
-        if not oggetto.lower().startswith("re:"):
-            oggetto = f"Re: {oggetto}"
-        try:
-            accoda_email(
-                to_email=email_ricevuta.sender_email,
-                subject=oggetto,
-                message=testo,
-                descrizione=f"Risposta a {email_ricevuta.sender_email}",
-                modello=EmailInCoda.MODELLO_LIBERA,
-                from_email=(request.user.email or ""),
-            )
-        except Exception as exc:
-            messages.error(request, f"Risposta non accodata: {exc}")
-        else:
-            messages.success(request, f"Risposta accodata per {email_ricevuta.sender_email}: verrà inviata entro pochi minuti.")
-    return redirect("core:posta_messaggio", pk=pk)
-
-
-@role_required(*POSTA_ROLES)
-def posta_allegato(request, pk, indice):
-    """Scarica un allegato dell'email."""
-    from django.http import FileResponse, Http404
-
-    from .imap import PostaNonConfigurata, scarica_allegato
-    from .models import InboundEmail
-
-    email_ricevuta = get_object_or_404(InboundEmail, pk=pk)
-    try:
-        nome, tipo, contenuto = scarica_allegato(email_ricevuta, indice)
-    except PostaNonConfigurata as exc:
-        messages.error(request, str(exc))
-        return redirect("core:posta_messaggio", pk=pk)
-    except Exception as exc:
-        raise Http404(f"Allegato non disponibile: {exc}")
-
-    from io import BytesIO
-
-    # Lo scaricamento (as_attachment) evita che un allegato pericoloso venga
-    # aperto come pagina web nella sessione di chi lo riceve.
-    return FileResponse(BytesIO(contenuto), as_attachment=True, filename=nome, content_type=tipo or "application/octet-stream")
 
 
 def global_search(request):

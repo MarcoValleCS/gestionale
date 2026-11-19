@@ -36,7 +36,7 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true", help="Mostra cosa verrebbe fatto.")
 
     def handle(self, *args, **options):
-        from apps.core.guida import PAGINE
+        from apps.core.guida import PAGINE, PAGINE_RITIRATE
         from apps.core.models import WikiPage
 
         creati = aggiornati = invariati = 0
@@ -72,6 +72,20 @@ class Command(BaseCommand):
             if not options["dry_run"]:
                 pagina.save()
             aggiornati += 1
+
+        ritirate = 0
+        for pagina in WikiPage.objects.filter(slug__in=PAGINE_RITIRATE):
+            ritirate += 1
+            if options["dry_run"]:
+                continue
+            if pagina.updated_by_id is None:
+                pagina.delete()
+            elif pagina.is_published:
+                # modificata a mano: non la si cancella, ma non si mostra più
+                pagina.is_published = False
+                pagina.save(update_fields=["is_published", "updated_at"])
+        if ritirate:
+            self.stdout.write(f"  guida: {ritirate} pagine di funzioni non più presenti tolte")
 
         if options["dry_run"]:
             self.stdout.write(f"  (prova) da creare: {creati} · da aggiornare: {aggiornati} · invariati: {invariati}")

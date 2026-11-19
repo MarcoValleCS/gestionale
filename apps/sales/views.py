@@ -167,7 +167,7 @@ def follow_up(request):
             "conversione": conversione,
             "tempo_medio": tempo_medio,
             "valore_fermo": valore_fermo,
-            "email_configurata": emailing.email_configured(),
+            "email_configurata": emailing.email_configured(request.user),
         },
     )
 
@@ -181,8 +181,8 @@ def quote_reminder(request, pk):
     if not preventivo.customer.email:
         messages.error(request, f"Il cliente {preventivo.customer.name} non ha un indirizzo email.")
         return redirect("sales:follow_up")
-    if not emailing.email_configured():
-        messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+    if not emailing.email_configured(request.user):
+        messages.error(request, "Invio email non configurato: imposta la casella in Impostazioni › Email o la tua casella personale.")
         return redirect("sales:follow_up")
 
     giorni = (timezone.localdate() - preventivo.date).days
@@ -216,7 +216,7 @@ def quote_reminder(request, pk):
             descrizione=f"Sollecito {preventivo.number} a {preventivo.customer.email}",
             modello=EmailInCoda.MODELLO_PREVENTIVO,
             oggetto_id=preventivo.pk,
-            from_email=(request.user.email or ""),
+            utente=request.user,
         )
     except Exception as exc:
         messages.error(request, f"Sollecito non accodato: {exc}")
@@ -515,7 +515,7 @@ class QuoteDetailView(RoleRequiredMixin, DetailView):
         context["vat_rows"] = self.object.vat_breakdown()
         context["margine"] = _margine_documento(self.object, context["lines"])
         context["generated_order"] = self.object.generated_order
-        context["email_configured"] = emailing.email_configured()
+        context["email_configured"] = emailing.email_configured(self.request.user)
         context["pdf_available"] = pdf_available()
 
         from apps.core.email_templates import contenuto
@@ -677,8 +677,8 @@ def quote_email(request, pk):
 
         if not to_email:
             messages.error(request, "Indica l'indirizzo email del cliente.")
-        elif not emailing.email_configured():
-            messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        elif not emailing.email_configured(request.user):
+            messages.error(request, "Invio email non configurato: imposta la casella in Impostazioni › Email o la tua casella personale.")
         else:
             try:
                 pdf = emailing.render_quote_pdf(quote)
@@ -691,7 +691,7 @@ def quote_email(request, pk):
                     descrizione=f"Preventivo {quote.number} a {to_email}",
                     modello=EmailInCoda.MODELLO_PREVENTIVO,
                     oggetto_id=quote.pk,
-                    from_email=(request.user.email or ""),
+                    utente=request.user,
                 )
             except Exception as exc:
                 messages.error(request, f"Accodamento non riuscito: {exc}")

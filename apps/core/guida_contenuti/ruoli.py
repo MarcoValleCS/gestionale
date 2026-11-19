@@ -33,7 +33,7 @@ attraverso i DDT e le consegne che registri.</p>
   <li>Apri la <a href="/guida/dashboard/">dashboard</a>: controlla preventivi aperti, ordini da evadere, fatture da incassare e manutenzioni in scadenza.</li>
   <li>Apri <a href="/guida/follow-up/">Da seguire</a>: i preventivi fermi da più giorni vanno sollecitati o chiusi.</li>
   <li>Apri i <a href="/guida/lead/">Lead</a>: i lead nuovi hanno un pallino rosso nel menu.</li>
-  <li>Guarda la <a href="/guida/posta/">Posta</a> per le risposte dei clienti.</li>
+  <li>Controlla la tua casella email per le risposte dei clienti: i documenti che invii partono dal tuo indirizzo (<a href="/guida/invio-email/">come si imposta</a>).</li>
 </ol>
 
 <h3>Il ciclo completo di una vendita</h3>

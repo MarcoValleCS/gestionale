@@ -21,7 +21,7 @@ backup e aggiornamenti.</p>
   <li><a href="/guida/tabelle-base/">Tabelle di base</a>: IVA, unità di misura, etichette, pagamenti.</li>
   <li><a href="/guida/numerazioni/">Numerazioni</a>: prefissi e progressivi dei documenti.</li>
   <li><a href="/guida/utenti-ruoli/">Utenti e ruoli</a>: accessi e permessi.</li>
-  <li><a href="/guida/email-configurazione/">Email</a>: invio, casella in arrivo e modelli.</li>
+  <li><a href="/guida/email-configurazione/">Email</a>: casella di invio predefinita, caselle personali, modelli e note predefinite.</li>
   <li><a href="/guida/copia-sicurezza/">Copia di sicurezza</a>: backup e ripristino.</li>
 </ol>
 
@@ -35,7 +35,8 @@ backup e aggiornamenti.</p>
     <tr><td>Etichette</td><td>Etichette colorate di contatti e articoli</td></tr>
     <tr><td>Condizioni di pagamento</td><td>Rimessa diretta, bonifico 30/60…</td></tr>
     <tr><td>Numerazioni</td><td>Prefissi e numeri dei documenti</td></tr>
-    <tr><td>Email</td><td>Stato SMTP/IMAP, prova di invio, modelli</td></tr>
+    <tr><td>Email</td><td>Email di invio predefinita, caselle personali, prova di invio</td></tr>
+    <tr><td>Note predefinite</td><td>Testo già scritto nelle note di preventivi, ordini e ordini fornitore</td></tr>
     <tr><td>Fasi lead</td><td>Pipeline commerciale</td></tr>
     <tr><td>Registro attività</td><td>Chi ha creato, modificato o cancellato</td></tr>
     <tr><td>Copia di sicurezza</td><td>Backup disponibili da scaricare</td></tr>
@@ -234,7 +235,7 @@ fare.</p>
   <li>Un utente con <strong>solo</strong> il ruolo Collaboratore viene reindirizzato sempre alla sua area.</li>
   <li>Se un collaboratore deve vedere anche altro, aggiungi un secondo ruolo.</li>
   <li>Il superuser (amministratore Django) bypassa i ruoli: usalo solo per la manutenzione.</li>
-  <li>L'email dell'utente diventa il <strong>Reply-To</strong> delle email che invia: il mittente resta la casella aziendale.</li>
+  <li>Con email e <strong>password della casella</strong> compilate, le email dell'utente partono dalla sua casella; senza password partono dalla casella aziendale e la sua email diventa l'indirizzo di risposta.</li>
 </ul>
 
 <div class="guida-avviso">Prima di disattivare un utente, controlla se è
@@ -244,42 +245,46 @@ l'accesso ma non cancella le registrazioni fatte.</div>
     },
     {
         "slug": "email-configurazione",
-        "title": "Email: invio, casella e modelli",
+        "title": "Email: caselle di invio, note e modelli",
         "area": "Impostazioni",
         "roles": SOLO_ADMIN,
         "order": 60,
-        "summary": "Configurare SMTP e IMAP, provare l'invio, personalizzare i testi e capire la coda.",
+        "summary": "Casella di invio predefinita, caselle personali, note predefinite, modelli e coda.",
         "body": """
 <p>Il gestionale invia preventivi, ordini fornitore, fatture e solleciti per
-email, e può leggere la casella aziendale via IMAP. La configurazione sta nel
-file <code>.env</code> del server, non nell'interfaccia.</p>
+email. Le caselle si configurano in <em>Impostazioni → Email</em>; il file
+<code>.env</code> del server resta come riserva.</p>
 
-<h3>Invio (SMTP)</h3>
-<pre>EMAIL_HOST=smtp.tuoprovider.it
-EMAIL_PORT=587
-EMAIL_HOST_USER=info@tuodominio.it
-EMAIL_HOST_PASSWORD=la-password
-EMAIL_USE_TLS=true
-DEFAULT_FROM_EMAIL=Nome Azienda &lt;info@tuodominio.it&gt;</pre>
-<p>Per la fatturazione elettronica servono le credenziali della casella
+<h3>Email di invio predefinita</h3>
+<p>È la casella aziendale: da qui partono le email di chi non ha una casella
+personale, gli avvisi automatici e la trasmissione allo SDI. Compila:</p>
+<ul>
+  <li><strong>Nome del mittente</strong> (es. «Aquaforma») ed <strong>email di invio</strong>;</li>
+  <li><strong>password della casella</strong>: viene salvata cifrata e non si rilegge più;</li>
+  <li>il <strong>server di posta</strong> solo se non è Aruba (<code>smtps.aruba.it</code>, SSL, porta 465).</li>
+</ul>
+<p>Se lasci vuota l'email di invio valgono le variabili <code>EMAIL_*</code>
+del file <code>.env</code>. Per la fatturazione elettronica serve la casella
 <strong>PEC</strong>: l'XML viene trasmesso allo SDI via PEC.</p>
-<p>Dopo la modifica riavvia il servizio: <code>docker compose up -d</code> in
-produzione, oppure riavvia <code>runserver</code> in locale.</p>
 
-<h3>Casella in arrivo (IMAP)</h3>
-<pre>IMAP_HOST=imaps.aruba.it
-IMAP_PORT=993
-IMAP_USER=info@tuodominio.it
-IMAP_PASSWORD=la-password
-IMAP_FOLDER=INBOX</pre>
-<p>Se non indichi utente e password IMAP, il gestionale usa le stesse
-credenziali dell'invio. La casella può essere scaricata periodicamente da un
-comando schedulato sul server; il pulsante <strong>Scarica nuove email</strong>
-forza comunque il controllo.</p>
+<h3>Caselle personali</h3>
+<p>Ogni dipendente può spedire dalla propria casella (es.
+<code>katia@aquaforma.it</code>): la imposta da <strong>Password ed email</strong>
+nel menu utente, oppure la imposti tu dalla scheda dell'utente (campo
+<strong>Password della casella email</strong>). La pagina Email elenca chi usa
+la casella personale e chi quella aziendale. Il server è lo stesso della
+casella aziendale.</p>
+<p>Ogni email spedita viene copiata nella cartella Inviati della casella usata
+(server IMAP <code>IMAP_HOST</code>, di norma <code>imaps.aruba.it</code>).</p>
+
+<h3>Note predefinite</h3>
+<p>In <em>Impostazioni → Note predefinite</em> scegli il testo già scritto in
+«Note e condizioni» dei nuovi preventivi e ordini cliente, e nelle note dei
+nuovi ordini fornitore. I documenti già creati non cambiano.</p>
 
 <h3>Prova di invio</h3>
-<p>In <em>Impostazioni → Email</em> vedi host, porta, utente e mittente
-configurati. Scrivi un indirizzo e premi <strong>Invia prova</strong>: se
+<p>In <em>Impostazioni → Email</em> vedi server, utente e mittente della
+casella aziendale. Scrivi un indirizzo e premi <strong>Invia prova</strong>: se
 arriva, la configurazione funziona. Se non arriva, controlla spam, credenziali
 e porta/TLS.</p>
 
@@ -300,13 +305,17 @@ e porta/TLS.</p>
 
 <h3>La coda</h3>
 <p>Le email non partono durante il clic: vengono messe in coda e spedite da un
-comando in background, di norma ogni pochi minuti. Così un server di posta
+comando in background, di norma ogni pochi minuti. Se la casella personale
+rifiuta la password, l'email parte comunque dalla casella aziendale e sulla voce
+della coda resta l'avviso. Così un server di posta
 lento non blocca la pagina. Se la coda si blocca, controlla che il comando
 <code>invia_coda_email</code> sia schedulato e leggi i suoi log.</p>
 
 <div class="guida-avviso">Non mettere la password SMTP o PEC in un documento,
 in un messaggio o nella guida. Se sospetti che sia stata esposta, cambiala e
-aggiorna il <code>.env</code>.</div>
+aggiornala in <em>Impostazioni → Email</em> (o nel <code>.env</code>). Le password
+salvate sono cifrate con la chiave <code>DJANGO_SECRET_KEY</code>: se la chiave
+cambia, vanno reinserite.</div>
 """,
     },
     {

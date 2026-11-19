@@ -14,6 +14,7 @@ urlpatterns = [
     ),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("password/", views.CustomPasswordChangeView.as_view(), name="password_change"),
+    path("casella-email/", views.casella_email, name="casella_email"),
     path("utenti/", views.UserListView.as_view(), name="user_list"),
     path("utenti/nuovo/", views.UserCreateView.as_view(), name="user_create"),
     path("utenti/<int:pk>/", views.UserUpdateView.as_view(), name="user_update"),

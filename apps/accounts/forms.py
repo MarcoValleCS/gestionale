@@ -14,24 +14,73 @@ class LoginForm(BootstrapFormMixin, AuthenticationForm):
 
 
 class StyledPasswordChangeForm(BootstrapFormMixin, PasswordChangeForm):
-    email = forms.EmailField(
-        label="La tua email",
-        required=False,
-        help_text="Mittente delle email che invii dal gestionale. Se vuota si usa quella aziendale.",
-    )
-    field_order = ["email", "old_password", "new_password1", "new_password2"]
+    pass
+
+
+class CampiCasellaMixin:
+    """Password della casella email personale: si scrive, non si rilegge.
+
+    Lasciata vuota resta quella salvata; «Cancella» la toglie e l'utente torna
+    a spedire dalla casella aziendale.
+    """
+
+    def aggiungi_campi_casella(self):
+        self.fields["password_casella"] = forms.CharField(
+            label="Password della casella email",
+            required=False,
+            strip=False,
+            widget=forms.PasswordInput(
+                render_value=False, attrs={"autocomplete": "new-password", "class": "form-control"}
+            ),
+            help_text=(
+                "La password della casella (es. quella di Aruba): serve a spedire dal gestionale con questa email. "
+                "Lascia vuoto per tenere quella salvata. Viene salvata cifrata."
+            ),
+        )
+        self.fields["rimuovi_password_casella"] = forms.BooleanField(
+            label="Cancella la password salvata (le email partiranno dalla casella aziendale)",
+            required=False,
+            widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        )
+
+    def controlla_casella(self, cleaned):
+        if cleaned.get("password_casella") and not (cleaned.get("email") or "").strip():
+            self.add_error("email", "Indica l'email della casella a cui appartiene la password.")
+        return cleaned
+
+    def applica_casella(self, utente):
+        if self.cleaned_data.get("rimuovi_password_casella"):
+            utente.imposta_password_casella("")
+        if self.cleaned_data.get("password_casella"):
+            utente.imposta_password_casella(self.cleaned_data["password_casella"])
+        return utente
+
+
+class CasellaPersonaleForm(CampiCasellaMixin, BootstrapFormMixin, forms.ModelForm):
+    """La propria casella email: le email inviate dal gestionale partono da qui."""
+
+    class Meta:
+        model = User
+        fields = ["email"]
+        labels = {"email": "La tua email"}
+        help_texts = {"email": "Es. simone@aquaforma.it. Con la password qui sotto le tue email partono da questa casella."}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.user is not None:
-            self.fields["email"].initial = self.user.email
+        self.aggiungi_campi_casella()
+        if not self.instance.password_email:
+            del self.fields["rimuovi_password_casella"]
+
+    def clean(self):
+        return self.controlla_casella(super().clean())
 
     def save(self, commit=True):
-        user = super().save(commit=False)
-        user.email = (self.cleaned_data.get("email") or "").strip()
+        utente = self.applica_casella(super().save(commit=False))
+        if not (utente.email or "").strip():
+            utente.imposta_password_casella("")
         if commit:
-            user.save(update_fields=["email", "password"])
-        return user
+            utente.save(update_fields=["email", "password_email"])
+        return utente
 
 
 def _valida_password(form, campo, password):
@@ -49,7 +98,7 @@ def _valida_password(form, campo, password):
         form.add_error(campo, errore)
 
 
-class UserForm(BootstrapFormMixin, forms.ModelForm):
+class UserForm(CampiCasellaMixin, BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = User
         fields = ["username", "first_name", "last_name", "email", "phone", "groups", "is_active"]
@@ -67,6 +116,13 @@ class UserForm(BootstrapFormMixin, forms.ModelForm):
         self.fields["groups"].help_text = "I ruoli determinano le funzioni accessibili a questo utente."
         self.fields["groups"].required = True
         self.fields["is_active"].initial = True
+        self.fields["email"].help_text = "Con la password della casella qui sotto, le email di questo utente partono dalla sua casella."
+        self.aggiungi_campi_casella()
+        if not self.instance.password_email:
+            del self.fields["rimuovi_password_casella"]
+
+    def clean(self):
+        return self.controlla_casella(super().clean())
 
 
 class UserCreateForm(UserForm):
@@ -84,6 +140,7 @@ class UserCreateForm(UserForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password1"])
+        self.applica_casella(user)
         if commit:
             user.save()
             self.save_m2m()
@@ -110,6 +167,7 @@ class UserUpdateForm(UserForm):
         password = self.cleaned_data.get("new_password")
         if password:
             user.set_password(password)
+        self.applica_casella(user)
         if commit:
             user.save()
             self.save_m2m()

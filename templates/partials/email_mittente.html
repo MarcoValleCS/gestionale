@@ -1,0 +1,17 @@
+{% load core_extras %}
+{% comment %} Nelle schede di invio: avviso se l'invio non è configurato, altrimenti
+   da quale casella partirà l'email (personale o aziendale). {% endcomment %}
+{% if not email_configured %}
+<div class="alert alert-warning py-2 small mb-3">
+  <i class="bi bi-exclamation-triangle"></i> Invio email non configurato: serve la casella di invio in
+  {% if roles.is_admin %}<a href="{% url 'core:email_settings' %}">Impostazioni › Email</a>{% else %}Impostazioni › Email (amministratore){% endif %}
+  oppure la tua casella personale in <a href="{% url 'accounts:password_change' %}">Password ed email</a>.
+</div>
+{% else %}
+{% with chi=user|mittente_email %}
+<div class="small text-muted mb-2">
+  <i class="bi bi-person-check"></i> Parte da <strong>{{ chi.indirizzo }}</strong>
+  {% if chi.personale %}(la tua casella){% else %}(casella aziendale){% if chi.risposte %}: le risposte arrivano a {{ chi.risposte }}{% endif %}{% endif %}.
+</div>
+{% endwith %}
+{% endif %}

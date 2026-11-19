@@ -89,8 +89,9 @@ documenti.
 
 Lead con bacheca per fasi della trattativa, valore stimato, prossima azione e
 import dal modulo contatti del sito. Galleria fotografica con etichette e
-collegamento al cantiere. Posta aziendale via IMAP, messaggi interni, guida
-per ruolo con diagrammi dei processi, modificabile dall'interno.
+collegamento al cantiere. Invio dei documenti dalla casella personale di ogni
+dipendente (o da quella aziendale), messaggi interni, guida per ruolo con
+diagrammi dei processi, modificabile dall'interno.
 
 Dashboard con fatturato, margine e marginalità del periodo, dettaglio per
 articolo, fornitore, cliente e cantiere, valore del magazzino e prossime
@@ -378,7 +379,7 @@ config/                 impostazioni Django (settings, urls)
 apps/
   accounts/             utenti e ruoli
   core/                 IVA, unità di misura, etichette, pagamenti, numerazioni, dashboard,
-                        posta IMAP, messaggi interni, guida, registro attività, backup
+                        invio email, messaggi interni, guida, registro attività, backup
   contacts/             clienti e fornitori
   catalog/              articoli, categorie, import CSV/Excel
   inventory/            giacenze e movimenti di magazzino

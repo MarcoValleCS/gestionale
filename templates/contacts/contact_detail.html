@@ -29,6 +29,8 @@
       <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-check-circle"></i> Riattiva</button>
       {% endif %}
     </form>
+    {% url 'contacts:delete' contact.pk as url_elimina %}
+    {% include "partials/elimina_button.html" with url=url_elimina etichetta=contact.name collegamenti=collegamenti %}
     {% endif %}
   </div>
 </div>

@@ -150,3 +150,29 @@ def lookup(mappa, chiave):
         return (mappa or {}).get(chiave, "")
     except Exception:
         return ""
+
+
+@register.filter
+def mittente_email(utente):
+    """Da quale casella partono le email di questo utente (per le schede di invio)."""
+    from email.utils import parseaddr
+
+    from ..mailing import mittente_per
+
+    try:
+        mittente = mittente_per(utente)
+    except Exception:
+        return {"indirizzo": "", "personale": False, "risposte": ""}
+    return {
+        "indirizzo": parseaddr(mittente.from_email)[1] or mittente.from_email,
+        "personale": mittente.personale,
+        "risposte": mittente.reply_to,
+    }
+
+
+@register.filter
+def collegamenti_testo(elenco):
+    """«2 preventivi, 1 ordine fornitore»: cosa impedisce di eliminare un oggetto."""
+    from ..eliminazione import descrivi_collegamenti
+
+    return descrivi_collegamenti(elenco or [])

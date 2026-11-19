@@ -116,7 +116,7 @@ def scadenzario(request):
             "totale_scaduto_pagamento": totali_pagamento["scadute"],
             "solo_scadute": solo_scadute,
             "oggi": oggi,
-            "email_configurata": emailing.email_configured(),
+            "email_configurata": emailing.email_configured(request.user),
         },
     )
 
@@ -133,8 +133,8 @@ def salesinvoice_reminder(request, pk):
     if not invoice.customer.email:
         messages.error(request, f"Il cliente {invoice.customer.name} non ha un indirizzo email.")
         return redirect("billing:scadenzario")
-    if not emailing.email_configured():
-        messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+    if not emailing.email_configured(request.user):
+        messages.error(request, "Invio email non configurato: imposta la casella in Impostazioni › Email o la tua casella personale.")
         return redirect("billing:scadenzario")
 
     oggetto = f"Sollecito fattura {invoice.number}"
@@ -166,7 +166,7 @@ def salesinvoice_reminder(request, pk):
             descrizione=f"Sollecito {invoice.number} a {invoice.customer.email}",
             modello=EmailInCoda.MODELLO_FATTURA,
             oggetto_id=invoice.pk,
-            from_email=(request.user.email or ""),
+            utente=request.user,
         )
     except Exception as exc:
         messages.error(request, f"Sollecito non accodato: {exc}")
@@ -456,7 +456,7 @@ class SalesInvoiceDetailView(RoleRequiredMixin, DetailView):
         context["vat_rows"] = self.object.vat_breakdown()
         from django.conf import settings as django_settings
 
-        context["email_configured"] = emailing.email_configured()
+        context["email_configured"] = emailing.email_configured(self.request.user)
         context["pdf_available"] = pdf.pdf_available()
         context["sdi_statuses"] = SalesInvoice.SDI_STATUS_CHOICES
         context["sdi_pec_address"] = django_settings.SDI_PEC_ADDRESS
@@ -686,8 +686,8 @@ def salesinvoice_email(request, pk):
 
         if not to_email:
             messages.error(request, "Indica l'indirizzo email del cliente.")
-        elif not emailing.email_configured():
-            messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        elif not emailing.email_configured(request.user):
+            messages.error(request, "Invio email non configurato: imposta la casella in Impostazioni › Email o la tua casella personale.")
         elif invoice.status == SalesInvoice.STATUS_DRAFT:
             messages.error(request, "Emetti prima la fattura, poi inviala al cliente.")
         else:
@@ -702,7 +702,7 @@ def salesinvoice_email(request, pk):
                     descrizione=f"Fattura {invoice.number} a {to_email}",
                     modello=EmailInCoda.MODELLO_FATTURA,
                     oggetto_id=invoice.pk,
-                    from_email=(request.user.email or ""),
+                    utente=request.user,
                 )
             except Exception as exc:
                 messages.error(request, f"Accodamento non riuscito: {exc}")

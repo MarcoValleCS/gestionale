@@ -18,9 +18,10 @@ class CoreConfig(AppConfig):
         from apps.billing.models import DeliveryNote, PurchaseInvoice, SalesInvoice
         from apps.catalog.models import Product
         from apps.contacts.models import Contact
+        from apps.jobs.models import Job
         from apps.purchasing.models import PurchaseOrder
         from apps.sales.models import Quote, SalesOrder
 
         activity.sorveglia(
-            Quote, SalesOrder, PurchaseOrder, DeliveryNote, SalesInvoice, PurchaseInvoice, Product, Contact
+            Quote, SalesOrder, PurchaseOrder, DeliveryNote, SalesInvoice, PurchaseInvoice, Product, Contact, Job
         )

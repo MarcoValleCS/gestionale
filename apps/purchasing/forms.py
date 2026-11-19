@@ -85,6 +85,11 @@ class PurchaseOrderForm(PurchaseSupplierFormMixin, BaseBootstrapModelForm):
         self.fields["job"].label_from_instance = lambda obj: f"{obj.code} – {obj.name} ({obj.customer.name})"
         self.fields["job"].required = False
         self.fields["job"].help_text = "Facoltativo: collega l'ordine al cantiere/commessa."
+        if not self.instance.pk:
+            from apps.core.models import CompanySettings
+
+            # Note predefinite: si cambiano in Impostazioni › Note predefinite
+            self.fields["notes"].initial = CompanySettings.load().note_acquisto
 
 
 class PurchaseOrderLineForm(LineFormMixin, BaseBootstrapModelForm):

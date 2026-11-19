@@ -19,6 +19,8 @@
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'jobs:job_update' job.pk %}"><i class="bi bi-pencil"></i> Modifica</a>
     <a class="btn btn-outline-primary btn-sm" href="{% url 'sales:quote_create' %}"><i class="bi bi-file-earmark-plus"></i> Nuovo preventivo</a>
     <a class="btn btn-outline-primary btn-sm" href="{% url 'jobs:maintenance_create' %}?cliente={{ job.customer.pk }}&cantiere={{ job.pk }}"><i class="bi bi-calendar-plus"></i> Manutenzione</a>
+    {% url 'jobs:job_delete' job.pk as url_elimina %}
+    {% include "partials/elimina_button.html" with url=url_elimina etichetta=job collegamenti=collegamenti %}
     {% endif %}
   </div>
 </div>

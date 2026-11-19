@@ -14,6 +14,7 @@ urlpatterns = [
     path("categorie/<int:pk>/", views.CategoryUpdateView.as_view(), name="category_update"),
     path("<int:pk>/", views.ProductDetailView.as_view(), name="product_detail"),
     path("<int:pk>/modifica/", views.ProductUpdateView.as_view(), name="product_update"),
+    path("<int:pk>/elimina/", views.product_delete, name="product_delete"),
     path("<int:pk>/default/", views.product_defaults, name="product_defaults"),
     path("<int:pk>/varianti/", views.product_variants_create, name="product_variants_create"),
     path("<int:pk>/componenti/aggiungi/", views.product_component_add, name="product_component_add"),

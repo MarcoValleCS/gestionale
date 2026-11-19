@@ -7,10 +7,10 @@ from .models import Attachment, CompanySettings, EmailInCoda, NumberSequence, Pa
 class EmailInCodaAdmin(admin.ModelAdmin):
     """Coda email in background: qui si vedono gli invii falliti."""
 
-    list_display = ("descrizione", "to_email", "stato", "tentativi", "created_at", "sent_at")
+    list_display = ("descrizione", "to_email", "inviata_da", "stato", "tentativi", "created_at", "sent_at")
     list_filter = ("stato",)
     search_fields = ("to_email", "subject", "descrizione")
-    readonly_fields = ("stato", "tentativi", "ultimo_errore", "created_at", "sent_at")
+    readonly_fields = ("stato", "tentativi", "ultimo_errore", "inviata_da", "created_at", "sent_at")
     list_per_page = 50
 
 

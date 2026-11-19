@@ -177,6 +177,74 @@ class CompanySettingsForm(BaseBootstrapModelForm):
         self.fields["sales_terms"].widget.attrs["rows"] = 12
 
 
+class NotePredefiniteForm(BaseBootstrapModelForm):
+    """Testo proposto nelle note dei nuovi documenti."""
+
+    class Meta:
+        model = CompanySettings
+        fields = ["note_vendita", "note_acquisto"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["note_acquisto"].widget.attrs["rows"] = 5
+
+    def clean_note_vendita(self):
+        from .richtext import clean_notes
+
+        return clean_notes(self.cleaned_data.get("note_vendita"))
+
+
+class EmailInvioForm(BaseBootstrapModelForm):
+    """Casella da cui partono le email di chi non ha una casella personale."""
+
+    password = forms.CharField(
+        label="Password della casella",
+        required=False,
+        strip=False,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password"}),
+        help_text="Lascia vuoto per tenere quella già salvata. Viene salvata cifrata.",
+    )
+    rimuovi_password = forms.BooleanField(label="Cancella la password salvata", required=False)
+
+    class Meta:
+        model = CompanySettings
+        fields = [
+            "mittente_nome",
+            "mittente_email",
+            "smtp_host",
+            "smtp_porta",
+            "smtp_sicurezza",
+            "smtp_utente",
+            "caselle_host",
+            "caselle_sicurezza",
+        ]
+
+    def clean(self):
+        from django.conf import settings
+
+        cleaned = super().clean()
+        email = (cleaned.get("mittente_email") or "").strip()
+        if not email:
+            return cleaned
+        utente = (cleaned.get("smtp_utente") or email).strip().lower()
+        nuova = cleaned.get("password") or ""
+        salvata = "" if cleaned.get("rimuovi_password") else self.instance.password_smtp
+        da_env = utente == (settings.EMAIL_HOST_USER or "").strip().lower() and settings.EMAIL_HOST_PASSWORD
+        if not (nuova or salvata or da_env):
+            self.add_error("password", "Inserisci la password della casella: senza, il server rifiuta l'invio.")
+        return cleaned
+
+    def save(self, commit=True):
+        azienda = super().save(commit=False)
+        if self.cleaned_data.get("rimuovi_password"):
+            azienda.imposta_password_smtp("")
+        if self.cleaned_data.get("password"):
+            azienda.imposta_password_smtp(self.cleaned_data["password"])
+        if commit:
+            azienda.save()
+        return azienda
+
+
 class WikiPageForm(BaseBootstrapModelForm):
     """Modifica di una pagina della guida."""
 

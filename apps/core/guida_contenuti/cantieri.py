@@ -66,6 +66,13 @@ nato da un ordine o da un preventivo, il cantiere si eredita.</p>
   <li><strong>Personale</strong>: vede il cantiere e registra ore; non vede prezzi e fatture.</li>
 </ul>
 
+<h3>Eliminare un cantiere</h3>
+<p>Un cantiere creato per sbaglio si elimina con <strong>Elimina</strong> nella
+sua scheda, ma solo se non ha <strong>niente di collegato</strong>: preventivi,
+ordini, DDT, fatture, ore, rapportini, foto, manutenzioni o lead. Se qualcosa è
+collegato il pulsante resta grigio e dice cosa: un lavoro che non si fa più va
+impostato come <strong>Annullato</strong>.</p>
+
 <div class="guida-avviso">Un documento senza cantiere non entra nelle statistiche
 per cantiere. Se il lavoro è importante, collega sempre i documenti al cantiere
 già dal preventivo.</div>

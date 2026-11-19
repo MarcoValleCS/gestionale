@@ -1,0 +1,14 @@
+{% load core_extras %}
+{% comment %} Pulsante «Elimina» delle anagrafiche (cantieri, contatti, articoli).
+   Parametri: url (azione POST), etichetta (nome per la conferma), collegamenti
+   (elenco di ciò che lo usa: se non è vuoto il pulsante resta spento). {% endcomment %}
+{% if collegamenti %}
+<span class="d-inline-block" tabindex="0" title="Non si può eliminare: è collegato a {{ collegamenti|collegamenti_testo }}.">
+  <button class="btn btn-outline-danger btn-sm" type="button" disabled><i class="bi bi-trash"></i> Elimina</button>
+</span>
+{% else %}
+<form method="post" action="{{ url }}" onsubmit="return confirm('Eliminare definitivamente «{{ etichetta|escapejs }}»? L'operazione non si può annullare.');">
+  {% csrf_token %}
+  <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+</form>
+{% endif %}

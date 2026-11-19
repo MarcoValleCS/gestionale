@@ -332,7 +332,7 @@ class PurchaseOrderDetailView(RoleRequiredMixin, DetailView):
             "azienda": CompanySettings.load().name,
         }
         context["email_subject"], context["email_body"] = contenuto(EmailTemplate.KIND_PURCHASE_ORDER, contesto)
-        context["email_configured"] = email_configured()
+        context["email_configured"] = email_configured(self.request.user)
         return context
 
 
@@ -462,8 +462,8 @@ def po_email(request, pk):
 
         if not to_email:
             messages.error(request, "Indica l'indirizzo email del fornitore.")
-        elif not email_configured():
-            messages.error(request, "Invio email non configurato: imposta le variabili EMAIL_* nel file .env.")
+        elif not email_configured(request.user):
+            messages.error(request, "Invio email non configurato: imposta la casella in Impostazioni › Email o la tua casella personale.")
         else:
             try:
                 pdf = render_po_pdf(order)
@@ -476,7 +476,7 @@ def po_email(request, pk):
                     descrizione=f"Ordine fornitore {order.number} a {to_email}",
                     modello=EmailInCoda.MODELLO_ORDINE_FORNITORE,
                     oggetto_id=order.pk,
-                    from_email=(request.user.email or ""),
+                    utente=request.user,
                 )
             except Exception as exc:
                 messages.error(request, f"Accodamento non riuscito: {exc}")

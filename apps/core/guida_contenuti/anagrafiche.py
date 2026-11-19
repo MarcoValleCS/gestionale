@@ -55,9 +55,15 @@ automaticamente nel documento.</p>
 non compare più nelle tendine dei nuovi documenti. Puoi riattivarlo in qualsiasi
 momento.</p>
 
-<div class="guida-avviso">Non cancellare un contatto che ha documenti: la
-disattivazione è la scelta giusta per conservare lo storico. La cancellazione
-non è prevista dall'interfaccia.</div>
+<h3>Eliminare un contatto</h3>
+<p>Un contatto creato per sbaglio o doppio si elimina con <strong>Elimina</strong>
+nella sua scheda, ma solo se <strong>nulla lo usa</strong>: preventivi, ordini,
+DDT, fatture, cantieri, manutenzioni, listini, lead o articoli di cui è il
+fornitore. Se qualcosa è collegato, il pulsante resta grigio e, passandoci sopra,
+dice cosa c'è di collegato.</p>
+
+<div class="guida-avviso">Un contatto con documenti non si elimina: la
+disattivazione è la scelta giusta per conservare lo storico.</div>
 """,
     },
     {
@@ -142,6 +148,11 @@ dettagliate sono in <a href="/guida/varianti-kit/">Varianti e kit</a>.</p>
 <p>Da <strong>Articoli → Importa</strong> si carica un file CSV o Excel. La
 procedura, le colonne riconosciute e gli errori comuni sono in
 <a href="/guida/importa-articoli/">Importare articoli</a>.</p>
+
+<h3>Eliminare un articolo</h3>
+<p>Un articolo mai usato si elimina con <strong>Elimina</strong> nella sua
+scheda. Se compare in un documento, in un listino, in un kit, ha varianti,
+movimenti o giacenza, il pulsante resta grigio: in quel caso disattivalo.</p>
 
 <div class="guida-avviso">Gli articoli non gestiti a magazzino (servizi,
 trasporti, manodopera) non hanno giacenza e non vengono scaricati dai

@@ -27,4 +27,8 @@ ORDINE_AREE = [
     "Impostazioni",
 ]
 
-__all__ = ["PAGINE", "ORDINE_AREE"]
+# Pagine tolte dal programma: ``carica_guida`` le cancella (o, se modificate a
+# mano, le nasconde), così non restano istruzioni su funzioni che non esistono.
+PAGINE_RITIRATE = ("posta",)
+
+__all__ = ["PAGINE", "ORDINE_AREE", "PAGINE_RITIRATE"]

@@ -11,7 +11,6 @@ from xml.etree import ElementTree as ET
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.core.mail import EmailMessage
 from django.db import transaction
 from django.utils import timezone
 
@@ -229,7 +228,7 @@ def accoda_invoice_sdi(invoice):
 
     if not email_configured():
         raise ValidationError(
-            "Configura prima l'invio email/PEC (variabili EMAIL_* nel file .env) per trasmettere allo SDI."
+            "Configura prima la casella di invio/PEC (Impostazioni › Email) per trasmettere allo SDI."
         )
     if invoice.status == SalesInvoice.STATUS_DRAFT:
         raise ValidationError("Emetti prima la fattura, poi trasmettila allo SDI.")
@@ -261,7 +260,7 @@ def send_invoice_sdi(invoice):
 
     if not email_configured():
         raise ValidationError(
-            "Configura prima l'invio email/PEC (variabili EMAIL_* nel file .env) per trasmettere allo SDI."
+            "Configura prima la casella di invio/PEC (Impostazioni › Email) per trasmettere allo SDI."
         )
     if invoice.status == SalesInvoice.STATUS_DRAFT:
         raise ValidationError("Emetti prima la fattura, poi trasmettila allo SDI.")
@@ -271,16 +270,20 @@ def send_invoice_sdi(invoice):
     customer = invoice.customer
     destination = (customer.sdi_code or customer.pec or "").strip()
     subject = f"Fattura {destination} {invoice.number}"
-    email = EmailMessage(
-        subject=subject,
-        body=f"Invio della fattura {invoice.number} al Sistema di Interscambio.",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[settings.SDI_PEC_ADDRESS],
-    )
+    from apps.core.mailing import invia_subito
+
     with invoice.xml_file.open("rb") as handle:
         filename = invoice.xml_file.name.rsplit("/", 1)[-1]
-        email.attach(filename, handle.read(), "application/xml")
-    email.send(fail_silently=False)
+        xml_bytes = handle.read()
+    # Sempre dalla casella aziendale (la PEC), mai da quella personale
+    invia_subito(
+        to_email=settings.SDI_PEC_ADDRESS,
+        subject=subject,
+        message=f"Invio della fattura {invoice.number} al Sistema di Interscambio.",
+        attachment=xml_bytes,
+        attachment_name=filename,
+        attachment_type="application/xml",
+    )
 
     invoice.sdi_status = SalesInvoice.SDI_SENT
     invoice.sdi_sent_at = timezone.now()

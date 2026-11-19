@@ -7,7 +7,6 @@ Uso:
     python manage.py avviso "Il backup notturno è fallito" --oggetto "Backup fallito"
 """
 from django.conf import settings
-from django.core.mail import send_mail
 from django.core.management.base import BaseCommand
 
 
@@ -23,9 +22,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from pathlib import Path
 
-        from django.core.mail import EmailMessage
-
-        from apps.core.mailing import email_configured
+        from apps.core.mailing import email_configured, invia_subito
         from apps.core.models import CompanySettings
 
         destinatario = options["destinatario"] or settings.AVVISO_EMAIL
@@ -39,20 +36,22 @@ class Command(BaseCommand):
             self.stderr.write("Invio email non configurato: avviso non inviato.")
             return
 
-        email = EmailMessage(
-            subject=options["oggetto"],
-            body=options["messaggio"],
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[destinatario],
-        )
-
         allegato = options["allega"]
+        contenuto = None
         if allegato:
             percorso = Path(allegato)
             if not percorso.is_file():
                 self.stderr.write(f"Allegato non trovato: {allegato}. Avviso non inviato.")
                 return
-            email.attach(percorso.name, percorso.read_bytes(), "application/gzip")
+            contenuto = percorso.read_bytes()
 
-        email.send(fail_silently=False)
+        # Dalla casella aziendale (Impostazioni › Email o file .env)
+        invia_subito(
+            to_email=destinatario,
+            subject=options["oggetto"],
+            message=options["messaggio"],
+            attachment=contenuto,
+            attachment_name=Path(allegato).name if allegato else "",
+            attachment_type="application/gzip",
+        )
         self.stdout.write(f"Avviso inviato a {destinatario}." + (f" Con allegato {Path(allegato).name}." if allegato else ""))

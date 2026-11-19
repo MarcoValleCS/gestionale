@@ -67,6 +67,13 @@ class ContactDetailView(DetailView):
         context["orders"] = contact.sales_orders.select_related("customer").order_by("-date", "-id")[:30]
         context["purchase_orders"] = contact.purchase_orders.select_related("supplier").order_by("-date", "-id")[:30]
         context["price_lists"] = contact.price_lists.order_by("-valid_from")[:20] if contact.is_supplier else []
+        from apps.accounts.permissions import has_role
+
+        if has_role(self.request.user, *EDIT_ROLES):
+            from apps.core.eliminazione import collegamenti
+
+            # Il pulsante «Elimina» è attivo solo se nulla usa il contatto
+            context["collegamenti"] = collegamenti(contact)
         return context
 
 
@@ -121,6 +128,27 @@ def contact_toggle_active(request, pk):
     else:
         messages.warning(request, f"«{contact.name}» disattivato.")
     return redirect("contacts:detail", pk=contact.pk)
+
+
+@role_required(*EDIT_ROLES)
+def contact_delete(request, pk):
+    """Elimina un contatto solo se non ha documenti, cantieri, listini o altro collegato."""
+    from apps.core.eliminazione import descrivi_collegamenti, elimina_se_libero
+
+    contact = get_object_or_404(Contact, pk=pk)
+    if request.method != "POST":
+        return redirect("contacts:detail", pk=contact.pk)
+    nome = contact.name
+    bloccanti = elimina_se_libero(contact)
+    if bloccanti:
+        messages.error(
+            request,
+            f"«{nome}» non si può eliminare: è collegato a {descrivi_collegamenti(bloccanti)}. "
+            "Se non serve più, disattivalo.",
+        )
+        return redirect("contacts:detail", pk=contact.pk)
+    messages.success(request, f"Contatto «{nome}» eliminato.")
+    return redirect("contacts:list")
 
 
 @role_required(*EDIT_ROLES)

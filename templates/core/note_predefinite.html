@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Note predefinite{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-9">
+    <form method="post" novalidate class="card">
+      {% csrf_token %}
+      <div class="card-header"><i class="bi bi-card-text me-1"></i> Note predefinite dei documenti</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Il testo che trovi già scritto quando crei un nuovo documento. Puoi sempre cambiarlo sul singolo
+          documento: questa pagina modifica solo il testo proposto ai <strong>nuovi</strong> documenti,
+          quelli già creati restano come sono.
+        </p>
+        {% for error in form.non_field_errors %}<div class="alert alert-danger py-2">{{ error }}</div>{% endfor %}
+        {% include "partials/rich_notes.html" with field=form.note_vendita %}
+        <div class="row">
+          {% include "partials/field.html" with field=form.note_acquisto %}
+        </div>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+        <a class="btn btn-outline-secondary" href="{% url 'core:settings' %}">Annulla</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/rich_notes.js' %}"></script>
+{% endblock %}

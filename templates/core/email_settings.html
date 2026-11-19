@@ -7,27 +7,65 @@
     <div class="card mb-3">
       <div class="card-header"><i class="bi bi-envelope-check me-1"></i> Stato dell'invio email</div>
       <div class="card-body">
-        {% if configurato %}
+        {% if configurazione.configurata %}
         <div class="alert alert-success py-2 mb-3">
           <i class="bi bi-check-circle me-1"></i> L'invio è configurato: preventivi, fatture e solleciti possono partire.
         </div>
         {% else %}
         <div class="alert alert-warning py-2 mb-3">
           <i class="bi bi-exclamation-triangle me-1"></i>
-          <strong>L'invio non è configurato.</strong>
-          Finché le variabili <code>EMAIL_*</code> nel file <code>.env</code> restano vuote non partono
-          preventivi, fatture, solleciti né la trasmissione allo SDI.
+          <strong>L'invio dalla casella aziendale non è configurato.</strong>
+          Indica qui sotto l'email di invio predefinita con la sua password (oppure le variabili
+          <code>EMAIL_*</code> nel file <code>.env</code>). Chi ha una casella personale può spedire comunque.
         </div>
         {% endif %}
 
         <dl class="row mb-0 small">
-          <dt class="col-sm-4 text-muted">Sistema di invio</dt><dd class="col-sm-8">{{ backend }}</dd>
-          <dt class="col-sm-4 text-muted">Server SMTP</dt><dd class="col-sm-8">{{ host }}</dd>
-          <dt class="col-sm-4 text-muted">Porta</dt><dd class="col-sm-8">{{ port }}{% if tls %} · TLS attivo{% endif %}</dd>
-          <dt class="col-sm-4 text-muted">Utente</dt><dd class="col-sm-8">{{ utente }}</dd>
-          <dt class="col-sm-4 text-muted">Mittente</dt><dd class="col-sm-8">{{ mittente }}</dd>
+          <dt class="col-sm-4 text-muted">Mittente predefinito</dt><dd class="col-sm-8">{{ configurazione.mittente|default:"—" }}</dd>
+          <dt class="col-sm-4 text-muted">Server SMTP</dt><dd class="col-sm-8">{{ configurazione.host }}:{{ configurazione.porta }} · {{ configurazione.sicurezza|upper }}</dd>
+          <dt class="col-sm-4 text-muted">Utente</dt><dd class="col-sm-8">{{ configurazione.utente|default:"—" }}</dd>
+          <dt class="col-sm-4 text-muted">Configurata in</dt>
+          <dd class="col-sm-8">{% if configurazione.da_impostazioni %}questa pagina{% else %}file <code>.env</code> del server{% endif %}</dd>
           <dt class="col-sm-4 text-muted">PEC per lo SDI</dt><dd class="col-sm-8">{{ pec_sdi }}</dd>
         </dl>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-envelope-at me-1"></i> Email di invio predefinita</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          È la casella da cui partono le email di chi <strong>non</strong> ha una casella personale, gli avvisi
+          automatici e la trasmissione allo SDI. Lascia vuota l'email per usare quella del file <code>.env</code>.
+        </p>
+        <form method="post" novalidate autocomplete="off">
+          {% csrf_token %}
+          <input type="hidden" name="azione" value="salva">
+          {% for error in form.non_field_errors %}<div class="alert alert-danger py-2">{{ error }}</div>{% endfor %}
+          <div class="row">
+            {% include "partials/field.html" with field=form.mittente_nome col=5 %}
+            {% include "partials/field.html" with field=form.mittente_email col=7 %}
+            {% include "partials/field.html" with field=form.password col=7 %}
+            <div class="col-md-5 d-flex align-items-center">
+              <div class="small {% if password_salvata %}text-success{% else %}text-muted{% endif %} mb-3">
+                {% if password_salvata %}<i class="bi bi-lock-fill"></i> Password salvata{% else %}<i class="bi bi-unlock"></i> Nessuna password salvata{% endif %}
+              </div>
+            </div>
+            {% if password_salvata %}{% include "partials/field.html" with field=form.rimuovi_password %}{% endif %}
+          </div>
+          <details class="mb-3">
+            <summary class="small text-muted">Server di posta (di solito non serve cambiarlo)</summary>
+            <div class="row mt-2">
+              {% include "partials/field.html" with field=form.smtp_host col=6 %}
+              {% include "partials/field.html" with field=form.smtp_sicurezza col=3 %}
+              {% include "partials/field.html" with field=form.smtp_porta col=3 %}
+              {% include "partials/field.html" with field=form.smtp_utente col=12 %}
+              {% include "partials/field.html" with field=form.caselle_host col=8 %}
+              {% include "partials/field.html" with field=form.caselle_sicurezza col=4 %}
+            </div>
+          </details>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Salva</button>
+        </form>
       </div>
     </div>
 
@@ -35,17 +73,18 @@
       <div class="card-header"><i class="bi bi-send me-1"></i> Prova di invio</div>
       <div class="card-body">
         <p class="text-muted small">
-          Manda una email di prova per verificare che la configurazione funzioni davvero.
+          Manda una email di prova dalla casella aziendale per verificare che la configurazione funzioni davvero.
         </p>
         <form method="post" class="row g-2 align-items-end">
           {% csrf_token %}
+          <input type="hidden" name="azione" value="prova">
           <div class="col-md-8">
             <label class="form-label" for="email-test">Destinatario</label>
             <input class="form-control" type="email" id="email-test" name="to" value="{{ destinatario }}"
                    placeholder="indirizzo@esempio.it" required>
           </div>
           <div class="col-md-4">
-            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send"></i> Invia prova</button>
+            <button class="btn btn-outline-primary w-100" type="submit"><i class="bi bi-send"></i> Invia prova</button>
           </div>
         </form>
 
@@ -56,34 +95,49 @@
         {% endif %}
       </div>
     </div>
-
-    <div class="card mt-3">
-      <div class="card-body d-flex justify-content-between align-items-center gap-2 flex-wrap">
-        <div>
-          <div class="fw-semibold"><i class="bi bi-envelope-paper me-1"></i> Modelli delle email</div>
-          <div class="text-muted small">Personalizza oggetto e testo delle mail di invio e dei solleciti.</div>
-        </div>
-        <a class="btn btn-outline-primary btn-sm" href="{% url 'core:email_templates' %}"><i class="bi bi-pencil"></i> Modifica</a>
-      </div>
-    </div>
   </div>
 
   <div class="col-lg-5">
-    <div class="card">
-      <div class="card-header"><i class="bi bi-gear me-1"></i> Come si configura</div>
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-people me-1"></i> Caselle personali</div>
       <div class="card-body small">
-        <p>Nel file <code>.env</code> del server (accanto a <code>docker-compose.yml</code>) vanno compilate:</p>
-        <pre class="bg-light border rounded p-2 small mb-3">EMAIL_HOST=smtp.tuoprovider.it
-EMAIL_PORT=587
-EMAIL_HOST_USER=info@aquaforma.space
-EMAIL_HOST_PASSWORD=la-password
-EMAIL_USE_TLS=true
-DEFAULT_FROM_EMAIL=Aquaforma &lt;info@aquaforma.space&gt;</pre>
-        <p class="mb-2">Per la <strong>fatturazione elettronica</strong> serve la stessa configurazione, ma con le
-        credenziali della casella <strong>PEC</strong>: l'XML viene trasmesso allo SDI via PEC.</p>
-        <p class="mb-0 text-muted">
-          Dopo la modifica: <code>docker compose up -d</code> per riavviare con le nuove variabili.
+        <p class="text-muted">
+          Ogni dipendente può spedire dalla propria casella (es. <em>simone@aquaforma.it</em>): la imposta da
+          <strong>menu utente › Password ed email</strong>, oppure la imposti tu dalla scheda dell'utente.
+          Senza password personale, le sue email partono dalla casella aziendale con la sua email come
+          indirizzo di risposta.
         </p>
+        <p class="text-muted">Server delle caselle personali: <strong>{{ server_caselle.host }}:{{ server_caselle.porta }}</strong> ({{ server_caselle.sicurezza|upper }}).</p>
+        <ul class="list-group list-group-flush">
+          {% for utente in utenti %}
+          <li class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2">
+            <div>
+              <div class="fw-semibold">{{ utente }}</div>
+              <div class="text-muted">{{ utente.email|default:"nessuna email" }}</div>
+            </div>
+            <div class="text-end">
+              {% if utente.ha_casella_personale %}
+              <span class="badge text-bg-success">Casella personale</span>
+              {% else %}
+              <span class="badge text-bg-secondary">Casella aziendale</span>
+              {% endif %}
+              {% if user.is_superuser or not utente.is_superuser %}
+              <a class="ms-1" href="{% url 'accounts:user_update' utente.pk %}" title="Modifica utente"><i class="bi bi-pencil"></i></a>
+              {% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <div>
+          <div class="fw-semibold"><i class="bi bi-envelope-paper me-1"></i> Testo delle email</div>
+          <div class="text-muted small">Oggetto e testo delle mail di invio e dei solleciti.</div>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'core:email_templates' %}"><i class="bi bi-pencil"></i> Modelli email</a>
       </div>
     </div>
   </div>

@@ -167,11 +167,7 @@
     <div class="card mb-3 no-print">
       <div class="card-header"><i class="bi bi-envelope me-1"></i> Invia al cliente</div>
       <div class="card-body">
-        {% if not email_configured %}
-        <div class="alert alert-warning py-2 small mb-3">
-          <i class="bi bi-exclamation-triangle"></i> Invio email non configurato: imposta le variabili <code>EMAIL_*</code> nel file <code>.env</code>.
-        </div>
-        {% endif %}
+        {% include "partials/email_mittente.html" %}
         <form method="post" action="{% url 'billing:salesinvoice_email' invoice.pk %}">
           {% csrf_token %}
           <div class="mb-2">
@@ -247,7 +243,7 @@
           </div>
         </form>
         <p class="text-muted small mt-2 mb-0">
-          «Invia allo SDI» trasmette l'XML via PEC a <code>{{ sdi_pec_address }}</code> usando le credenziali <code>EMAIL_*</code>.
+          «Invia allo SDI» trasmette l'XML via PEC a <code>{{ sdi_pec_address }}</code> dalla casella di invio predefinita (Impostazioni › Email).
           Le ricevute arrivano sulla casella PEC: aggiorna qui l'esito.
         </p>
       </div>

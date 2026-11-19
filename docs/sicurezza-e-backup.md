@@ -142,7 +142,7 @@ Da tenere a mente:
   un minuto; anche i prodotti sotto scorta e le tendine del registro attività
   sono in cache (60 s / 5 min).
 - Ogni pagina riusa i gruppi dell'utente letti una sola volta e i conteggi dei
-  badge (messaggi/posta) in cache per un minuto; i dati azienda restano in
+  badge (messaggi, lead) in cache per un minuto; i dati azienda restano in
   memoria del processo per 60 secondi.
 - Email e PEC (preventivi, fatture, solleciti, SDI) si accodano dalla pagina e
   partono in background ogni 2 minuti (`invia_coda_email`): un server di posta
@@ -151,8 +151,15 @@ Da tenere a mente:
 - I PDF dei documenti si riusano finché il documento non cambia (niente più
   render WeasyPrint ripetuti); il selettore dei componenti kit usa
   l'autocompletamento invece di 23k voci nel menu.
-- La posta si sincronizza ogni 20 minuti (non ogni 5) e salta i messaggi già
-  scaricati senza riscaricarli; il giro notturno resta alle 3:00.
+- La lettura della posta in arrivo è stata tolta (novembre 2026): il comando
+  `sincronizza_posta` non esiste più, la riga del cron che lo chiamava va
+  rimossa (`crontab -e`). IMAP resta solo per copiare le email spedite nella
+  cartella Inviati della casella usata.
+- Le password delle caselle email salvate dal gestionale (Impostazioni ›
+  Email e caselle personali dei dipendenti) sono cifrate con una chiave
+  derivata da `DJANGO_SECRET_KEY`: un backup del database da solo non basta a
+  leggerle. Se la chiave cambia, metti la vecchia in `SECRET_KEY_FALLBACKS`
+  oppure fai reinserire le password.
 - I log registrano i tempi di risposta (Gunicorn in microsecondi, Caddy in
   JSON) e le query oltre 1 secondo: per trovare le pagine lente basta
   `docker compose logs web db | grep …`.

@@ -82,6 +82,11 @@ class JobDetailView(DetailView):
             from apps.hr.services import costi_collaboratori_cantiere
 
             context["costi_collaboratori"] = costi_collaboratori_cantiere(job)
+        if has_role(self.request.user, *JOB_EDIT_ROLES):
+            from apps.core.eliminazione import collegamenti
+
+            # Il pulsante «Elimina» è attivo solo se nulla usa il cantiere
+            context["collegamenti"] = collegamenti(job)
         return context
 
 
@@ -123,6 +128,31 @@ class JobUpdateView(ConflictAwareUpdateView, RoleRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Cantiere aggiornato.")
         return super().form_valid(form)
+
+
+@role_required(*JOB_EDIT_ROLES)
+def job_delete(request, pk):
+    """Elimina un cantiere, ma solo se non ha nulla di collegato.
+
+    Preventivi, ordini, DDT, fatture, ore, foto o manutenzioni bloccano
+    l'eliminazione: in quel caso si può impostare lo stato «Annullato».
+    """
+    from apps.core.eliminazione import descrivi_collegamenti, elimina_se_libero
+
+    job = get_object_or_404(Job, pk=pk)
+    if request.method != "POST":
+        return redirect("jobs:job_detail", pk=job.pk)
+    etichetta = str(job)
+    bloccanti = elimina_se_libero(job)
+    if bloccanti:
+        messages.error(
+            request,
+            f"Il cantiere {etichetta} non si può eliminare: è collegato a {descrivi_collegamenti(bloccanti)}. "
+            "Se non serve più, impostalo come «Annullato».",
+        )
+        return redirect("jobs:job_detail", pk=job.pk)
+    messages.success(request, f"Cantiere {etichetta} eliminato.")
+    return redirect("jobs:job_list")
 
 
 # ------------------------------------------------------------------- foto

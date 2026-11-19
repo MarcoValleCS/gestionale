@@ -7,6 +7,7 @@ from django.db import models, transaction
 from django.db.models import F
 from django.utils import timezone
 
+from .termini_vendita import RIGA_TERMINI_BREVE
 from .utils import format_quantity, mescola_colori, normalizza_colore, rgba, schiarisci, scurisci
 from .validators import valida_file_caricato
 
@@ -241,6 +242,65 @@ class CompanySettings(models.Model):
         help_text="Lascia vuoto per usare il testo standard. Ammessi segnaposto {azienda} {indirizzo} {piva} {email} {telefono} e formattazione semplice (grassetto, elenchi).",
     )
 
+    # ----------------------------------------------------- note predefinite
+    note_vendita = models.TextField(
+        "Note predefinite di preventivi e ordini cliente",
+        blank=True,
+        default=RIGA_TERMINI_BREVE,
+        help_text="Testo già compilato in «Note e condizioni» di ogni nuovo preventivo e ordine cliente (stampato sul documento).",
+    )
+    note_acquisto = models.TextField(
+        "Note predefinite degli ordini fornitore",
+        blank=True,
+        help_text="Testo già compilato nelle note di ogni nuovo ordine fornitore (stampato sul documento).",
+    )
+
+    # ------------------------------------------- email di invio predefinita
+    SICUREZZA_SSL = "ssl"
+    SICUREZZA_TLS = "tls"
+    SICUREZZA_NESSUNA = "nessuna"
+    SICUREZZA_CHOICES = [
+        (SICUREZZA_SSL, "SSL (porta 465)"),
+        (SICUREZZA_TLS, "STARTTLS (porta 587)"),
+        (SICUREZZA_NESSUNA, "Nessuna (sconsigliato)"),
+    ]
+
+    mittente_nome = models.CharField(
+        "Nome del mittente",
+        max_length=120,
+        blank=True,
+        help_text="Come appare il mittente al cliente (es. «Aquaforma»). Vuoto = ragione sociale.",
+    )
+    mittente_email = models.EmailField(
+        "Email di invio predefinita",
+        blank=True,
+        help_text="Casella da cui partono le email di chi non ha una casella personale. Vuoto = quella del file .env.",
+    )
+    smtp_host = models.CharField(
+        "Server SMTP",
+        max_length=120,
+        blank=True,
+        help_text="Vuoto = quello del file .env (o smtps.aruba.it se non indicato).",
+    )
+    smtp_porta = models.PositiveIntegerField("Porta SMTP", null=True, blank=True, help_text="Vuoto = 465 con SSL, 587 con STARTTLS.")
+    smtp_sicurezza = models.CharField("Protezione della connessione", max_length=10, choices=SICUREZZA_CHOICES, blank=True)
+    smtp_utente = models.CharField(
+        "Utente SMTP",
+        max_length=254,
+        blank=True,
+        help_text="Di solito coincide con l'email di invio: lascia vuoto in quel caso.",
+    )
+    smtp_password = models.TextField("Password della casella (cifrata)", blank=True, editable=False)
+    caselle_host = models.CharField(
+        "Server SMTP delle caselle personali",
+        max_length=120,
+        blank=True,
+        help_text="Vuoto = smtps.aruba.it. Separato da quello aziendale, che può essere la PEC. Ammesso «server:porta».",
+    )
+    caselle_sicurezza = models.CharField(
+        "Protezione (caselle personali)", max_length=10, choices=SICUREZZA_CHOICES, blank=True
+    )
+
     # -------------------------------------------------------- aspetto grafico
     BACKGROUND_CHOICES = [
         ("soft", "Azzurro tenue"),
@@ -295,6 +355,18 @@ class CompanySettings(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def password_smtp(self):
+        """Password della casella di invio, in chiaro (vuota se non salvata)."""
+        from .cifratura import decifra
+
+        return decifra(self.smtp_password)
+
+    def imposta_password_smtp(self, password):
+        from .cifratura import cifra
+
+        self.smtp_password = cifra(password or "")
 
     def get_sales_terms(self):
         """Condizioni di vendita con i dati aziendali (proprie o standard)."""
@@ -558,75 +630,6 @@ class InternalMessage(TimeStampedModel):
         dimentica(f"badge_msg_{self.recipient_id}")
 
 
-class InboundEmail(TimeStampedModel):
-    """Email scaricata dalla casella aziendale, per leggerla dal gestionale.
-
-    Il messaggio viene copiato qui al momento della sincronizzazione: così la
-    posta si legge senza aspettare il server IMAP, e resta consultabile anche
-    quando la casella è momentaneamente irraggiungibile. Il corpo completo e gli
-    allegati si scaricano alla prima apertura.
-    """
-
-    uid = models.CharField("UID IMAP", max_length=64, unique=True)
-    folder = models.CharField("Cartella", max_length=60, default="INBOX")
-    message_id = models.CharField("Message-ID", max_length=255, blank=True)
-    sender_name = models.CharField("Mittente", max_length=200, blank=True)
-    sender_email = models.EmailField("Email mittente", blank=True)
-    recipients = models.CharField("Destinatari", max_length=500, blank=True)
-    subject = models.CharField("Oggetto", max_length=300, blank=True)
-    received_at = models.DateTimeField("Ricevuta il", null=True, blank=True)
-    body_text = models.TextField("Testo", blank=True)
-    body_html = models.TextField("HTML", blank=True)
-    body_loaded = models.BooleanField("Corpo scaricato", default=False)
-    attachments = models.JSONField("Allegati", default=list, blank=True)
-    read_at = models.DateTimeField("Letta il", null=True, blank=True)
-    is_reply = models.BooleanField("È una risposta", default=False)
-    is_internal = models.BooleanField("Da dominio aziendale", default=False)
-    is_relevant = models.BooleanField("Rilevante", default=False, db_index=True)
-    relevance = models.CharField("Perché è rilevante", max_length=30, blank=True)
-    contact = models.ForeignKey(
-        "contacts.Contact",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="emails",
-        verbose_name="Contatto collegato",
-    )
-
-    class Meta:
-        verbose_name = "Email ricevuta"
-        verbose_name_plural = "Posta ricevuta"
-        ordering = ["-received_at", "-pk"]
-        indexes = [
-            models.Index(fields=["-received_at"], name="email_received_idx"),
-            models.Index(fields=["read_at"], name="email_read_idx"),
-        ]
-
-    def __str__(self):
-        return f"{self.sender_email}: {self.subject}"
-
-    @property
-    def is_read(self):
-        return self.read_at is not None
-
-    @property
-    def has_attachments(self):
-        return bool(self.attachments)
-
-    @property
-    def sender_label(self):
-        return self.sender_name or self.sender_email or "(sconosciuto)"
-
-    def mark_read(self):
-        if self.read_at is None:
-            self.read_at = timezone.now()
-            self.save(update_fields=["read_at", "updated_at"])
-            from .cache import dimentica
-
-            dimentica("badge_posta")
-        return self.read_at
-
-
 class EmailInCoda(models.Model):
     """Email da inviare accodata dalla pagina e spedita in background.
 
@@ -654,6 +657,15 @@ class EmailInCoda(models.Model):
 
     to_email = models.EmailField("Destinatario", max_length=254)
     from_email = models.EmailField("Mittente", max_length=254, blank=True, default="")
+    inviata_da = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="email_in_coda",
+        verbose_name="Inviata da",
+        help_text="Se l'utente ha una casella personale configurata, l'email parte da quella.",
+    )
     subject = models.CharField("Oggetto", max_length=300)
     body = models.TextField("Testo")
     attachment = models.BinaryField("Allegato", null=True, blank=True)

@@ -23,7 +23,6 @@ from apps.accounts.forms import UserCreateForm, UserUpdateForm
 from apps.catalog.models import Product
 from apps.contacts.models import Contact
 from apps.core.models import Attachment, UnitOfMeasure, VatRate
-from apps.core.richtext import clean_email_html
 from apps.inventory.models import StockMovement, Warehouse
 from apps.inventory.services import register_movement
 from apps.sales.models import Quote, SalesOrder
@@ -100,39 +99,6 @@ class AzioniSoloPostTest(TestCase):
         preventivo = self._preventivo()
         self.client.post(reverse("sales:quote_convert", args=[preventivo.pk]))
         self.assertTrue(SalesOrder.objects.filter(source_quote=preventivo).exists())
-
-
-class EmailHtmlTest(TestCase):
-    """L'HTML di un'email ricevuta resta dentro il suo riquadro."""
-
-    def test_le_immagini_con_indirizzo_del_gestionale_vengono_tolte(self):
-        html = '<p>Ciao</p><img src="/vendite/ordini/5/consegna/"><img src="//altro.example/x.png">'
-        pulito = clean_email_html(html)
-        self.assertIn("Ciao", pulito)
-        self.assertNotIn("/vendite/", pulito)
-        self.assertNotIn("altro.example", pulito)
-
-    def test_i_link_relativi_vengono_tolti_quelli_completi_restano(self):
-        pulito = clean_email_html('<a href="/accounts/logout/">esci</a><a href="https://aquaforma.it">sito</a>')
-        self.assertNotIn("/accounts/logout/", pulito)
-        self.assertIn('href="https://aquaforma.it"', pulito)
-
-    def test_le_classi_della_pagina_non_si_possono_usare(self):
-        pulito = clean_email_html('<div class="position-fixed top-0 start-0 w-100 h-100">Sessione scaduta</div>')
-        self.assertIn("Sessione scaduta", pulito)
-        self.assertNotIn("position-fixed", pulito)
-
-    def test_gli_stili_che_caricano_indirizzi_vengono_tolti(self):
-        for stile in ("background: url(/vendite/x)", "list-style: url(/x)", "background-image: u\\72l(/x)"):
-            with self.subTest(stile=stile):
-                pulito = clean_email_html(f'<p style="{stile}">testo</p>')
-                self.assertNotIn("url", pulito)
-                self.assertNotIn("/x", pulito)
-
-    def test_gli_stili_normali_restano(self):
-        pulito = clean_email_html('<p style="color: red; background-color: #fff">testo</p>')
-        self.assertIn("color", pulito)
-        self.assertIn("background-color", pulito)
 
 
 class MediaCollaboratoreTest(TestCase):
